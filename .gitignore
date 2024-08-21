@@ -1,0 +1,14 @@
+# Executable files
+*.exe
+
+# IDE-specific files (optional, but commonly ignored)
+.vscode/
+.idea/
+
+# Go-specific ignores
+*.test
+*.out
+
+# OS-specific files
+.DS_Store
+Thumbs.db
