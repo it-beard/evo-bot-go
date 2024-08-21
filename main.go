@@ -98,32 +98,116 @@ func forwardReplyToPrivate(b *gotgbot.Bot, ctx *ext.Context) error {
 		log.Printf("Reply message deleted")
 	}
 
-	// Send a copy of the original message to the user who replied in markdown
-	bottomText := "ссылка на сообщение"
-	lengthBottomText := utf8.RuneCountInString(bottomText)
-	messageText := fmt.Sprintf("%s\n %s", replyMsg.Text, bottomText)
+	// Setting the additional text to the original message
+	messageUrl := fmt.Sprintf("https://t.me/c/%s/%d", strconv.FormatInt(replyMsg.Chat.Id, 10)[4:], replyMsg.MessageId)
+	bottomText := "[тыц]"
+	lengthBottomText := utf8.RuneCountInString(bottomText) + 1
+	originalText := replyMsg.Text
+	if originalText == "" {
+		originalText = replyMsg.Caption
+	}
+	messageText := fmt.Sprintf("%s\n%s ", originalText, bottomText)
 
-	if replyMsg.Photo == nil {
-		_, err = b.SendMessage(
+	if replyMsg.Animation != nil {
+		_, err = b.SendAnimation(
 			ctx.EffectiveUser.Id,
-			messageText,
-			&gotgbot.SendMessageOpts{
-				Entities: append(replyMsg.Entities, gotgbot.MessageEntity{
-					Type:   "blockquote",
+			gotgbot.InputFileByID(replyMsg.Animation.FileId),
+			&gotgbot.SendAnimationOpts{
+				Caption: messageText,
+				CaptionEntities: append(replyMsg.Entities, gotgbot.MessageEntity{
+					Type:   "italic",
 					Offset: int64(utf8.RuneCountInString(messageText) - lengthBottomText),
 					Length: int64(lengthBottomText),
 				}, gotgbot.MessageEntity{
 					Type:   "text_link",
 					Offset: int64(utf8.RuneCountInString(messageText) - lengthBottomText),
 					Length: int64(lengthBottomText),
-					Url:    fmt.Sprintf("https://t.me/c/%s/%d", strconv.FormatInt(replyMsg.Chat.Id, 10)[4:], replyMsg.MessageId),
+					Url:    messageUrl,
+				}),
+			},
+		)
+		if err != nil {
+			log.Printf("Error sending copy of animation to user: %v", err)
+			return err
+		} else {
+			log.Printf("Animation sent to user: %v", messageUrl)
+		}
+	}
+
+	if replyMsg.Photo != nil {
+		_, err = b.SendPhoto(
+			ctx.EffectiveUser.Id,
+			gotgbot.InputFileByID(replyMsg.Photo[len(replyMsg.Photo)-1].FileId),
+			&gotgbot.SendPhotoOpts{
+				Caption: messageText,
+				CaptionEntities: append(replyMsg.Entities, gotgbot.MessageEntity{
+					Type:   "italic",
+					Offset: int64(utf8.RuneCountInString(messageText) - lengthBottomText),
+					Length: int64(lengthBottomText),
+				}, gotgbot.MessageEntity{
+					Type:   "text_link",
+					Offset: int64(utf8.RuneCountInString(messageText) - lengthBottomText),
+					Length: int64(lengthBottomText),
+					Url:    messageUrl,
+				}),
+			},
+		)
+		if err != nil {
+			log.Printf("Error sending copy of animation to user: %v", err)
+			return err
+		} else {
+			log.Printf("Animation sent to user: %v", messageUrl)
+		}
+	}
+
+	if replyMsg.Video != nil {
+		_, err = b.SendVideo(
+			ctx.EffectiveUser.Id,
+			gotgbot.InputFileByID(replyMsg.Video.FileId),
+			&gotgbot.SendVideoOpts{
+				Caption: messageText,
+				CaptionEntities: append(replyMsg.Entities, gotgbot.MessageEntity{
+					Type:   "italic",
+					Offset: int64(utf8.RuneCountInString(messageText) - lengthBottomText),
+					Length: int64(lengthBottomText),
+				}, gotgbot.MessageEntity{
+					Type:   "text_link",
+					Offset: int64(utf8.RuneCountInString(messageText) - lengthBottomText),
+					Length: int64(lengthBottomText),
+					Url:    messageUrl,
+				}),
+			},
+		)
+		if err != nil {
+			log.Printf("Error sending copy of animation to user: %v", err)
+			return err
+		} else {
+			log.Printf("Animation sent to user: %v", messageUrl)
+		}
+	}
+
+	if replyMsg.Photo == nil && replyMsg.Animation == nil {
+		// Send a copy of the original message to the user who replied in markdown
+		_, err = b.SendMessage(
+			ctx.EffectiveUser.Id,
+			messageText,
+			&gotgbot.SendMessageOpts{
+				Entities: append(replyMsg.Entities, gotgbot.MessageEntity{
+					Type:   "italic",
+					Offset: int64(utf8.RuneCountInString(messageText) - lengthBottomText),
+					Length: int64(lengthBottomText),
+				}, gotgbot.MessageEntity{
+					Type:   "text_link",
+					Offset: int64(utf8.RuneCountInString(messageText) - lengthBottomText),
+					Length: int64(lengthBottomText),
+					Url:    messageUrl,
 				}),
 			})
 		if err != nil {
 			log.Printf("Error sending copy of message to user: %v", err)
 			return err
 		} else {
-			log.Printf("Message sent to user: %v", messageText)
+			log.Printf("Message sent to user: %v", messageUrl)
 		}
 	}
 
