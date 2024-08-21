@@ -17,6 +17,12 @@ func NewMessageSender(bot *gotgbot.Bot) MessageSender {
 }
 
 func (s *TelegramMessageSender) Send(chatId int64, text string, entities []gotgbot.MessageEntity, originalMessage *gotgbot.Message) (*gotgbot.Message, error) {
+	if originalMessage == nil {
+		return s.bot.SendMessage(chatId, text, &gotgbot.SendMessageOpts{
+			Entities: entities,
+		})
+	}
+
 	if originalMessage.Animation != nil {
 		return s.bot.SendAnimation(chatId, gotgbot.InputFileByID(originalMessage.Animation.FileId), &gotgbot.SendAnimationOpts{
 			Caption:         text,

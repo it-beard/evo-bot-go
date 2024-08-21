@@ -25,39 +25,50 @@ func (h *ForwardHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	// Delete the reply message before sending the copy
 	_, err := ctx.EffectiveMessage.Delete(b, nil)
 	if err != nil {
-		log.Printf("Error deleting reply message: %v", err)
-		return err
+		return fmt.Errorf("err >> error deleting reply message: %v", err)
 	}
 
+	// Return error if the reply to message is nil
+	if ctx.EffectiveMessage.ReplyToMessage == nil {
+		return fmt.Errorf("err >> reply to message is nil")
+	}
+
+	// Setting up copy message
 	originalMessage := ctx.EffectiveMessage.ReplyToMessage
 	originalMessageUrl := fmt.Sprintf("https://t.me/c/%s/%d", strconv.FormatInt(originalMessage.Chat.Id, 10)[4:], originalMessage.MessageId)
 	originalText := originalMessage.Text
 	if originalText == "" {
 		originalText = originalMessage.Caption
 	}
-	bottomText := "[тыц]"
-	bottomTextLen := utf8.RuneCountInString(bottomText) + 1
-	messageText := fmt.Sprintf("%s\n%s ", originalText, bottomText)
-	entities := append(originalMessage.Entities,
-		gotgbot.MessageEntity{
+	infoMsgText := "⬆️ ссылка на оригинал ⬆️"
+	infoMsgLen := utf8.RuneCountInString(infoMsgText)
+	infoMsgEntities := []gotgbot.MessageEntity{
+		{
 			Type:   "italic",
-			Offset: int64(utf8.RuneCountInString(messageText) - bottomTextLen),
-			Length: int64(bottomTextLen),
+			Offset: 0,
+			Length: int64(infoMsgLen),
 		},
-		gotgbot.MessageEntity{
+		{
 			Type:   "text_link",
-			Offset: int64(utf8.RuneCountInString(messageText) - bottomTextLen),
-			Length: int64(bottomTextLen),
+			Offset: 0,
+			Length: int64(infoMsgLen),
 			Url:    originalMessageUrl,
-		})
-
-	// Sending the message
-	_, err = h.messageSender.Send(ctx.EffectiveUser.Id, messageText, entities, originalMessage)
-	if err != nil {
-		log.Printf("Error sending message: %v", err)
-		return err
+		},
 	}
-	log.Printf("Message sent to user: %v", originalMessageUrl)
+
+	// Sending copied message
+	_, err = h.messageSender.Send(ctx.EffectiveUser.Id, originalText, originalMessage.Entities, originalMessage)
+	if err != nil {
+		return fmt.Errorf("err >> error sending copied message: %v", err)
+	}
+	log.Printf("Copied message sent: %v", originalMessageUrl)
+
+	// Sending info message
+	_, err = h.messageSender.Send(ctx.EffectiveUser.Id, infoMsgText, infoMsgEntities, nil)
+	if err != nil {
+		return fmt.Errorf("err >> error sending info message: %v", err)
+	}
+	log.Printf("Info message sent: %v", originalMessageUrl)
 	return nil
 }
 
