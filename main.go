@@ -38,15 +38,18 @@ func main() {
 	})
 	updater := ext.NewUpdater(dispatcher, nil)
 
+	dispatcher.AddHandler(handlers.NewCommand("start", handleStartCommand))
+	dispatcher.AddHandler(handlers.NewCommand("help", handleHelpCommand))
+	dispatcher.AddHandler(handlers.NewCommand("forward", handleForwardReplyToPrivate))
 	// Handler for new chat members and left chat members
 	dispatcher.AddHandler(handlers.NewMessage(func(msg *gotgbot.Message) bool {
 		return msg.NewChatMembers != nil || msg.LeftChatMember != nil
-	}, deleteJoinLeaveMessages))
+	}, handeleDeleteJoinLeaveMessages))
 
 	// Handler for replies mentioning only the bot
 	dispatcher.AddHandler(handlers.NewMessage(func(msg *gotgbot.Message) bool {
 		return msg.ReplyToMessage != nil && strings.TrimSpace(msg.Text) == "@"+b.Username
-	}, forwardReplyToPrivate))
+	}, handleForwardReplyToPrivate))
 
 	// Start receiving updates.
 	err = updater.StartPolling(b, &ext.PollingOpts{
@@ -68,7 +71,21 @@ func main() {
 	updater.Idle()
 }
 
-func deleteJoinLeaveMessages(b *gotgbot.Bot, ctx *ext.Context) error {
+func handleStartCommand(b *gotgbot.Bot, ctx *ext.Context) error {
+	_, err := ctx.EffectiveMessage.Reply(b, "Привет! Я дворецкий бот клуба \"Эволюция Кода\". Используй /help, что бы увидеть мои возможности.", nil)
+	return err
+}
+
+func handleHelpCommand(b *gotgbot.Bot, ctx *ext.Context) error {
+	helpText := "Доступные команды:\n" +
+		"/start - Приветственное сообщение\n" +
+		"/help - Показывает это сообщение\n" +
+		"/forward - Пересылает зареплаенное сообщение в ЛС"
+	_, err := ctx.EffectiveMessage.Reply(b, helpText, nil)
+	return err
+}
+
+func handeleDeleteJoinLeaveMessages(b *gotgbot.Bot, ctx *ext.Context) error {
 	// Delete the message
 	_, err := ctx.EffectiveMessage.Delete(b, nil)
 	if err != nil {
@@ -83,12 +100,7 @@ func deleteJoinLeaveMessages(b *gotgbot.Bot, ctx *ext.Context) error {
 	return nil
 }
 
-func forwardReplyToPrivate(b *gotgbot.Bot, ctx *ext.Context) error {
-	replyMsg := ctx.EffectiveMessage.ReplyToMessage
-	if replyMsg == nil {
-		return nil
-	}
-
+func handleForwardReplyToPrivate(b *gotgbot.Bot, ctx *ext.Context) error {
 	// Delete the reply message before sending the copy
 	_, err := ctx.EffectiveMessage.Delete(b, nil)
 	if err != nil {
@@ -99,22 +111,23 @@ func forwardReplyToPrivate(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	// Setting the additional text to the original message
-	messageUrl := fmt.Sprintf("https://t.me/c/%s/%d", strconv.FormatInt(replyMsg.Chat.Id, 10)[4:], replyMsg.MessageId)
+	originalMessage := ctx.EffectiveMessage.ReplyToMessage
+	messageUrl := fmt.Sprintf("https://t.me/c/%s/%d", strconv.FormatInt(originalMessage.Chat.Id, 10)[4:], originalMessage.MessageId)
 	bottomText := "[тыц]"
 	lengthBottomText := utf8.RuneCountInString(bottomText) + 1
-	originalText := replyMsg.Text
+	originalText := originalMessage.Text
 	if originalText == "" {
-		originalText = replyMsg.Caption
+		originalText = originalMessage.Caption
 	}
 	messageText := fmt.Sprintf("%s\n%s ", originalText, bottomText)
 
-	if replyMsg.Animation != nil {
+	if originalMessage.Animation != nil {
 		_, err = b.SendAnimation(
 			ctx.EffectiveUser.Id,
-			gotgbot.InputFileByID(replyMsg.Animation.FileId),
+			gotgbot.InputFileByID(originalMessage.Animation.FileId),
 			&gotgbot.SendAnimationOpts{
 				Caption: messageText,
-				CaptionEntities: append(replyMsg.Entities, gotgbot.MessageEntity{
+				CaptionEntities: append(originalMessage.Entities, gotgbot.MessageEntity{
 					Type:   "italic",
 					Offset: int64(utf8.RuneCountInString(messageText) - lengthBottomText),
 					Length: int64(lengthBottomText),
@@ -134,13 +147,13 @@ func forwardReplyToPrivate(b *gotgbot.Bot, ctx *ext.Context) error {
 		}
 	}
 
-	if replyMsg.Photo != nil {
+	if originalMessage.Photo != nil {
 		_, err = b.SendPhoto(
 			ctx.EffectiveUser.Id,
-			gotgbot.InputFileByID(replyMsg.Photo[len(replyMsg.Photo)-1].FileId),
+			gotgbot.InputFileByID(originalMessage.Photo[len(originalMessage.Photo)-1].FileId),
 			&gotgbot.SendPhotoOpts{
 				Caption: messageText,
-				CaptionEntities: append(replyMsg.Entities, gotgbot.MessageEntity{
+				CaptionEntities: append(originalMessage.Entities, gotgbot.MessageEntity{
 					Type:   "italic",
 					Offset: int64(utf8.RuneCountInString(messageText) - lengthBottomText),
 					Length: int64(lengthBottomText),
@@ -160,13 +173,13 @@ func forwardReplyToPrivate(b *gotgbot.Bot, ctx *ext.Context) error {
 		}
 	}
 
-	if replyMsg.Video != nil {
+	if originalMessage.Video != nil {
 		_, err = b.SendVideo(
 			ctx.EffectiveUser.Id,
-			gotgbot.InputFileByID(replyMsg.Video.FileId),
+			gotgbot.InputFileByID(originalMessage.Video.FileId),
 			&gotgbot.SendVideoOpts{
 				Caption: messageText,
-				CaptionEntities: append(replyMsg.Entities, gotgbot.MessageEntity{
+				CaptionEntities: append(originalMessage.Entities, gotgbot.MessageEntity{
 					Type:   "italic",
 					Offset: int64(utf8.RuneCountInString(messageText) - lengthBottomText),
 					Length: int64(lengthBottomText),
@@ -186,13 +199,13 @@ func forwardReplyToPrivate(b *gotgbot.Bot, ctx *ext.Context) error {
 		}
 	}
 
-	if replyMsg.Photo == nil && replyMsg.Animation == nil {
+	if originalMessage.Photo == nil && originalMessage.Animation == nil {
 		// Send a copy of the original message to the user who replied in markdown
 		_, err = b.SendMessage(
 			ctx.EffectiveUser.Id,
 			messageText,
 			&gotgbot.SendMessageOpts{
-				Entities: append(replyMsg.Entities, gotgbot.MessageEntity{
+				Entities: append(originalMessage.Entities, gotgbot.MessageEntity{
 					Type:   "italic",
 					Offset: int64(utf8.RuneCountInString(messageText) - lengthBottomText),
 					Length: int64(lengthBottomText),
