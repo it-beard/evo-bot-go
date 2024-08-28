@@ -1,6 +1,6 @@
 # Telegram Bot
 
-This project contains a Telegram bot implemented in Go.
+This project contains a Telegram bot implemented in Go. Tested on Windows 11.
 
 ## Building the Executable
 
