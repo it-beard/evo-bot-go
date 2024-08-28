@@ -1,6 +1,6 @@
 # Telegram Bot
 
-This project contains a Telegram bot implemented in Go. The bot is designed to be a simple and efficient bot that can be used for a variety of purposes.
+This project contains a Telegram bot implemented in Go. 
 
 ## Building the Executable
 
