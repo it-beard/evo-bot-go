@@ -58,10 +58,16 @@ func (h *ForwardRepliesHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) e
 
 func (h *ForwardRepliesHandler) forwardReplyMessage(ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
-	replyToMessageUrl := fmt.Sprintf("https://t.me/c/%s/%d", strconv.FormatInt(msg.ReplyToMessage.Chat.Id, 10)[4:], msg.ReplyToMessage.MessageId)
+	replyToMessageUrl := fmt.Sprintf(
+		"https://t.me/c/%s/%d",
+		strconv.FormatInt(msg.ReplyToMessage.Chat.Id, 10)[4:],
+		msg.ReplyToMessage.MessageId)
 
 	// Prepare the text with the user mention
-	firstLine := fmt.Sprintf("oтвет на %s от @%s", replyToMessageUrl, msg.From.Username)
+	firstLine := fmt.Sprintf(
+		"oтвет на %s от @%s",
+		replyToMessageUrl,
+		msg.From.Username)
 	firstLineLength := utf8.RuneCountInString(firstLine)
 	firstLineEntities := []gotgbot.MessageEntity{
 		{

@@ -52,7 +52,7 @@ func (b *Bot) registerHandlers() {
 	b.dispatcher.AddHandler(privatehandlers.NewHelpHandler())
 	b.dispatcher.AddHandler(publichandlers.NewSaveHandler(messageSender))
 	b.dispatcher.AddHandler(publichandlers.NewForwardRepliesHandler(messageSender))
-	b.dispatcher.AddHandler(publichandlers.NewDeleteMessagesHandler())
+	b.dispatcher.AddHandler(publichandlers.NewDeleteMessagesHandler(messageSender))
 }
 
 func (b *Bot) Start() {

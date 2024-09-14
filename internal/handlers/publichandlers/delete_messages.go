@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"your_module_name/internal/handlers"
+	"your_module_name/internal/services"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -14,9 +15,10 @@ import (
 
 type DeleteMessagesHandler struct {
 	threadsForClean map[int64]bool
+	messageSender   services.MessageSender
 }
 
-func NewDeleteMessagesHandler() handlers.Handler {
+func NewDeleteMessagesHandler(messageSender services.MessageSender) handlers.Handler {
 	threadsForClean := make(map[int64]bool)
 	threadsStr := os.Getenv("TG_EVO_BOT_THREADS_FOR_CLEAN_IDS")
 	for _, chatID := range strings.Split(threadsStr, ",") {
@@ -26,6 +28,7 @@ func NewDeleteMessagesHandler() handlers.Handler {
 	}
 	return &DeleteMessagesHandler{
 		threadsForClean: threadsForClean,
+		messageSender:   messageSender,
 	}
 }
 
@@ -33,6 +36,10 @@ func (h *DeleteMessagesHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) e
 	msg := ctx.EffectiveMessage
 
 	if h.shouldDeleteMessage(b, ctx) {
+		_, err0 := h.messageSender.SendCopy(msg.From.Id, nil, msg.Text, msg.Entities, msg)
+		if err0 != nil {
+			return fmt.Errorf("failed to forward reply message: %w", err0)
+		}
 		_, err := msg.Delete(b, nil)
 		if err != nil {
 			log.Printf("Error deleting message: %v", err)
@@ -42,9 +49,25 @@ func (h *DeleteMessagesHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) e
 			} else if msg.LeftChatMember != nil {
 				log.Printf("User left. User ID: %v", msg.LeftChatMember.Username)
 			} else {
-				// send message about deleting message to user
-				b.SendMessage(msg.From.Id, fmt.Sprintf("Ваше сообщение в треде _№%d_ сообщества \"_%s_\" было удалено, так как этот тред только для чтения. \n\nОднако, вы можете сохранять сообщения из него с моей помощью. Подробнее по команде /help", msg.MessageThreadId, msg.Chat.Title), &gotgbot.SendMessageOpts{ParseMode: "markdown"})
-				log.Printf("Deleted message in topic #%d\nUser ID: %d\nContent\"%s\"", msg.MessageThreadId, msg.From.Id, msg.Text)
+				// Prepare message components
+				chatIdStr := strconv.FormatInt(msg.Chat.Id, 10)[4:]
+				threadUrl := fmt.Sprintf("https://t.me/c/%s/%d", chatIdStr, msg.MessageThreadId)
+				messageText := fmt.Sprintf(
+					"Ваше сообщение в треде %s сообщества \"_%s_\" было удалено, так как этот тред только для чтения.\n\n"+
+						"Выше я прислал вам копию удаленного сообщения.\n\n"+
+						"Однако, вы можете сохранять сообщения из него с моей помощью. Подробнее по команде /help",
+					threadUrl, msg.Chat.Title,
+				)
+
+				// Send message to user about deletion
+				b.SendMessage(msg.From.Id, messageText, &gotgbot.SendMessageOpts{ParseMode: "markdown"})
+
+				// Log the deletion
+				log.Printf(
+					"Deleted message in topic %s\n"+
+						"User ID: %d\n"+
+						"Content: \"%s\"",
+					threadUrl, msg.From.Id, msg.Text)
 			}
 		}
 	}

@@ -14,7 +14,10 @@ func NewStartHandler() handlers.Handler {
 }
 
 func (h *StartHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
-	_, err := b.SendMessage(ctx.EffectiveMessage.From.Id, "Привет! \nЯ *Дженкинс Вебстер*, дворецкий бот клуба _\"Эволюция Кода\"_. \nИспользуй команду /help, чтобы увидеть мои возможности.", &gotgbot.SendMessageOpts{ParseMode: "markdown"})
+	message := "Привет! Я *Дженкинс Вебстер*, дворецкий бот клуба _\"Эволюция Кода\"_.\n" +
+		"Используй /help для просмотра возможностей."
+	opts := &gotgbot.SendMessageOpts{ParseMode: "markdown"}
+	_, err := b.SendMessage(ctx.EffectiveMessage.From.Id, message, opts)
 	return err
 }
 

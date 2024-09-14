@@ -47,7 +47,10 @@ func (h *SaveHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 
 	// Setting up copy message
 	originalMessage := ctx.EffectiveMessage.ReplyToMessage
-	originalMessageUrl := fmt.Sprintf("https://t.me/c/%s/%d", strconv.FormatInt(originalMessage.Chat.Id, 10)[4:], originalMessage.MessageId)
+	originalMessageUrl := fmt.Sprintf(
+		"https://t.me/c/%s/%d",
+		strconv.FormatInt(originalMessage.Chat.Id, 10)[4:],
+		originalMessage.MessageId)
 	originalText := originalMessage.Text
 	if originalText == "" {
 		originalText = originalMessage.Caption
