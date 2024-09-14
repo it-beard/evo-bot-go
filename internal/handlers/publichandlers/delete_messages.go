@@ -6,9 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"unicode/utf8"
 	"your_module_name/internal/handlers"
-	"your_module_name/internal/services"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -16,11 +14,9 @@ import (
 
 type DeleteMessagesHandler struct {
 	threadsForClean map[int64]bool
-	mainThreadId    int64
-	messageSender   services.MessageSender
 }
 
-func NewDeleteMessagesHandler(messageSender services.MessageSender) handlers.Handler {
+func NewDeleteMessagesHandler() handlers.Handler {
 	threadsForClean := make(map[int64]bool)
 	threadsStr := os.Getenv("TG_EVO_BOT_THREADS_FOR_CLEAN_IDS")
 	for _, chatID := range strings.Split(threadsStr, ",") {
@@ -28,15 +24,8 @@ func NewDeleteMessagesHandler(messageSender services.MessageSender) handlers.Han
 			threadsForClean[id] = true
 		}
 	}
-	mainThreadStr := os.Getenv("TG_EVO_BOT_MAIN_THREAD_ID")
-	mainThreadId, err := strconv.ParseInt(mainThreadStr, 10, 64)
-	if err != nil {
-		log.Printf("Error parsing main thread ID: %v", err)
-	}
 	return &DeleteMessagesHandler{
 		threadsForClean: threadsForClean,
-		messageSender:   messageSender,
-		mainThreadId:    mainThreadId,
 	}
 }
 
@@ -53,61 +42,11 @@ func (h *DeleteMessagesHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) e
 			} else if msg.LeftChatMember != nil {
 				log.Printf("User left. User ID: %v", msg.LeftChatMember.Username)
 			} else {
-				// Check if the message is a reply to a message in a thread for cleaning
-				if msg.ReplyToMessage != nil && h.threadsForClean[msg.MessageThreadId] && msg.ReplyToMessage.MessageId != msg.MessageThreadId {
-					// Forward the reply message to the main thread
-					if err := h.forwardReplyMessage(ctx); err != nil {
-						log.Printf("Error forwarding reply message: %v", err)
-					}
-				} else {
-					// send message about deleting message to user
-					b.SendMessage(msg.From.Id, fmt.Sprintf("Ваше сообщение в треде _№%d_ сообщества \"_%s_\" было удалено, так как этот тред только для чтения. \n\nОднако, вы можете сохранять сообщения из него с моей помощью. Подробнее по команде /help", msg.MessageThreadId, msg.Chat.Title), &gotgbot.SendMessageOpts{ParseMode: "markdown"})
-					log.Printf("Deleted message in chat %d", msg.Chat.Id)
-				}
+				// send message about deleting message to user
+				b.SendMessage(msg.From.Id, fmt.Sprintf("Ваше сообщение в треде _№%d_ сообщества \"_%s_\" было удалено, так как этот тред только для чтения. \n\nОднако, вы можете сохранять сообщения из него с моей помощью. Подробнее по команде /help", msg.MessageThreadId, msg.Chat.Title), &gotgbot.SendMessageOpts{ParseMode: "markdown"})
+				log.Printf("Deleted message in chat %d", msg.Chat.Id)
 			}
 		}
-	}
-
-	return nil
-}
-
-func (h *DeleteMessagesHandler) forwardReplyMessage(ctx *ext.Context) error {
-	msg := ctx.EffectiveMessage
-	replyToMessageUrl := fmt.Sprintf("https://t.me/c/%s/%d", strconv.FormatInt(msg.ReplyToMessage.Chat.Id, 10)[4:], msg.ReplyToMessage.MessageId)
-
-	// Prepare the text with the user mention
-	firstLine := fmt.Sprintf("oтвет на %s от @%s", replyToMessageUrl, msg.From.Username)
-	firstLineLength := utf8.RuneCountInString(firstLine)
-	firstLineEntities := []gotgbot.MessageEntity{
-		{
-			Type:   "blockquote",
-			Offset: 0,
-			Length: int64(firstLineLength),
-		},
-		{
-			Type:   "italic",
-			Offset: 0,
-			Length: int64(firstLineLength),
-		},
-	}
-
-	// Increase offset for all original entities
-	var updatedEntities []gotgbot.MessageEntity
-	for _, entity := range msg.Entities {
-		// Check if the entity is within the bounds of the new text
-		if int(entity.Offset)+int(entity.Length) <= len(msg.Text) {
-			newEntity := entity
-			newEntity.Offset += int64(firstLineLength) + 1 // +1 for the newline character
-			updatedEntities = append(updatedEntities, newEntity)
-		}
-	}
-	updatedEntities = append(updatedEntities, firstLineEntities...)
-
-	finalMessage := firstLine + "\n" + msg.Text
-	// Forward the message
-	_, err := h.messageSender.SendCopy(msg.Chat.Id, &h.mainThreadId, finalMessage, updatedEntities, msg)
-	if err != nil {
-		return fmt.Errorf("failed to forward reply message: %w", err)
 	}
 
 	return nil
@@ -146,6 +85,11 @@ func (h *DeleteMessagesHandler) shouldDeleteMessage(b *gotgbot.Bot, ctx *ext.Con
 
 	// Don't delete messages from bot with name "GroupAnonymousBot" (this is anonymous bot)
 	if msg.From.IsBot && msg.From.Username == "GroupAnonymousBot" {
+		return false
+	}
+
+	// Do not delete messages that are replies to messages (this already handled by ForwardRepliesHandler)
+	if h.threadsForClean[msg.MessageThreadId] && msg.ReplyToMessage.MessageId != msg.MessageThreadId {
 		return false
 	}
 
