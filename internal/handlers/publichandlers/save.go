@@ -15,28 +15,25 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
-type ForwardHandler struct {
+type SaveHandler struct {
 	messageSender   services.MessageSender
 	anonymousUserId int64
 }
 
-func NewForwardHandler(messageSender services.MessageSender) handlers.Handler {
+func NewSaveHandler(messageSender services.MessageSender) handlers.Handler {
 	anonymousUserIdString := os.Getenv("TG_EVO_BOT_ANONYMOUS_USER_ID")
 	anonymousUserId, err := strconv.ParseInt(anonymousUserIdString, 10, 64)
 	if err != nil {
 		log.Printf("Error parsing main thread ID: %v", err)
 	}
-	if err != nil {
-		log.Printf("Error parsing main thread ID: %v", err)
-	}
 
-	return &ForwardHandler{
+	return &SaveHandler{
 		messageSender:   messageSender,
 		anonymousUserId: anonymousUserId,
 	}
 }
 
-func (h *ForwardHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *SaveHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	// Delete the reply message before sending the copy
 	_, err := ctx.EffectiveMessage.Delete(b, nil)
 	if err != nil {
@@ -92,13 +89,13 @@ func (h *ForwardHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	return nil
 }
 
-func (h *ForwardHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
+func (h *SaveHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 	if ctx.EffectiveMessage == nil {
 		return false
 	}
-	return ctx.EffectiveMessage.Text != "" && (ctx.EffectiveMessage.Text == "@"+b.User.Username || strings.HasPrefix(ctx.EffectiveMessage.Text, "/forward"))
+	return ctx.EffectiveMessage.Text != "" && (ctx.EffectiveMessage.Text == "@"+b.User.Username || strings.HasPrefix(ctx.EffectiveMessage.Text, "/save"))
 }
 
-func (h *ForwardHandler) Name() string {
-	return "forward_handler"
+func (h *SaveHandler) Name() string {
+	return "save_handler"
 }

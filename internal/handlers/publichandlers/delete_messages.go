@@ -127,9 +127,9 @@ func (h *DeleteMessagesHandler) shouldDeleteMessage(b *gotgbot.Bot, ctx *ext.Con
 	}
 
 	// Don't delete messages with specific content
-	if strings.Contains(msg.Text, "/forward") ||
-		strings.Contains(msg.Text, "@"+b.User.Username) ||
-		strings.Contains(msg.Text, "/forward@"+b.User.Username) {
+	if msg.Text == "/save" ||
+		msg.Text == "@"+b.User.Username ||
+		msg.Text == "/save@"+b.User.Username {
 		return false
 	}
 

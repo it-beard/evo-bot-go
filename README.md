@@ -38,7 +38,7 @@ Then run the executable.
 - Deletes messages in specified threads (read-only threads)
 - Forwards replies from read-only threads to the main thread
 - Deletes join/leave messages in all threads
-- Forwards messages to direct chat on request (command: `/forward`)
+- Forwards messages to direct chat on request (command: `/save`)
 - Provides help information (command: `/help`)
 
 For more details on bot usage, use the `/help` command in the bot chat.
