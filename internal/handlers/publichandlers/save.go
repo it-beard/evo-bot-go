@@ -78,14 +78,13 @@ func (h *SaveHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	if err != nil {
 		return fmt.Errorf("err >> error sending copied message: %v", err)
 	}
-	log.Printf("Copied message sent: %v", originalMessageUrl)
+	log.Printf("Copied message sent: %v\nUser ID: %d", originalMessageUrl, userId)
 
 	// Sending info message
 	_, err = h.messageSender.SendCopy(userId, nil, infoMsgText, infoMsgEntities, nil)
 	if err != nil {
 		return fmt.Errorf("err >> error sending info message: %v", err)
 	}
-	log.Printf("Info message sent: %v", originalMessageUrl)
 	return nil
 }
 

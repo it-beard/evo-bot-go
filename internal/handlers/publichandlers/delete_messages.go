@@ -44,7 +44,7 @@ func (h *DeleteMessagesHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) e
 			} else {
 				// send message about deleting message to user
 				b.SendMessage(msg.From.Id, fmt.Sprintf("Ваше сообщение в треде _№%d_ сообщества \"_%s_\" было удалено, так как этот тред только для чтения. \n\nОднако, вы можете сохранять сообщения из него с моей помощью. Подробнее по команде /help", msg.MessageThreadId, msg.Chat.Title), &gotgbot.SendMessageOpts{ParseMode: "markdown"})
-				log.Printf("Deleted message in chat %d", msg.Chat.Id)
+				log.Printf("Deleted message in topic #%d\nUser ID: %d\nContent\"%s\"", msg.MessageThreadId, msg.From.Id, msg.Text)
 			}
 		}
 	}

@@ -104,6 +104,11 @@ func (h *ForwardRepliesHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bo
 		return false
 	}
 
+	// Don't forward frow GroupAnonymousBot
+	if msg.From.IsBot && msg.From.Username == "GroupAnonymousBot" {
+		return false
+	}
+
 	return h.threadsForClean[msg.MessageThreadId] && msg.ReplyToMessage.MessageId != msg.MessageThreadId
 }
 
