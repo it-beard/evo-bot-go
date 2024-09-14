@@ -19,7 +19,7 @@ Before running the bot, make sure to set the following environment variables:
 1. `TG_EVO_BOT_TOKEN`: Your Telegram bot token
 2. `TG_EVO_BOT_THREADS_FOR_CLEAN`: Comma-separated list of thread IDs for message cleaning
 3. `TG_EVO_BOT_ANONYMOUS_USER_ID`: User ID for the that sitting on the anonymous group account (if you are using anonymous group account)
-4. `TG_EVO_BOT_MAIN_THREAD_ID`: ID of the main thread where forwarded replies will be sent
+4. `TG_EVO_BOT_MAIN_THREAD_ID`: ID of the main thread where forwarded replies will be sent (0 for General topic)
 
 
 On Windows, you can set the environment variables using the following commands in Command Prompt:
