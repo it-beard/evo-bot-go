@@ -1,12 +1,14 @@
-package handlers
+package publichandlers
 
 import (
 	"fmt"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 	"unicode/utf8"
 
+	"your_module_name/internal/handlers"
 	"your_module_name/internal/services"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -14,11 +16,24 @@ import (
 )
 
 type ForwardHandler struct {
-	messageSender services.MessageSender
+	messageSender   services.MessageSender
+	anonymousUserId int64
 }
 
-func NewForwardHandler(messageSender services.MessageSender) Handler {
-	return &ForwardHandler{messageSender: messageSender}
+func NewForwardHandler(messageSender services.MessageSender) handlers.Handler {
+	anonymousUserIdString := os.Getenv("TG_EVO_BOT_ANONYMOUS_USER_ID")
+	anonymousUserId, err := strconv.ParseInt(anonymousUserIdString, 10, 64)
+	if err != nil {
+		log.Printf("Error parsing main thread ID: %v", err)
+	}
+	if err != nil {
+		log.Printf("Error parsing main thread ID: %v", err)
+	}
+
+	return &ForwardHandler{
+		messageSender:   messageSender,
+		anonymousUserId: anonymousUserId,
+	}
 }
 
 func (h *ForwardHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
@@ -56,15 +71,20 @@ func (h *ForwardHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 		},
 	}
 
+	var userId int64 = ctx.EffectiveUser.Id
+	if ctx.EffectiveUser.IsBot && ctx.EffectiveUser.Username == "GroupAnonymousBot" {
+		userId = h.anonymousUserId
+	}
+
 	// Sending copied message
-	_, err = h.messageSender.Send(ctx.EffectiveUser.Id, originalText, originalMessage.Entities, originalMessage)
+	_, err = h.messageSender.SendCopy(userId, nil, originalText, originalMessage.Entities, originalMessage)
 	if err != nil {
 		return fmt.Errorf("err >> error sending copied message: %v", err)
 	}
 	log.Printf("Copied message sent: %v", originalMessageUrl)
 
 	// Sending info message
-	_, err = h.messageSender.Send(ctx.EffectiveUser.Id, infoMsgText, infoMsgEntities, nil)
+	_, err = h.messageSender.SendCopy(userId, nil, infoMsgText, infoMsgEntities, nil)
 	if err != nil {
 		return fmt.Errorf("err >> error sending info message: %v", err)
 	}

@@ -4,7 +4,8 @@ import (
 	"log"
 	"time"
 
-	"your_module_name/internal/handlers"
+	"your_module_name/internal/handlers/privatehandlers"
+	"your_module_name/internal/handlers/publichandlers"
 	"your_module_name/internal/services"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -47,10 +48,10 @@ func NewBot(token string) (*Bot, error) {
 func (b *Bot) registerHandlers() {
 	messageSender := services.NewMessageSender(b.bot)
 
-	b.dispatcher.AddHandler(handlers.NewStartHandler())
-	b.dispatcher.AddHandler(handlers.NewHelpHandler())
-	b.dispatcher.AddHandler(handlers.NewForwardHandler(messageSender))
-	b.dispatcher.AddHandler(handlers.NewDeleteMessagesHandler())
+	b.dispatcher.AddHandler(privatehandlers.NewStartHandler())
+	b.dispatcher.AddHandler(privatehandlers.NewHelpHandler())
+	b.dispatcher.AddHandler(publichandlers.NewForwardHandler(messageSender))
+	b.dispatcher.AddHandler(publichandlers.NewDeleteMessagesHandler(messageSender))
 }
 
 func (b *Bot) Start() {

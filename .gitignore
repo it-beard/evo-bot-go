@@ -2,7 +2,6 @@
 *.exe
 
 # IDE-specific files (optional, but commonly ignored)
-.vscode/
 .idea/
 
 # Go-specific ignores

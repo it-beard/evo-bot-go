@@ -5,7 +5,13 @@ import (
 )
 
 type MessageSender interface {
-	Send(chatId int64, text string, entities []gotgbot.MessageEntity, originalMessage *gotgbot.Message) (*gotgbot.Message, error)
+	SendCopy(
+		chatId int64,
+		threadId *int64,
+		text string,
+		entities []gotgbot.MessageEntity,
+		originalMessage *gotgbot.Message,
+	) (*gotgbot.Message, error)
 }
 
 type TelegramMessageSender struct {
@@ -16,31 +22,57 @@ func NewMessageSender(bot *gotgbot.Bot) MessageSender {
 	return &TelegramMessageSender{bot: bot}
 }
 
-func (s *TelegramMessageSender) Send(chatId int64, text string, entities []gotgbot.MessageEntity, originalMessage *gotgbot.Message) (*gotgbot.Message, error) {
+// Sends a copy of the original message to the chat
+func (s *TelegramMessageSender) SendCopy(
+	chatId int64,
+	threadId *int64,
+	text string,
+	entities []gotgbot.MessageEntity,
+	originalMessage *gotgbot.Message,
+
+) (*gotgbot.Message, error) {
+	var opts interface{}
+	var method func(int64, interface{}, interface{}) (*gotgbot.Message, error)
+
 	if originalMessage == nil {
-		return s.bot.SendMessage(chatId, text, &gotgbot.SendMessageOpts{
-			Entities: entities,
-		})
+		opts = &gotgbot.SendMessageOpts{Entities: entities}
+		method = func(chatId int64, text interface{}, opts interface{}) (*gotgbot.Message, error) {
+			return s.bot.SendMessage(chatId, text.(string), opts.(*gotgbot.SendMessageOpts))
+		}
+	} else if originalMessage.Animation != nil {
+		opts = &gotgbot.SendAnimationOpts{Caption: text, CaptionEntities: entities}
+		method = func(chatId int64, fileId interface{}, opts interface{}) (*gotgbot.Message, error) {
+			return s.bot.SendAnimation(chatId, gotgbot.InputFileByID(originalMessage.Animation.FileId), opts.(*gotgbot.SendAnimationOpts))
+		}
+	} else if originalMessage.Photo != nil {
+		opts = &gotgbot.SendPhotoOpts{Caption: text, CaptionEntities: entities}
+		method = func(chatId int64, fileId interface{}, opts interface{}) (*gotgbot.Message, error) {
+			return s.bot.SendPhoto(chatId, gotgbot.InputFileByID(originalMessage.Photo[len(originalMessage.Photo)-1].FileId), opts.(*gotgbot.SendPhotoOpts))
+		}
+	} else if originalMessage.Video != nil {
+		opts = &gotgbot.SendVideoOpts{Caption: text, CaptionEntities: entities}
+		method = func(chatId int64, fileId interface{}, opts interface{}) (*gotgbot.Message, error) {
+			return s.bot.SendVideo(chatId, gotgbot.InputFileByID(originalMessage.Video.FileId), opts.(*gotgbot.SendVideoOpts))
+		}
+	} else {
+		opts = &gotgbot.SendMessageOpts{Entities: entities}
+		method = func(chatId int64, text interface{}, opts interface{}) (*gotgbot.Message, error) {
+			return s.bot.SendMessage(chatId, text.(string), opts.(*gotgbot.SendMessageOpts))
+		}
 	}
 
-	if originalMessage.Animation != nil {
-		return s.bot.SendAnimation(chatId, gotgbot.InputFileByID(originalMessage.Animation.FileId), &gotgbot.SendAnimationOpts{
-			Caption:         text,
-			CaptionEntities: entities,
-		})
-	} else if originalMessage.Photo != nil {
-		return s.bot.SendPhoto(chatId, gotgbot.InputFileByID(originalMessage.Photo[len(originalMessage.Photo)-1].FileId), &gotgbot.SendPhotoOpts{
-			Caption:         text,
-			CaptionEntities: entities,
-		})
-	} else if originalMessage.Video != nil {
-		return s.bot.SendVideo(chatId, gotgbot.InputFileByID(originalMessage.Video.FileId), &gotgbot.SendVideoOpts{
-			Caption:         text,
-			CaptionEntities: entities,
-		})
-	} else {
-		return s.bot.SendMessage(chatId, text, &gotgbot.SendMessageOpts{
-			Entities: entities,
-		})
+	if threadId != nil {
+		switch o := opts.(type) {
+		case *gotgbot.SendMessageOpts:
+			o.MessageThreadId = *threadId
+		case *gotgbot.SendAnimationOpts:
+			o.MessageThreadId = *threadId
+		case *gotgbot.SendPhotoOpts:
+			o.MessageThreadId = *threadId
+		case *gotgbot.SendVideoOpts:
+			o.MessageThreadId = *threadId
+		}
 	}
+
+	return method(chatId, text, opts)
 }
