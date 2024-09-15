@@ -36,24 +36,25 @@ func NewSaveHandler(messageSender services.MessageSender) handlers.Handler {
 }
 
 func (h *SaveHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
+	msg := ctx.EffectiveMessage
 	// Delete the reply message before sending the copy
-	_, err := ctx.EffectiveMessage.Delete(b, nil)
+	_, err := msg.Delete(b, nil)
 	if err != nil {
 		return fmt.Errorf("%s: err >> error deleting reply message: %v", saveHandlerName, err)
 	}
 
-	// Return error if the reply to message is nil
-	if ctx.EffectiveMessage.ReplyToMessage == nil {
+	// Return warning if the reply to message is nil
+	if msg.ReplyToMessage == nil {
 		return fmt.Errorf("%s: warning >> reply to message is nil", saveHandlerName)
 	}
 
-	// Return error if the reply to message text is empty
-	if ctx.EffectiveMessage.ReplyToMessage.Text == "" {
-		return fmt.Errorf("%s: warning >> reply to message text is empty", saveHandlerName)
+	// Return warning if it is reply to first message in message thread (not a reply in thread context)
+	if msg.ReplyToMessage.MessageId == msg.ReplyToMessage.MessageThreadId {
+		return fmt.Errorf("%s: warning >> reply to message not exists", saveHandlerName)
 	}
 
 	// Setting up copy message
-	originalMessage := ctx.EffectiveMessage.ReplyToMessage
+	originalMessage := msg.ReplyToMessage
 	originalMessageUrl := fmt.Sprintf(
 		"https://t.me/c/%s/%d",
 		strconv.FormatInt(originalMessage.Chat.Id, 10)[4:],
@@ -78,8 +79,8 @@ func (h *SaveHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 		},
 	}
 
-	var userId int64 = ctx.EffectiveUser.Id
-	if ctx.EffectiveUser.IsBot && ctx.EffectiveUser.Username == "GroupAnonymousBot" {
+	var userId int64 = msg.From.Id
+	if msg.From.IsBot && msg.From.Username == "GroupAnonymousBot" {
 		userId = h.anonymousUserId
 	}
 
@@ -92,7 +93,7 @@ func (h *SaveHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 		"%s: Copied message sent: %v\nUsername: %s\nUser ID: %d",
 		saveHandlerName,
 		originalMessageUrl,
-		ctx.EffectiveUser.Username,
+		msg.From.Username,
 		userId)
 
 	// Sending info message
@@ -104,12 +105,13 @@ func (h *SaveHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 }
 
 func (h *SaveHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
-	if ctx.EffectiveMessage == nil {
+	msg := ctx.EffectiveMessage
+	if msg == nil {
 		return false
 	}
-	return ctx.EffectiveMessage.Text != "" && (ctx.EffectiveMessage.Text == "@"+b.User.Username ||
-		strings.HasPrefix(ctx.EffectiveMessage.Text, "/save") ||
-		strings.HasPrefix(ctx.EffectiveMessage.Text, "/forward"))
+	return msg.Text != "" && (msg.Text == "@"+b.User.Username ||
+		strings.HasPrefix(msg.Text, "/save") ||
+		strings.HasPrefix(msg.Text, "/forward"))
 }
 
 func (h *SaveHandler) Name() string {
