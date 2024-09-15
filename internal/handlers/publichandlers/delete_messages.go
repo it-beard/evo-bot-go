@@ -36,10 +36,6 @@ func (h *DeleteMessagesHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) e
 	msg := ctx.EffectiveMessage
 
 	if h.shouldDeleteMessage(b, ctx) {
-		_, err0 := h.messageSender.SendCopy(msg.From.Id, nil, msg.Text, msg.Entities, msg)
-		if err0 != nil {
-			return fmt.Errorf("failed to forward reply message: %w", err0)
-		}
 		_, err := msg.Delete(b, nil)
 		if err != nil {
 			log.Printf("Error deleting message: %v", err)
@@ -49,6 +45,11 @@ func (h *DeleteMessagesHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) e
 			} else if msg.LeftChatMember != nil {
 				log.Printf("User left. User ID: %v", msg.LeftChatMember.Username)
 			} else {
+				_, err := h.messageSender.SendCopy(msg.From.Id, nil, msg.Text, msg.Entities, msg)
+				if err != nil {
+					return fmt.Errorf("failed to send copy message: %w", err)
+				}
+
 				// Prepare message components
 				chatIdStr := strconv.FormatInt(msg.Chat.Id, 10)[4:]
 				threadUrl := fmt.Sprintf("https://t.me/c/%s/%d", chatIdStr, msg.MessageThreadId)
