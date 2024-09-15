@@ -48,11 +48,15 @@ func NewBot(token string) (*Bot, error) {
 func (b *Bot) registerHandlers() {
 	messageSender := services.NewMessageSender(b.bot)
 
+	// Private handlers
 	b.dispatcher.AddHandler(privatehandlers.NewStartHandler())
 	b.dispatcher.AddHandler(privatehandlers.NewHelpHandler())
+
+	// Public handlers
+	b.dispatcher.AddHandler(publichandlers.NewDeleteJoinLeftMessagesHandler())
 	b.dispatcher.AddHandler(publichandlers.NewSaveHandler(messageSender))
-	b.dispatcher.AddHandler(publichandlers.NewForwardRepliesHandler(messageSender))
-	b.dispatcher.AddHandler(publichandlers.NewDeleteMessagesHandler(messageSender))
+	b.dispatcher.AddHandler(publichandlers.NewRepliesFromClosedThreadsHandler(messageSender))
+	b.dispatcher.AddHandler(publichandlers.NewCleanClosedThreadsHandler(messageSender))
 }
 
 func (b *Bot) Start() {
