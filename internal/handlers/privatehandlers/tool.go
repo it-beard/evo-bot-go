@@ -28,7 +28,7 @@ type ToolHandler struct {
 
 func NewToolHandler(openaiClient *clients.OpenAiClient) handlers.Handler {
 	// Parse environment variables
-	chatIdStr := os.Getenv("TG_EVO_BOT_TOOL_CHAT_ID")
+	chatIdStr := os.Getenv("TG_EVO_BOT_MAIN_CHAT_ID")
 	topicIdStr := os.Getenv("TG_EVO_BOT_TOOL_TOPIC_ID")
 
 	chatId, err := strconv.ParseInt(chatIdStr, 10, 64)
