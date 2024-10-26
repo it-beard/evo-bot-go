@@ -132,6 +132,22 @@ func (h *ToolHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 		return false
 	}
 
+	if msg.Text != "" && strings.HasPrefix(msg.Text, toolCommand) && msg.Chat.Type == privateChat {
+		if !h.isUserClubMember(b, msg) {
+			msg.Reply(b, "Команда доступна только для членов клуба.", nil)
+			log.Print("Trying to use /tool command without club membership")
+			return false
+		}
+		return true
+	}
+
+	return false
+}
+
+func (h *ToolHandler) Name() string {
+	return toolHandlerName
+}
+func (h *ToolHandler) isUserClubMember(b *gotgbot.Bot, msg *gotgbot.Message) bool {
 	chatId, err := strconv.ParseInt("-100"+strconv.FormatInt(h.chatId, 10), 10, 64)
 	if err != nil {
 		log.Printf("Failed to parse chat ID: %v", err)
@@ -146,13 +162,7 @@ func (h *ToolHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 
 	status := chatMember.GetStatus()
 	if status == "left" || status == "kicked" {
-		msg.Reply(b, "Команда доступна только для членов клуба.", nil)
-		log.Print("Trying to use /tool command without club membership")
 		return false
 	}
-	return msg.Text != "" && strings.HasPrefix(msg.Text, toolCommand) && msg.Chat.Type == privateChat
-}
-
-func (h *ToolHandler) Name() string {
-	return toolHandlerName
+	return true
 }

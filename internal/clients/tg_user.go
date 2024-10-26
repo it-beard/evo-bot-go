@@ -7,11 +7,18 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/gotd/td/session"
 	"github.com/gotd/td/telegram"
 	"github.com/gotd/td/telegram/auth"
 	"github.com/gotd/td/tg"
+)
+
+var (
+	verificationCode string
+	codeMutex        sync.RWMutex
+	storage          = new(session.StorageMemory)
 )
 
 type TelegramUserClientConfig struct {
@@ -56,8 +63,6 @@ func GetChatMessagesNew(chatId int64, topicId int, limit int) ([]tg.Message, err
 		return nil, fmt.Errorf("failed to get telegram config: %w", err)
 	}
 
-	sessionPath := "session_phone.json"
-	storage := &session.FileStorage{Path: sessionPath}
 	client := telegram.NewClient(config.appId, config.appHash, telegram.Options{SessionStorage: storage})
 
 	err = client.Run(context.Background(), func(ctx context.Context) error {
@@ -105,6 +110,44 @@ func GetChatMessagesNew(chatId int64, topicId int, limit int) ([]tg.Message, err
 	}
 
 	return messages, nil
+}
+
+func TgUserClientKeepSessionAlive() error {
+	// Get config from environment
+	config, err := NewTelegramUserClientConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get telegram config: %w", err)
+	}
+
+	client := telegram.NewClient(config.appId, config.appHash, telegram.Options{SessionStorage: storage})
+
+	err = client.Run(context.Background(), func(ctx context.Context) error {
+		// Ensure we're authorized
+		if err := ensureAuthorized(ctx, client, config.phoneNumber, config.password); err != nil {
+			return err
+		}
+
+		// Make a simple request to keep session alive
+		api := client.API()
+		_, err := api.HelpGetConfig(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get self user info: %w", err)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to keep session alive: %w", err)
+	}
+
+	return nil
+}
+
+func SetVerificationCode(code string) {
+	codeMutex.Lock()
+	defer codeMutex.Unlock()
+	verificationCode = code
 }
 
 func getPeerInfoByChatId(chatId int64, tgClient *telegram.Client, ctx context.Context) (tg.InputPeerClass, error) {
@@ -177,10 +220,15 @@ func ensureAuthorized(ctx context.Context, client *telegram.Client, phoneNumber,
 		}
 		sentCode := code.(*tg.AuthSentCode)
 
-		receivedCode := os.Getenv("TG_EVO_BOT_TGUSERCLIENT_CODE")
+		// Replace environment variable with in-memory code
+		codeMutex.RLock()
+		receivedCode := verificationCode
+		codeMutex.RUnlock()
 
 		if receivedCode == "" {
-			return fmt.Errorf("verification code cannot be empty")
+			return fmt.Errorf("verification code not set - use /code command to set it")
+		} else {
+			log.Print("Code applied")
 		}
 
 		_, err = authCli.SignIn(ctx, phoneNumber, receivedCode, sentCode.PhoneCodeHash)
@@ -196,39 +244,5 @@ func ensureAuthorized(ctx context.Context, client *telegram.Client, phoneNumber,
 		}
 	}
 
-	return nil
-}
-
-func TgUserClientKeepSessionAlive() error {
-	// Get config from environment
-	config, err := NewTelegramUserClientConfig()
-	if err != nil {
-		return fmt.Errorf("failed to get telegram config: %w", err)
-	}
-
-	sessionPath := "session_phone.json"
-	storage := &session.FileStorage{Path: sessionPath}
-	client := telegram.NewClient(config.appId, config.appHash, telegram.Options{SessionStorage: storage})
-
-	err = client.Run(context.Background(), func(ctx context.Context) error {
-		// Ensure we're authorized
-		if err := ensureAuthorized(ctx, client, config.phoneNumber, config.password); err != nil {
-			return err
-		}
-
-		// Make a simple request to keep session alive
-		api := client.API()
-		_, err := api.HelpGetConfig(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to get self user info: %w", err)
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to keep session alive: %w", err)
-	}
-
-	return nil
+	return err
 }
