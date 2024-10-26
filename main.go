@@ -3,10 +3,28 @@ package main
 import (
 	"log"
 	"os"
+	"time"
 
 	"your_module_name/internal/bot"
 	"your_module_name/internal/clients"
 )
+
+func keepTgUserClientSessionAlive() {
+	// Keep session alive every 30 minutes
+	ticker := time.NewTicker(30 * time.Minute)
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				if err := clients.TgUserClientKeepSessionAlive(); err != nil {
+					log.Printf("Failed to keep session alive: %v", err)
+				} else {
+					log.Printf("Session refresh successful")
+				}
+			}
+		}
+	}()
+}
 
 func main() {
 	token := os.Getenv("TG_EVO_BOT_TOKEN")
@@ -19,6 +37,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create OpenAI client: %v", err)
 	}
+
+	// Start session keep-alive routine
+	keepTgUserClientSessionAlive()
 
 	bot, err := bot.NewTgBotClient(token, openaiClient)
 	if err != nil {

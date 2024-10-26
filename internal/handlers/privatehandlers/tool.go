@@ -55,7 +55,7 @@ func (h *ToolHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	commandText := strings.TrimPrefix(msg.Text, toolCommand)
 	commandText = strings.TrimSpace(commandText)
 	if commandText == "" {
-		_, err := msg.Reply(b, "Please provide some text after the command. Usage: /count <your text>", nil)
+		_, err := msg.Reply(b, fmt.Sprintf("Пожалуйста, введи текст после команды. Пример: %s <текст>", toolCommand), nil)
 		return err
 	}
 
@@ -129,6 +129,25 @@ func (h *ToolHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 func (h *ToolHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 	msg := ctx.EffectiveMessage
 	if msg == nil {
+		return false
+	}
+
+	chatId, err := strconv.ParseInt("-100"+strconv.FormatInt(h.chatId, 10), 10, 64)
+	if err != nil {
+		log.Printf("Failed to parse chat ID: %v", err)
+		return false
+	}
+	// Check if user is member of target group
+	chatMember, err := b.GetChatMember(chatId, msg.From.Id, nil)
+	if err != nil {
+		log.Printf("Failed to get chat member: %v", err)
+		return false
+	}
+
+	status := chatMember.GetStatus()
+	if status == "left" || status == "kicked" {
+		msg.Reply(b, "Команда доступна только для членов клуба.", nil)
+		log.Print("Trying to use /tool command without club membership")
 		return false
 	}
 	return msg.Text != "" && strings.HasPrefix(msg.Text, toolCommand) && msg.Chat.Type == privateChat

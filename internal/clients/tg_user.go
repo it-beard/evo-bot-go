@@ -200,3 +200,37 @@ func ensureAuthorized(ctx context.Context, client *telegram.Client, phoneNumber,
 
 	return nil
 }
+
+func TgUserClientKeepSessionAlive() error {
+	// Get config from environment
+	config, err := NewTelegramUserClientConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get telegram config: %w", err)
+	}
+
+	sessionPath := "session_phone.json"
+	storage := &session.FileStorage{Path: sessionPath}
+	client := telegram.NewClient(config.appId, config.appHash, telegram.Options{SessionStorage: storage})
+
+	err = client.Run(context.Background(), func(ctx context.Context) error {
+		// Ensure we're authorized
+		if err := ensureAuthorized(ctx, client, config.phoneNumber, config.password); err != nil {
+			return err
+		}
+
+		// Make a simple request to keep session alive
+		api := client.API()
+		_, err := api.HelpGetConfig(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get self user info: %w", err)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to keep session alive: %w", err)
+	}
+
+	return nil
+}
