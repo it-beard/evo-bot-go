@@ -54,8 +54,8 @@ func NewTelegramUserClientConfig() (*TelegramUserClientConfig, error) {
 	}, nil
 }
 
-func GetChatMessagesNew(chatId int64, topicId int, limit int) ([]tg.Message, error) {
-	var messages []tg.Message
+func GetChatMessagesNew(chatId int64, topicId int) ([]tg.Message, error) {
+	var allMessages []tg.Message
 
 	// Get config from environment
 	config, err := NewTelegramUserClientConfig()
@@ -80,26 +80,48 @@ func GetChatMessagesNew(chatId int64, topicId int, limit int) ([]tg.Message, err
 			return fmt.Errorf("failed to get peer info: %w", err)
 		}
 
-		// Get messages from chat
-		resp, err := api.MessagesGetReplies(ctx, &tg.MessagesGetRepliesRequest{
-			Peer:  inputPeer,
-			Limit: limit,
-			MsgID: topicId,
-		})
-		if err != nil {
-			log.Fatalf("failed to get messages: %v", err)
-		}
-
-		// Extract messages from response
-		switch m := resp.(type) {
-		case *tg.MessagesChannelMessages:
-			for _, msg := range m.Messages {
-				if message, ok := msg.(*tg.Message); ok {
-					messages = append(messages, *message)
-				}
+		offset := 0
+		limit := 100
+		for {
+			// Get messages from chat with pagination
+			resp, err := api.MessagesGetReplies(ctx, &tg.MessagesGetRepliesRequest{
+				Peer:      inputPeer,
+				Limit:     limit,
+				MsgID:     topicId,
+				AddOffset: offset, // Add offset for pagination
+			})
+			if err != nil {
+				return fmt.Errorf("failed to get messages: %w", err)
 			}
-		default:
-			return fmt.Errorf("unexpected response type: %T", resp)
+
+			// Extract messages from response
+			var batchMessages []tg.Message
+			switch m := resp.(type) {
+			case *tg.MessagesChannelMessages:
+				for _, msg := range m.Messages {
+					if message, ok := msg.(*tg.Message); ok {
+						batchMessages = append(batchMessages, *message)
+					}
+				}
+			default:
+				return fmt.Errorf("unexpected response type: %T", resp)
+			}
+
+			// If no messages returned, we've reached the end
+			if len(batchMessages) == 0 {
+				break
+			}
+
+			// Append batch messages to all messages
+			allMessages = append(allMessages, batchMessages...)
+
+			// If we got less messages than the limit, we've reached the end
+			if len(batchMessages) < limit {
+				break
+			}
+
+			// Increment offset for next batch
+			offset += limit
 		}
 
 		return nil
@@ -109,7 +131,7 @@ func GetChatMessagesNew(chatId int64, topicId int, limit int) ([]tg.Message, err
 		log.Fatalf("Failed to run Telegram client: %v", err)
 	}
 
-	return messages, nil
+	return allMessages, nil
 }
 
 func TgUserClientKeepSessionAlive() error {

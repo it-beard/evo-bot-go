@@ -56,7 +56,7 @@ func (h *ToolHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	// Get messages from chat
-	messages, err := clients.GetChatMessagesNew(h.chatId, h.topicId, 100) // Get last 100 messages
+	messages, err := clients.GetChatMessagesNew(h.chatId, h.topicId) // Get last 100 messages
 	if err != nil {
 		return fmt.Errorf("failed to get chat messages: %w", err)
 	}
