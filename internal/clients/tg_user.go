@@ -177,9 +177,7 @@ func ensureAuthorized(ctx context.Context, client *telegram.Client, phoneNumber,
 		}
 		sentCode := code.(*tg.AuthSentCode)
 
-		var receivedCode string
-		fmt.Print("Enter the code you received: ")
-		fmt.Scanln(&receivedCode)
+		receivedCode := os.Getenv("TG_EVO_BOT_TGUSERCLIENT_CODE")
 
 		if receivedCode == "" {
 			return fmt.Errorf("verification code cannot be empty")
