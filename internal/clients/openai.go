@@ -14,9 +14,9 @@ type OpenAiClient struct {
 }
 
 func NewOpenAiClient() (*OpenAiClient, error) {
-	apiKey := os.Getenv("OPENAI_API_KEY")
+	apiKey := os.Getenv("TG_EVO_BOT_OPENAI_API_KEY")
 	if apiKey == "" {
-		return nil, fmt.Errorf("OPENAI_API_KEY environment variable is not set")
+		return nil, fmt.Errorf("TG_EVO_BOT_OPENAI_API_KEY environment variable is not set")
 	}
 
 	client := openai.NewClient(
