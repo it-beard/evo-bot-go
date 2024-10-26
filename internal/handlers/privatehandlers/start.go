@@ -31,5 +31,5 @@ func (h *StartHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 }
 
 func (h *StartHandler) Name() string {
-	return "start_handler"
+	return startHandlerName
 }

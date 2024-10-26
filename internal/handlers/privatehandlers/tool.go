@@ -16,10 +16,6 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
-const toolHandlerName = "tool_handler"
-const toolCommand = "/tool"
-const privateChat = "private"
-
 type ToolHandler struct {
 	openaiClient *clients.OpenAiClient
 	chatId       int64 // Add field for chat ID
@@ -147,6 +143,7 @@ func (h *ToolHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 func (h *ToolHandler) Name() string {
 	return toolHandlerName
 }
+
 func (h *ToolHandler) isUserClubMember(b *gotgbot.Bot, msg *gotgbot.Message) bool {
 	chatId, err := strconv.ParseInt("-100"+strconv.FormatInt(h.chatId, 10), 10, 64)
 	if err != nil {
