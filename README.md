@@ -40,7 +40,6 @@ Before running the bot, make sure to set the following environment variables:
 - `TG_EVO_BOT_TGUSERCLIENT_APPID`: Telegram API App ID
 - `TG_EVO_BOT_TGUSERCLIENT_APPHASH`: Telegram API App Hash
 - `TG_EVO_BOT_TGUSERCLIENT_PHONENUMBER`: Phone number for Telegram user client
-- `TG_EVO_BOT_TGUSERCLIENT_CODE`: Verification code for Telegram user client
 - `TG_EVO_BOT_TGUSERCLIENT_2FAPASS`: Two-factor authentication password for Telegram user client (if you are using 2FA)
 
 On Windows, you can set the environment variables using the following commands in Command Prompt:
@@ -63,7 +62,6 @@ set TG_EVO_BOT_TOOL_TOPIC_ID=tool_topic_id
 set TG_EVO_BOT_TGUSERCLIENT_APPID=your_app_id
 set TG_EVO_BOT_TGUSERCLIENT_APPHASH=your_app_hash
 set TG_EVO_BOT_TGUSERCLIENT_PHONENUMBER=your_phone_number
-set TG_EVO_BOT_TGUSERCLIENT_CODE=your_verification_code
 set TG_EVO_BOT_TGUSERCLIENT_2FAPASS=your_2fa_password
 ```
 
@@ -74,9 +72,9 @@ Then run the executable.
 To obtain the verification code, you need to run the Telegram User Client. 
 After first run you will get this **code in your telegram app**. 
 
-Stop bot, put this code to `TG_EVO_BOT_TGUSERCLIENT_CODE` environment variable, and run the bot again. 
+Send this code **REVERTED** by /code command to your bot.
 
-After that your bot will be able to use Telegram User Client and wil lupdate session automaticaly once per _30 minutes_.
+After that your bot will be able to use Telegram User Client and will update session automaticaly once per _30 minutes_.
 
 ## Features
 
