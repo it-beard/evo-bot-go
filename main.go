@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"your_module_name/internal/bot"
+	"your_module_name/internal/clients"
 )
 
 func main() {
@@ -13,9 +14,15 @@ func main() {
 		log.Fatal("TOKEN environment variable is empty")
 	}
 
-	bot, err := bot.NewBot(token)
+	// Initialize OpenAI client
+	openaiClient, err := clients.NewOpenAiClient()
 	if err != nil {
-		log.Fatal("failed to create new bot: " + err.Error())
+		log.Fatalf("Failed to create OpenAI client: %v", err)
+	}
+
+	bot, err := bot.NewTgBotClient(token, openaiClient)
+	if err != nil {
+		log.Fatal("Failed to create Telegram Bot Client: " + err.Error())
 	}
 
 	bot.Start()

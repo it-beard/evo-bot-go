@@ -4,6 +4,7 @@ import (
 	"log"
 	"time"
 
+	"your_module_name/internal/clients"
 	"your_module_name/internal/handlers/privatehandlers"
 	"your_module_name/internal/handlers/publichandlers"
 	"your_module_name/internal/services"
@@ -12,13 +13,13 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
-type Bot struct {
+type TgBotClient struct {
 	bot        *gotgbot.Bot
 	dispatcher *ext.Dispatcher
 	updater    *ext.Updater
 }
 
-func NewBot(token string) (*Bot, error) {
+func NewTgBotClient(token string, openaiClient *clients.OpenAiClient) (*TgBotClient, error) {
 	b, err := gotgbot.NewBot(token, nil)
 	if err != nil {
 		return nil, err
@@ -34,23 +35,24 @@ func NewBot(token string) (*Bot, error) {
 
 	updater := ext.NewUpdater(dispatcher, nil)
 
-	bot := &Bot{
+	bot := &TgBotClient{
 		bot:        b,
 		dispatcher: dispatcher,
 		updater:    updater,
 	}
 
-	bot.registerHandlers()
+	bot.registerHandlers(openaiClient)
 
 	return bot, nil
 }
 
-func (b *Bot) registerHandlers() {
+func (b *TgBotClient) registerHandlers(openaiClient *clients.OpenAiClient) {
 	messageSender := services.NewMessageSender(b.bot)
 
 	// Private handlers
 	b.dispatcher.AddHandler(privatehandlers.NewStartHandler())
 	b.dispatcher.AddHandler(privatehandlers.NewHelpHandler())
+	b.dispatcher.AddHandler(privatehandlers.NewToolHandler(openaiClient))
 
 	// Public handlers
 	b.dispatcher.AddHandler(publichandlers.NewDeleteJoinLeftMessagesHandler())
@@ -59,7 +61,7 @@ func (b *Bot) registerHandlers() {
 	b.dispatcher.AddHandler(publichandlers.NewCleanClosedThreadsHandler(messageSender))
 }
 
-func (b *Bot) Start() {
+func (b *TgBotClient) Start() {
 	err := b.updater.StartPolling(b.bot, &ext.PollingOpts{
 		DropPendingUpdates: true,
 		GetUpdatesOpts: &gotgbot.GetUpdatesOpts{
