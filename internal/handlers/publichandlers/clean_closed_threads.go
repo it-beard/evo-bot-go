@@ -55,7 +55,8 @@ func (h *CleanClosedThreadsHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Contex
 	threadUrl := fmt.Sprintf("https://t.me/c/%s/%d", chatIdStr, msg.MessageThreadId)
 	messageText := fmt.Sprintf(
 		"Ваше сообщение в канале %s было удалено, так как этот канал предназначен только для чтения. "+
-			"Но вы можете сохранять посты из таких каналов с моей помощью. Узнайте подробности через команду /help.\n\n"+
+			"Но вы можете отвечать на посты из этого канала. Для этого сделайте Replay (ответ) на выбранный пост, "+
+			"после чего ваш ответ появиться в чате \"Оффтопчик\".\n\n"+
 			"⬇️ _Копия удаленного сообщения_ ⬇️",
 		threadUrl,
 	)
