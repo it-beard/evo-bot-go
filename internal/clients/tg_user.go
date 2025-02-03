@@ -18,8 +18,26 @@ import (
 var (
 	verificationCode string
 	codeMutex        sync.RWMutex
-	storage          = new(session.StorageMemory)
+	storage          session.Storage
 )
+
+func init() {
+	// Read the session type from the environment.
+	// If set to "file" (case-insensitive), use file storage ("session.json");
+	// otherwise, default to in-memory storage.
+	//sessionType := os.Getenv("TG_EVO_BOT_TGUSERCLIENT_SESSION_TYPE")
+	sessionType := "file"
+	if strings.ToLower(sessionType) == "file" {
+		// Get session file from environment variable; default to "@TG"
+		sessionFile := "session.json"
+		storage = &session.FileStorage{Path: sessionFile}
+		log.Printf("Using file session storage (%s)", sessionFile)
+	} else {
+		// Default: in-memory session storage.
+		storage = new(session.StorageMemory)
+		log.Print("Using in-memory session storage")
+	}
+}
 
 type TelegramUserClientConfig struct {
 	appId       int
