@@ -53,6 +53,7 @@ func (b *TgBotClient) registerHandlers(openaiClient *clients.OpenAiClient) {
 	b.dispatcher.AddHandler(privatehandlers.NewStartHandler())
 	b.dispatcher.AddHandler(privatehandlers.NewHelpHandler())
 	b.dispatcher.AddHandler(privatehandlers.NewToolHandler(openaiClient))
+	b.dispatcher.AddHandler(privatehandlers.NewContentHandler(openaiClient))
 	b.dispatcher.AddHandler(privatehandlers.NewCodeHandler())
 
 	// Public handlers

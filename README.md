@@ -34,13 +34,14 @@ Before running the bot, make sure to set the following environment variables:
 - `TG_EVO_BOT_MAIN_CHAT_ID`: Chat ID of your Supergroup
 - `TG_EVO_BOT_OPENAI_API_KEY`: OpenAI API key
 - `TG_EVO_BOT_CLOSED_THREADS_IDS`: Comma-separated list of thread IDs that closed for chatting
-- `TG_EVO_BOT_ANONYMOUS_USER_ID`: User ID for the that sitting on the anonymous group account (if you are using anonymous group account)
-- `TG_EVO_BOT_FORWARDING_THREAD_ID`: ID of the thread where forwarded from closed threads replies will be sent (0 for General topic)
+- `TG_EVO_BOT_ANONYMOUS_USER_ID`: User ID for the account used on the anonymous group (if applicable)
+- `TG_EVO_BOT_FORWARDING_THREAD_ID`: ID of the thread where forwarded replies will be sent (0 for General topic)
 - `TG_EVO_BOT_TOOL_TOPIC_ID`: Topic ID for the AI tools database
+- `TG_EVO_BOT_CONTENT_TOPIC_ID`: Topic ID for the content topic
 - `TG_EVO_BOT_TGUSERCLIENT_APPID`: Telegram API App ID
 - `TG_EVO_BOT_TGUSERCLIENT_APPHASH`: Telegram API App Hash
 - `TG_EVO_BOT_TGUSERCLIENT_PHONENUMBER`: Phone number for Telegram user client
-- `TG_EVO_BOT_TGUSERCLIENT_2FAPASS`: Two-factor authentication password for Telegram user client (if you are using 2FA)
+- `TG_EVO_BOT_TGUSERCLIENT_2FAPASS`: Two-factor authentication password for Telegram user client (if using 2FA)
 - `TG_EVO_BOT_TGUSERCLIENT_SESSION_TYPE`: Session type for Telegram User Client. Set it to `file` to enable file storage (using `session.json`), otherwise it defaults to in-memory session storage.
 
 On Windows, you can set the environment variables using the following commands in Command Prompt:

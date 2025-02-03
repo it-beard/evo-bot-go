@@ -20,16 +20,16 @@ import (
 	"github.com/gotd/td/tg"
 )
 
-type ToolHandler struct {
+type ContentHandler struct {
 	openaiClient *clients.OpenAiClient
 	chatId       int64 // Add field for chat ID
 	topicId      int   // Add field for topic ID
 }
 
-func NewToolHandler(openaiClient *clients.OpenAiClient) handlers.Handler {
+func NewContentHandler(openaiClient *clients.OpenAiClient) handlers.Handler {
 	// Parse environment variables
 	chatIdStr := os.Getenv("TG_EVO_BOT_MAIN_CHAT_ID")
-	topicIdStr := os.Getenv("TG_EVO_BOT_TOOL_TOPIC_ID")
+	topicIdStr := os.Getenv("TG_EVO_BOT_CONTENT_TOPIC_ID")
 
 	chatId, err := strconv.ParseInt(chatIdStr, 10, 64)
 	if err != nil {
@@ -38,17 +38,17 @@ func NewToolHandler(openaiClient *clients.OpenAiClient) handlers.Handler {
 
 	topicId, err := strconv.Atoi(topicIdStr)
 	if err != nil {
-		log.Fatalf("Invalid TG_EVO_BOT_TOOL_TOPIC_ID: %v", err)
+		log.Fatalf("Invalid TG_EVO_BOT_CONTENT_TOPIC_ID: %v", err)
 	}
 
-	return &ToolHandler{
+	return &ContentHandler{
 		openaiClient: openaiClient,
 		chatId:       chatId,
 		topicId:      topicId,
 	}
 }
 
-func (h *ToolHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *ContentHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
 	// Extract text after command
@@ -75,7 +75,7 @@ func (h *ToolHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 
 	topicLink := fmt.Sprintf("https://t.me/c/%d/%d", h.chatId, h.topicId)
 	prompt := fmt.Sprintf(
-		prompts.GetToolPromptTemplate,
+		prompts.GetContentPromptTemplate,
 		topicLink,
 		topicLink,
 		string(dataMessages),
@@ -118,19 +118,19 @@ func (h *ToolHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	return err
 }
 
-func (h *ToolHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
+func (h *ContentHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 	msg := ctx.EffectiveMessage
 	if msg == nil {
 		return false
 	}
 
 	if msg.Text != "" &&
-		(strings.HasPrefix(msg.Text, toolsCommand) || strings.HasPrefix(msg.Text, toolCommand)) &&
+		strings.HasPrefix(msg.Text, contentCommand) &&
 		msg.Chat.Type == privateChat {
 
 		if !h.isUserClubMember(b, msg) {
 			msg.Reply(b, "Команда доступна только для членов клуба.", nil)
-			log.Print("Trying to use /tool command without club membership")
+			log.Print("Trying to use /content command without club membership")
 			return false
 		}
 		return true
@@ -139,11 +139,11 @@ func (h *ToolHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 	return false
 }
 
-func (h *ToolHandler) Name() string {
-	return toolHandlerName
+func (h *ContentHandler) Name() string {
+	return contentHandlerName
 }
 
-func (h *ToolHandler) extractCommandText(msg *gotgbot.Message) string {
+func (h *ContentHandler) extractCommandText(msg *gotgbot.Message) string {
 	var commandText string
 	if strings.HasPrefix(msg.Text, toolsCommand) {
 		commandText = strings.TrimPrefix(msg.Text, toolsCommand)
@@ -153,7 +153,7 @@ func (h *ToolHandler) extractCommandText(msg *gotgbot.Message) string {
 	return strings.TrimSpace(commandText)
 }
 
-func (h *ToolHandler) isUserClubMember(b *gotgbot.Bot, msg *gotgbot.Message) bool {
+func (h *ContentHandler) isUserClubMember(b *gotgbot.Bot, msg *gotgbot.Message) bool {
 	chatId, err := strconv.ParseInt("-100"+strconv.FormatInt(h.chatId, 10), 10, 64)
 	if err != nil {
 		log.Printf("Failed to parse chat ID: %v", err)
@@ -173,17 +173,31 @@ func (h *ToolHandler) isUserClubMember(b *gotgbot.Bot, msg *gotgbot.Message) boo
 	return true
 }
 
-func (h *ToolHandler) prepareTelegramMessages(messages []tg.Message) ([]byte, error) {
+func (h *ContentHandler) prepareTelegramMessages(messages []tg.Message) ([]byte, error) {
+	// Modified MessageObject to have Date as string
 	type MessageObject struct {
 		ID      int    `json:"id"`
 		Message string `json:"message"`
+		Date    string `json:"date"` // now formatted as "10 february 2024"
+	}
+
+	// Load CET location
+	loc, err := time.LoadLocation("CET")
+	if err != nil {
+		return nil, fmt.Errorf("failed to load CET location: %w", err)
 	}
 
 	messageObjects := make([]MessageObject, 0, len(messages))
 	for _, message := range messages {
+		// Convert Unix timestamp to CET time
+		t := time.Unix(int64(message.Date), 0).In(loc)
+		// Format date as "day month year" and convert to lowercase
+		dateFormatted := strings.ToLower(t.Format("2 January 2006"))
+
 		messageObjects = append(messageObjects, MessageObject{
 			ID:      message.ID,
 			Message: message.Message,
+			Date:    dateFormatted,
 		})
 	}
 
