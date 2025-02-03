@@ -11,9 +11,11 @@ import (
 
 	"your_module_name/internal/clients"
 	"your_module_name/internal/handlers"
+	"your_module_name/internal/handlers/prompts"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/gotd/td/tg"
 )
 
 type ToolHandler struct {
@@ -48,15 +50,7 @@ func (h *ToolHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
 	// Extract text after command
-	var commandText string
-	if strings.HasPrefix(msg.Text, toolsCommand) {
-		commandText = strings.TrimPrefix(msg.Text, toolsCommand)
-		commandText = strings.TrimSpace(commandText)
-	} else {
-		commandText = strings.TrimPrefix(msg.Text, toolCommand)
-		commandText = strings.TrimSpace(commandText)
-	}
-
+	commandText := h.extractCommandText(msg)
 	if commandText == "" {
 		_, err := msg.Reply(b, fmt.Sprintf("Пожалуйста, введи текст после команды. Пример: %s <текст>", toolCommand), nil)
 		return err
@@ -68,54 +62,12 @@ func (h *ToolHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 		return fmt.Errorf("failed to get chat messages: %w", err)
 	}
 
-	type MessageObject struct {
-		ID      int    `json:"id"`
-		Message string `json:"message"`
-	}
-
-	messageObjects := make([]MessageObject, 0, len(messages))
-	for _, message := range messages {
-		messageObjects = append(messageObjects, MessageObject{
-			ID:      message.ID, // assuming Message struct has ID field
-			Message: message.Message,
-		})
-	}
-
-	db, err := json.Marshal(messageObjects)
+	db, err := h.prepareMessagesDB(messages)
 	if err != nil {
-		return fmt.Errorf("failed to marshal messages to JSON: %w", err)
-	}
-	if len(messageObjects) == 0 {
-		return fmt.Errorf("no messages found in chat")
+		return err
 	}
 
-	if string(db) == "" {
-		return fmt.Errorf("no messages found in chat")
-	}
-
-	// Create prompt for OpenAI
-	prompt := "Ты помощник по поиску информации об ИИ-инструментах для разработки. \\n" +
-		"Вся информация об инструментах содержиться в формате json в БАЗЕ ДАННЫХ ниже. \\n" +
-		"Нужно найти самые релевантные инструменты по запросу ПОЛЬЗОВАТЕЛЯ. \\n" +
-		fmt.Sprintf("БАЗА ДАННЫХ инструментов: <database>%s</database>\\n", db) +
-		fmt.Sprintf("Запрос ПОЛЬЗОВАТЕЛЯ: <request>%s</request>\\n", commandText) +
-		"Отвечай только на русском языке. \\n" +
-		"Саморизируй описание инструмента до двух предложений либо меньше. \\n" +
-		"Если инструмента нет в базе данных, то ответь, что его нет. \\n" +
-		"Если найдено полное совпадения инструмента по названию (пользователь указал конкретное название), то выведи только его и без нумерации. \\n" +
-		"Если инструментов несколько, то расскажи про каждый из них отдельным блоком, но не более пяти инструментов в ответе. \\n" +
-		"Самые релевантные инструменты должны идти первыми в ответе. \\n" +
-		"Не используй в ответе хештеги, но обращай на них внимание при поиске. \\n" +
-		"Для ответа используй форматирование Markdown. \\n" +
-		"Оборачивай название инструмента ссылкой. \\n" +
-		fmt.Sprintf("Вид ссылки: https://t.me/c/%d/%d/ID, где ID - это ID инструмента в базе данных. \\n", h.chatId, h.topicId) +
-		"Пример ответа для одного инструмента: \\n" +
-		"Инструмент 1 - описание инструмента 1 \\n" +
-		"Пример ответа для нескольких инструментов: \\n" +
-		"1. Инструмент 1 - описание инструмента 1 \\n" +
-		"2. Инструмент 2 - описание инструмента 2 \\n" +
-		"3. Инструмент 3 - описание инструмента 3 \\n" +
-		fmt.Sprintf("Если по твоему мнению в базе есть больше пяти релевантных инструментов, то предложи ознакомиться с дополнительными инструментами непосредственно в чате \"Инструменты\". (слово \"Инструменты\" оборачивай в markdown-ссылку https://t.me/c/%d/%d)\\n", h.chatId, h.topicId)
+	prompt := fmt.Sprintf(prompts.GetToolPromptTemplate, string(db), commandText, h.chatId, h.topicId, h.chatId, h.topicId)
 
 	// Get completion from OpenAI
 	responseOpenAi, err := h.openaiClient.GetCompletion(context.TODO(), prompt)
@@ -127,6 +79,46 @@ func (h *ToolHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 		ParseMode: "Markdown",
 	})
 	return err
+}
+
+func (h *ToolHandler) extractCommandText(msg *gotgbot.Message) string {
+	var commandText string
+	if strings.HasPrefix(msg.Text, toolsCommand) {
+		commandText = strings.TrimPrefix(msg.Text, toolsCommand)
+	} else {
+		commandText = strings.TrimPrefix(msg.Text, toolCommand)
+	}
+	return strings.TrimSpace(commandText)
+}
+
+func (h *ToolHandler) prepareMessagesDB(messages []tg.Message) ([]byte, error) {
+	type MessageObject struct {
+		ID      int    `json:"id"`
+		Message string `json:"message"`
+	}
+
+	messageObjects := make([]MessageObject, 0, len(messages))
+	for _, message := range messages {
+		messageObjects = append(messageObjects, MessageObject{
+			ID:      message.ID,
+			Message: message.Message,
+		})
+	}
+
+	if len(messageObjects) == 0 {
+		return nil, fmt.Errorf("no messages found in chat")
+	}
+
+	db, err := json.Marshal(messageObjects)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal messages to JSON: %w", err)
+	}
+
+	if string(db) == "" {
+		return nil, fmt.Errorf("no messages found in chat")
+	}
+
+	return db, nil
 }
 
 func (h *ToolHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
