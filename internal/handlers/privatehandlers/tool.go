@@ -8,10 +8,12 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"your_module_name/internal/clients"
 	"your_module_name/internal/handlers"
 	"your_module_name/internal/handlers/prompts"
+	"your_module_name/internal/services"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -56,6 +58,10 @@ func (h *ToolHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 		return err
 	}
 
+	// Send typing action using MessageSender.
+	sender := services.NewMessageSender(b)
+	sender.SendTypingAction(msg.Chat.Id)
+
 	// Get messages from chat
 	messages, err := clients.GetChatMessagesNew(h.chatId, h.topicId) // Get last 100 messages
 	if err != nil {
@@ -69,8 +75,27 @@ func (h *ToolHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 
 	prompt := fmt.Sprintf(prompts.GetToolPromptTemplate, string(db), commandText, h.chatId, h.topicId, h.chatId, h.topicId)
 
-	// Get completion from OpenAI
-	responseOpenAi, err := h.openaiClient.GetCompletion(context.TODO(), prompt)
+	// Start periodic typing action every 5 seconds while waiting for the OpenAI response.
+	typingCtx, cancelTyping := context.WithCancel(context.Background())
+	defer cancelTyping() // ensure cancellation if function exits early
+
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				sender.SendTypingAction(msg.Chat.Id)
+			case <-typingCtx.Done():
+				return
+			}
+		}
+	}()
+
+	// Get completion from OpenAI using the new context.
+	responseOpenAi, err := h.openaiClient.GetCompletion(typingCtx, prompt)
+	// Cancel the periodic typing action immediately after getting the response.
+	cancelTyping()
 	if err != nil {
 		return fmt.Errorf("failed to get OpenAI completion: %w", err)
 	}

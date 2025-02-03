@@ -1,6 +1,9 @@
 package services
 
 import (
+	"log"
+	"strconv"
+
 	"github.com/PaulSonOfLars/gotgbot/v2"
 )
 
@@ -12,6 +15,7 @@ type MessageSender interface {
 		entities []gotgbot.MessageEntity,
 		originalMessage *gotgbot.Message,
 	) (*gotgbot.Message, error)
+	SendTypingAction(chatId int64) error
 }
 
 type TelegramMessageSender struct {
@@ -168,4 +172,16 @@ func utf16CodeUnitCount(s string) int {
 		}
 	}
 	return count
+}
+
+// SendTypingAction sends a typing action to the specified chat.
+func (s *TelegramMessageSender) SendTypingAction(chatId int64) error {
+	_, err := s.bot.Request("sendChatAction", map[string]string{
+		"chat_id": strconv.FormatInt(chatId, 10),
+		"action":  "typing",
+	}, nil, nil)
+	if err != nil {
+		log.Printf("failed to send typing action: %v", err)
+	}
+	return err
 }
