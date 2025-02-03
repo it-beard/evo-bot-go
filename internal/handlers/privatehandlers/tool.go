@@ -106,46 +106,6 @@ func (h *ToolHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	return err
 }
 
-func (h *ToolHandler) extractCommandText(msg *gotgbot.Message) string {
-	var commandText string
-	if strings.HasPrefix(msg.Text, toolsCommand) {
-		commandText = strings.TrimPrefix(msg.Text, toolsCommand)
-	} else {
-		commandText = strings.TrimPrefix(msg.Text, toolCommand)
-	}
-	return strings.TrimSpace(commandText)
-}
-
-func (h *ToolHandler) prepareMessagesDB(messages []tg.Message) ([]byte, error) {
-	type MessageObject struct {
-		ID      int    `json:"id"`
-		Message string `json:"message"`
-	}
-
-	messageObjects := make([]MessageObject, 0, len(messages))
-	for _, message := range messages {
-		messageObjects = append(messageObjects, MessageObject{
-			ID:      message.ID,
-			Message: message.Message,
-		})
-	}
-
-	if len(messageObjects) == 0 {
-		return nil, fmt.Errorf("no messages found in chat")
-	}
-
-	db, err := json.Marshal(messageObjects)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal messages to JSON: %w", err)
-	}
-
-	if string(db) == "" {
-		return nil, fmt.Errorf("no messages found in chat")
-	}
-
-	return db, nil
-}
-
 func (h *ToolHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 	msg := ctx.EffectiveMessage
 	if msg == nil {
