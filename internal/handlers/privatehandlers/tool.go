@@ -48,8 +48,15 @@ func (h *ToolHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
 	// Extract text after command
-	commandText := strings.TrimPrefix(msg.Text, toolCommand)
-	commandText = strings.TrimSpace(commandText)
+	var commandText string
+	if strings.HasPrefix(msg.Text, toolsCommand) {
+		commandText = strings.TrimPrefix(msg.Text, toolsCommand)
+		commandText = strings.TrimSpace(commandText)
+	} else {
+		commandText = strings.TrimPrefix(msg.Text, toolCommand)
+		commandText = strings.TrimSpace(commandText)
+	}
+
 	if commandText == "" {
 		_, err := msg.Reply(b, fmt.Sprintf("Пожалуйста, введи текст после команды. Пример: %s <текст>", toolCommand), nil)
 		return err
@@ -128,7 +135,10 @@ func (h *ToolHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 		return false
 	}
 
-	if msg.Text != "" && strings.HasPrefix(msg.Text, toolCommand) && msg.Chat.Type == privateChat {
+	if msg.Text != "" &&
+		(strings.HasPrefix(msg.Text, toolsCommand) || strings.HasPrefix(msg.Text, toolCommand)) &&
+		msg.Chat.Type == privateChat {
+
 		if !h.isUserClubMember(b, msg) {
 			msg.Reply(b, "Команда доступна только для членов клуба.", nil)
 			log.Print("Trying to use /tool command without club membership")

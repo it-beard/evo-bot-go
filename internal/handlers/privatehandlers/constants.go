@@ -6,6 +6,7 @@ const helpHandlerName = "help_handler"
 const startHandlerName = "start_handler"
 
 const toolCommand = "/tool"
+const toolsCommand = "/tool"
 const codeCommand = "/code"
 
 const privateChat = "private"
