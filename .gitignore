@@ -14,3 +14,4 @@ Thumbs.db
 .gitpmoji.env
 __debug*
 *session_phone.json
+*session.json
