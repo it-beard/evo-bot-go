@@ -68,12 +68,24 @@ func (h *ToolHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 		return fmt.Errorf("failed to get chat messages: %w", err)
 	}
 
-	db, err := h.prepareMessagesDB(messages)
+	dataMessages, err := h.prepareTelegramMessages(messages)
 	if err != nil {
 		return err
 	}
 
-	prompt := fmt.Sprintf(prompts.GetToolPromptTemplate, string(db), commandText, h.chatId, h.topicId, h.chatId, h.topicId)
+	topicLink := fmt.Sprintf("https://t.me/c/%d/%d", h.chatId, h.topicId)
+	prompt := fmt.Sprintf(
+		prompts.GetToolPromptTemplate,
+		topicLink,
+		topicLink,
+		string(dataMessages),
+		commandText)
+
+	// Save the prompt into a temporary file for logging purposes.
+	err = os.WriteFile("last-prompt-log.txt", []byte(prompt), 0644)
+	if err != nil {
+		log.Printf("Error writing prompt to file: %v", err)
+	}
 
 	// Start periodic typing action every 5 seconds while waiting for the OpenAI response.
 	typingCtx, cancelTyping := context.WithCancel(context.Background())
@@ -131,6 +143,16 @@ func (h *ToolHandler) Name() string {
 	return toolHandlerName
 }
 
+func (h *ToolHandler) extractCommandText(msg *gotgbot.Message) string {
+	var commandText string
+	if strings.HasPrefix(msg.Text, toolsCommand) {
+		commandText = strings.TrimPrefix(msg.Text, toolsCommand)
+	} else {
+		commandText = strings.TrimPrefix(msg.Text, toolCommand)
+	}
+	return strings.TrimSpace(commandText)
+}
+
 func (h *ToolHandler) isUserClubMember(b *gotgbot.Bot, msg *gotgbot.Message) bool {
 	chatId, err := strconv.ParseInt("-100"+strconv.FormatInt(h.chatId, 10), 10, 64)
 	if err != nil {
@@ -149,4 +171,34 @@ func (h *ToolHandler) isUserClubMember(b *gotgbot.Bot, msg *gotgbot.Message) boo
 		return false
 	}
 	return true
+}
+
+func (h *ToolHandler) prepareTelegramMessages(messages []tg.Message) ([]byte, error) {
+	type MessageObject struct {
+		ID      int    `json:"id"`
+		Message string `json:"message"`
+	}
+
+	messageObjects := make([]MessageObject, 0, len(messages))
+	for _, message := range messages {
+		messageObjects = append(messageObjects, MessageObject{
+			ID:      message.ID,
+			Message: message.Message,
+		})
+	}
+
+	if len(messageObjects) == 0 {
+		return nil, fmt.Errorf("no messages found in chat")
+	}
+
+	dataMessages, err := json.Marshal(messageObjects)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal messages to JSON: %w", err)
+	}
+
+	if string(dataMessages) == "" {
+		return nil, fmt.Errorf("no messages found in chat")
+	}
+
+	return dataMessages, nil
 }
