@@ -54,7 +54,7 @@ func (h *ContentHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	// Extract text after command
 	commandText := h.extractCommandText(msg)
 	if commandText == "" {
-		_, err := msg.Reply(b, fmt.Sprintf("Пожалуйста, введи поисковый запрос после команды. Например: %s <текст>", toolCommand), nil)
+		_, err := msg.Reply(b, fmt.Sprintf("Пожалуйста, введи поисковый запрос после команды. Например: %s <текст>", contentCommand), nil)
 		return err
 	}
 
@@ -145,10 +145,8 @@ func (h *ContentHandler) Name() string {
 
 func (h *ContentHandler) extractCommandText(msg *gotgbot.Message) string {
 	var commandText string
-	if strings.HasPrefix(msg.Text, toolsCommand) {
-		commandText = strings.TrimPrefix(msg.Text, toolsCommand)
-	} else {
-		commandText = strings.TrimPrefix(msg.Text, toolCommand)
+	if strings.HasPrefix(msg.Text, contentCommand) {
+		commandText = strings.TrimPrefix(msg.Text, contentCommand)
 	}
 	return strings.TrimSpace(commandText)
 }
