@@ -7,7 +7,7 @@ toolchain go1.23.5
 require (
 	github.com/PaulSonOfLars/gotgbot/v2 v2.0.0-rc.29
 	github.com/gotd/td v0.118.0
-	github.com/openai/openai-go v0.1.0-alpha.31
+	github.com/openai/openai-go v0.1.0-alpha.51
 	github.com/stretchr/testify v1.10.0
 )
 

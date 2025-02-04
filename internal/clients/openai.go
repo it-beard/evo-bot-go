@@ -34,7 +34,7 @@ func (c *OpenAiClient) GetCompletion(ctx context.Context, message string) (strin
 		Messages: openai.F([]openai.ChatCompletionMessageParamUnion{
 			openai.UserMessage(message),
 		}),
-		Model: openai.F(openai.ChatModelChatgpt4oLatest),
+		Model: openai.F(openai.ChatModelO3Mini),
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to get completion: %w", err)

@@ -48,8 +48,8 @@ github.com/mattn/go-isatty v0.0.20 h1:xfD0iDuEKnDkl03q4limB+vH+GxLEtL/jb4xVJSWWE
 github.com/mattn/go-isatty v0.0.20/go.mod h1:W+V8PltTTMOvKvAeJH7IuucS94S2C6jfK/D7dTCTo3Y=
 github.com/ogen-go/ogen v1.8.1 h1:7TZ+oIeLkcBiyl0qu0fHPrFUrGWDj3Fi/zKSWg2i2Tg=
 github.com/ogen-go/ogen v1.8.1/go.mod h1:2ShRm6u/nXUHuwdVKv2SeaG8enBKPKAE3kSbHwwFh6o=
-github.com/openai/openai-go v0.1.0-alpha.31 h1:LVYrKgPIEnKQWG67mRtb5TFaRa8yEWERD+BfgZcQKis=
-github.com/openai/openai-go v0.1.0-alpha.31/go.mod h1:3SdE6BffOX9HPEQv8IL/fi3LYZ5TUpRYaqGQZbyk11A=
+github.com/openai/openai-go v0.1.0-alpha.51 h1:/iuF8QoWt4x9yoEr6AdMsSBc2SglamxA/a7wClrDrqw=
+github.com/openai/openai-go v0.1.0-alpha.51/go.mod h1:3SdE6BffOX9HPEQv8IL/fi3LYZ5TUpRYaqGQZbyk11A=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/rogpeppe/go-internal v1.13.1 h1:KvO1DLK/DRN07sQ1LQKScxyZJuNnedQ5/wKSR38lUII=
