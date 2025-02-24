@@ -15,6 +15,18 @@ import (
 	"github.com/gotd/td/tg"
 )
 
+// Environment variable names
+const (
+	envSessionType = "TG_EVO_BOT_TGUSERCLIENT_SESSION_TYPE"
+	envAppID       = "TG_EVO_BOT_TGUSERCLIENT_APPID"
+	envAppHash     = "TG_EVO_BOT_TGUSERCLIENT_APPHASH"
+	envPhoneNumber = "TG_EVO_BOT_TGUSERCLIENT_PHONENUMBER"
+	envPassword    = "TG_EVO_BOT_TGUSERCLIENT_2FAPASS"
+
+	defaultSessionFile = "session.json"
+	defaultLimit       = 100
+)
+
 var (
 	verificationCode string
 	codeMutex        sync.RWMutex
@@ -22,73 +34,95 @@ var (
 )
 
 func init() {
-	// Read the session type from the environment.
-	// If set to "file" (case-insensitive), use file storage ("session.json");
-	// otherwise, default to in-memory storage.
-	sessionType := os.Getenv("TG_EVO_BOT_TGUSERCLIENT_SESSION_TYPE")
+	// Initialize session storage based on environment configuration
+	sessionType := os.Getenv(envSessionType)
 	if strings.ToLower(sessionType) == "file" {
-		// Get session file from environment variable; default to "@TG"
-		sessionFile := "session.json"
-		storage = &session.FileStorage{Path: sessionFile}
-		log.Printf("Using file session storage (%s)", sessionFile)
+		storage = &session.FileStorage{Path: defaultSessionFile}
+		log.Printf("Using file session storage (%s)", defaultSessionFile)
 	} else {
-		// Default: in-memory session storage.
 		storage = new(session.StorageMemory)
 		log.Print("Using in-memory session storage")
 	}
 }
 
-type TelegramUserClientConfig struct {
-	appId       int
-	appHash     string
-	phoneNumber string
-	password    string
+// TelegramConfig holds the configuration for Telegram client
+type TelegramConfig struct {
+	AppID       int
+	AppHash     string
+	PhoneNumber string
+	Password    string
 }
 
-func NewTelegramUserClientConfig() (*TelegramUserClientConfig, error) {
-	// Parse environment variables
-	appIdStr := os.Getenv("TG_EVO_BOT_TGUSERCLIENT_APPID")
-	appHash := os.Getenv("TG_EVO_BOT_TGUSERCLIENT_APPHASH")
-	phoneNumber := os.Getenv("TG_EVO_BOT_TGUSERCLIENT_PHONENUMBER")
-	password := os.Getenv("TG_EVO_BOT_TGUSERCLIENT_2FAPASS")
+// NewTelegramConfig creates a new TelegramConfig from environment variables
+func NewTelegramConfig() (*TelegramConfig, error) {
+	appIDStr := os.Getenv(envAppID)
+	appHash := os.Getenv(envAppHash)
+	phoneNumber := os.Getenv(envPhoneNumber)
+	password := os.Getenv(envPassword)
 
-	// Convert appId to int
-	appId, err := strconv.Atoi(appIdStr)
+	appID, err := strconv.Atoi(appIDStr)
 	if err != nil {
-		return nil, fmt.Errorf("invalid TG_EVO_BOT_TGUSERCLIENT_APPID: %w", err)
+		return nil, fmt.Errorf("invalid app ID: %w", err)
 	}
 
-	// Validate required fields
 	if appHash == "" || phoneNumber == "" || password == "" {
 		return nil, fmt.Errorf("missing required telegram client configuration")
 	}
 
-	return &TelegramUserClientConfig{
-		appId:       appId,
-		appHash:     appHash,
-		phoneNumber: phoneNumber,
-		password:    password,
+	return &TelegramConfig{
+		AppID:       appID,
+		AppHash:     appHash,
+		PhoneNumber: phoneNumber,
+		Password:    password,
 	}, nil
 }
 
-// GetChatMessageById retrieves a specific message by its ID from a chat
-// For forum topics, it returns a synthetic message with the topic name
-func GetChatMessageById(chatId int64, messageId int) (*tg.Message, error) {
-	config, err := NewTelegramUserClientConfig()
+// TelegramClient wraps the Telegram client functionality
+type TelegramClient struct {
+	client *telegram.Client
+	config *TelegramConfig
+}
+
+// NewTelegramClient creates a new TelegramClient
+func NewTelegramClient() (*TelegramClient, error) {
+	config, err := NewTelegramConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get telegram config: %w", err)
 	}
 
-	var message *tg.Message
-	client := telegram.NewClient(config.appId, config.appHash, telegram.Options{SessionStorage: storage})
+	client := telegram.NewClient(config.AppID, config.AppHash, telegram.Options{
+		SessionStorage: storage,
+	})
 
-	err = client.Run(context.Background(), func(ctx context.Context) error {
-		if err := ensureAuthorized(ctx, client, config.phoneNumber, config.password); err != nil {
+	return &TelegramClient{
+		client: client,
+		config: config,
+	}, nil
+}
+
+// SetVerificationCode sets the verification code for authentication
+func SetVerificationCode(code string) {
+	codeMutex.Lock()
+	defer codeMutex.Unlock()
+	verificationCode = code
+}
+
+// GetChatMessageById retrieves a specific message by its ID from a chat
+// For forum topics, it returns a synthetic message with the topic name
+func GetChatMessageById(chatID int64, messageID int) (*tg.Message, error) {
+	tgClient, err := NewTelegramClient()
+	if err != nil {
+		return nil, err
+	}
+
+	var message *tg.Message
+	err = tgClient.client.Run(context.Background(), func(ctx context.Context) error {
+		if err := tgClient.ensureAuthorized(ctx); err != nil {
 			return err
 		}
 
-		api := client.API()
-		inputPeer, err := getPeerInfoByChatId(chatId, client, ctx)
+		api := tgClient.client.API()
+		inputPeer, err := tgClient.getPeerInfoByChatID(ctx, chatID)
 		if err != nil {
 			return fmt.Errorf("failed to get peer info: %w", err)
 		}
@@ -103,15 +137,15 @@ func GetChatMessageById(chatId int64, messageId int) (*tg.Message, error) {
 			// Try to get forum topics
 			forumTopics, err := api.ChannelsGetForumTopics(ctx, &tg.ChannelsGetForumTopicsRequest{
 				Channel: inputChannel,
-				Limit:   100,
+				Limit:   defaultLimit,
 			})
 			if err == nil {
 				for _, topic := range forumTopics.Topics {
 					if forumTopic, ok := topic.(*tg.ForumTopic); ok {
-						if forumTopic.ID == messageId {
+						if forumTopic.ID == messageID {
 							// Create a synthetic message with the topic name
 							message = &tg.Message{
-								ID:      messageId,
+								ID:      messageID,
 								Message: forumTopic.Title,
 							}
 							return nil
@@ -121,7 +155,6 @@ func GetChatMessageById(chatId int64, messageId int) (*tg.Message, error) {
 			}
 		}
 
-		// If we still couldn't find the message, return an error
 		return fmt.Errorf("message not found or unexpected response type")
 	})
 
@@ -136,106 +169,112 @@ func GetChatMessageById(chatId int64, messageId int) (*tg.Message, error) {
 	return message, nil
 }
 
-func GetChatMessagesNew(chatId int64, topicId int) ([]tg.Message, error) {
-	var allMessages []tg.Message
-
-	// Get config from environment
-	config, err := NewTelegramUserClientConfig()
+// GetChatMessages retrieves messages from a chat topic
+func GetChatMessages(chatID int64, topicID int) ([]tg.Message, error) {
+	tgClient, err := NewTelegramClient()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get telegram config: %w", err)
+		return nil, err
 	}
 
-	client := telegram.NewClient(config.appId, config.appHash, telegram.Options{SessionStorage: storage})
-
-	err = client.Run(context.Background(), func(ctx context.Context) error {
-		// Ensure we're authorized
-		if err := ensureAuthorized(ctx, client, config.phoneNumber, config.password); err != nil {
+	var allMessages []tg.Message
+	err = tgClient.client.Run(context.Background(), func(ctx context.Context) error {
+		if err := tgClient.ensureAuthorized(ctx); err != nil {
 			return err
 		}
 
-		// start getting messages
-		api := client.API()
-
-		// Get peer info by chat id
-		inputPeer, err := getPeerInfoByChatId(chatId, client, ctx)
+		api := tgClient.client.API()
+		inputPeer, err := tgClient.getPeerInfoByChatID(ctx, chatID)
 		if err != nil {
 			return fmt.Errorf("failed to get peer info: %w", err)
 		}
 
-		offset := 0
-		limit := 100
-		for {
-			// Get messages from chat with pagination
-			resp, err := api.MessagesGetReplies(ctx, &tg.MessagesGetRepliesRequest{
-				Peer:      inputPeer,
-				Limit:     limit,
-				MsgID:     topicId,
-				AddOffset: offset, // Add offset for pagination
-			})
-			if err != nil {
-				return fmt.Errorf("failed to get messages: %w", err)
-			}
-
-			// Extract messages from response
-			var batchMessages []tg.Message
-			switch m := resp.(type) {
-			case *tg.MessagesChannelMessages:
-				for _, msg := range m.Messages {
-					if message, ok := msg.(*tg.Message); ok {
-						batchMessages = append(batchMessages, *message)
-					}
-				}
-			default:
-				return fmt.Errorf("unexpected response type: %T", resp)
-			}
-
-			// If no messages returned, we've reached the end
-			if len(batchMessages) == 0 {
-				break
-			}
-
-			// Append batch messages to all messages
-			allMessages = append(allMessages, batchMessages...)
-
-			// If we got less messages than the limit, we've reached the end
-			if len(batchMessages) < limit {
-				break
-			}
-
-			// Increment offset for next batch
-			offset += limit
-		}
-
-		return nil
+		return tgClient.fetchMessages(ctx, api, inputPeer, topicID, &allMessages)
 	})
 
 	if err != nil {
-		log.Fatalf("Failed to run Telegram client: %v", err)
+		return nil, fmt.Errorf("failed to get messages: %w", err)
 	}
 
 	return allMessages, nil
 }
 
-func TgUserClientKeepSessionAlive() error {
-	// Get config from environment
-	config, err := NewTelegramUserClientConfig()
-	if err != nil {
-		return fmt.Errorf("failed to get telegram config: %w", err)
+// fetchMessages retrieves messages with pagination
+func (t *TelegramClient) fetchMessages(ctx context.Context, api *tg.Client, inputPeer tg.InputPeerClass, topicID int, allMessages *[]tg.Message) error {
+	offset := 0
+	limit := defaultLimit
+
+	for {
+		// Get messages from chat with pagination
+		resp, err := api.MessagesGetReplies(ctx, &tg.MessagesGetRepliesRequest{
+			Peer:      inputPeer,
+			Limit:     limit,
+			MsgID:     topicID,
+			AddOffset: offset,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to get messages: %w", err)
+		}
+
+		// Extract messages from response
+		batchMessages, err := extractMessages(resp)
+		if err != nil {
+			return err
+		}
+
+		// If no messages returned, we've reached the end
+		if len(batchMessages) == 0 {
+			break
+		}
+
+		// Append batch messages to all messages
+		*allMessages = append(*allMessages, batchMessages...)
+
+		// If we got less messages than the limit, we've reached the end
+		if len(batchMessages) < limit {
+			break
+		}
+
+		// Increment offset for next batch
+		offset += limit
 	}
 
-	client := telegram.NewClient(config.appId, config.appHash, telegram.Options{SessionStorage: storage})
+	return nil
+}
 
-	err = client.Run(context.Background(), func(ctx context.Context) error {
-		// Ensure we're authorized
-		if err := ensureAuthorized(ctx, client, config.phoneNumber, config.password); err != nil {
+// extractMessages extracts messages from the API response
+func extractMessages(resp tg.MessagesMessagesClass) ([]tg.Message, error) {
+	var messages []tg.Message
+
+	switch m := resp.(type) {
+	case *tg.MessagesChannelMessages:
+		for _, msg := range m.Messages {
+			if message, ok := msg.(*tg.Message); ok {
+				messages = append(messages, *message)
+			}
+		}
+	default:
+		return nil, fmt.Errorf("unexpected response type: %T", resp)
+	}
+
+	return messages, nil
+}
+
+// KeepSessionAlive keeps the Telegram session alive
+func KeepSessionAlive() error {
+	tgClient, err := NewTelegramClient()
+	if err != nil {
+		return err
+	}
+
+	err = tgClient.client.Run(context.Background(), func(ctx context.Context) error {
+		if err := tgClient.ensureAuthorized(ctx); err != nil {
 			return err
 		}
 
 		// Make a simple request to keep session alive
-		api := client.API()
-		_, err := api.HelpGetConfig(ctx)
+		_, err := tgClient.client.API().HelpGetConfig(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to get self user info: %w", err)
+			return fmt.Errorf("failed to get config: %w", err)
 		}
 
 		return nil
@@ -248,67 +287,46 @@ func TgUserClientKeepSessionAlive() error {
 	return nil
 }
 
-func SetVerificationCode(code string) {
-	codeMutex.Lock()
-	defer codeMutex.Unlock()
-	verificationCode = code
-}
-
-func getPeerInfoByChatId(chatId int64, tgClient *telegram.Client, ctx context.Context) (tg.InputPeerClass, error) {
-	var inputPeer tg.InputPeerClass
-
-	api := tgClient.API()
+// getPeerInfoByChatID retrieves peer information by chat ID
+func (t *TelegramClient) getPeerInfoByChatID(ctx context.Context, chatID int64) (tg.InputPeerClass, error) {
+	api := t.client.API()
 
 	// Fetch dialogs to find the chat and get its AccessHash if needed
 	dialogs, err := api.MessagesGetDialogs(ctx, &tg.MessagesGetDialogsRequest{
-		Limit:      100, // Adjust the limit as needed
+		Limit:      defaultLimit,
 		OffsetPeer: &tg.InputPeerChat{},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get dialogs: %v", err)
+		return nil, fmt.Errorf("failed to get dialogs: %w", err)
 	}
-
-	found := false
 
 	switch dlg := dialogs.(type) {
 	case *tg.MessagesDialogsSlice:
 		for _, chat := range dlg.Chats {
 			switch c := chat.(type) {
 			case *tg.Chat:
-				if c.ID == chatId {
-					inputPeer = &tg.InputPeerChat{
-						ChatID: c.ID,
-					}
-					found = true
-					break
+				if c.ID == chatID {
+					return &tg.InputPeerChat{ChatID: c.ID}, nil
 				}
 			case *tg.Channel:
-				if c.ID == chatId {
-					inputPeer = &tg.InputPeerChannel{
+				if c.ID == chatID {
+					return &tg.InputPeerChannel{
 						ChannelID:  c.ID,
 						AccessHash: c.AccessHash,
-					}
-					found = true
-					break
+					}, nil
 				}
-			}
-			if found {
-				break
 			}
 		}
 	default:
 		return nil, fmt.Errorf("unexpected response type: %T", dialogs)
 	}
 
-	if !found {
-		return nil, fmt.Errorf("chat with ID %d not found", chatId)
-	}
-
-	return inputPeer, nil
+	return nil, fmt.Errorf("chat with ID %d not found", chatID)
 }
 
-func ensureAuthorized(ctx context.Context, client *telegram.Client, phoneNumber, password string) error {
-	authCli := client.Auth()
+// ensureAuthorized ensures the client is authorized
+func (t *TelegramClient) ensureAuthorized(ctx context.Context) error {
+	authCli := t.client.Auth()
 
 	status, err := authCli.Status(ctx)
 	if err != nil {
@@ -316,7 +334,7 @@ func ensureAuthorized(ctx context.Context, client *telegram.Client, phoneNumber,
 	}
 
 	if !status.Authorized {
-		code, err := authCli.SendCode(ctx, phoneNumber, auth.SendCodeOptions{
+		code, err := authCli.SendCode(ctx, t.config.PhoneNumber, auth.SendCodeOptions{
 			AllowAppHash: true,
 		})
 		if err != nil {
@@ -324,29 +342,27 @@ func ensureAuthorized(ctx context.Context, client *telegram.Client, phoneNumber,
 		}
 		sentCode := code.(*tg.AuthSentCode)
 
-		// Replace environment variable with in-memory code
 		codeMutex.RLock()
 		receivedCode := verificationCode
 		codeMutex.RUnlock()
 
 		if receivedCode == "" {
 			return fmt.Errorf("verification code not set - use /code command to set it")
-		} else {
-			log.Print("Code applied")
 		}
+		log.Print("Code applied")
 
-		_, err = authCli.SignIn(ctx, phoneNumber, receivedCode, sentCode.PhoneCodeHash)
+		_, err = authCli.SignIn(ctx, t.config.PhoneNumber, receivedCode, sentCode.PhoneCodeHash)
 		if err != nil {
 			if strings.Contains(err.Error(), "2FA required") {
-				_, err = authCli.Password(ctx, password)
+				_, err = authCli.Password(ctx, t.config.Password)
 				if err != nil {
 					return fmt.Errorf("failed to send 2FA password: %w", err)
 				}
 			} else {
-				return fmt.Errorf("SignIn error: %w", err)
+				return fmt.Errorf("sign in error: %w", err)
 			}
 		}
 	}
 
-	return err
+	return nil
 }

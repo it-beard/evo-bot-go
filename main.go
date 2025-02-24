@@ -11,7 +11,7 @@ import (
 
 func keepTgUserClientSessionAlive() {
 	// First time refresh
-	if err := clients.TgUserClientKeepSessionAlive(); err != nil {
+	if err := clients.KeepSessionAlive(); err != nil {
 		log.Printf("Failed to keep session alive: %v", err)
 	} else {
 		log.Printf("Session refresh successful")
@@ -20,7 +20,7 @@ func keepTgUserClientSessionAlive() {
 	ticker := time.NewTicker(30 * time.Minute)
 	go func() {
 		for range ticker.C {
-			if err := clients.TgUserClientKeepSessionAlive(); err != nil {
+			if err := clients.KeepSessionAlive(); err != nil {
 				log.Printf("Failed to keep session alive: %v", err)
 			} else {
 				log.Printf("Session refresh successful")
