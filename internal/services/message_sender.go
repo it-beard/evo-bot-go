@@ -74,6 +74,10 @@ func (s *TelegramMessageSender) SendCopy(
 					trimmedPartOfCaptionEntities = append(trimmedPartOfCaptionEntities, trimmedEntity)
 				}
 			}
+		} else {
+			// Set caption even when text is within limits
+			caption = text
+			captionEntities = entities
 		}
 	}
 

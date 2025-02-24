@@ -105,19 +105,38 @@ func (h *RepliesFromClosedThreadsHandler) forwardReplyMessage(ctx *ext.Context) 
 		},
 	}
 
-	// Increase offset for all original entities
+	var finalMessage string
 	var updatedEntities []gotgbot.MessageEntity
-	for _, entity := range msg.Entities {
-		// Check if the entity is within the bounds of the new text
-		if int(entity.Offset)+int(entity.Length) <= len(msg.Text) {
-			newEntity := entity
-			newEntity.Offset += int64(firstLineLength) + 1 // +1 for the newline character
-			updatedEntities = append(updatedEntities, newEntity)
-		}
-	}
-	updatedEntities = append(updatedEntities, firstLineEntities...)
 
-	finalMessage := firstLine + "\n" + msg.Text
+	// Check if we're dealing with caption or text
+	if msg.Caption != "" {
+		// Handle caption
+		// Increase offset for all original caption entities
+		for _, entity := range msg.CaptionEntities {
+			// Check if the entity is within the bounds of the caption
+			if int(entity.Offset)+int(entity.Length) <= len(msg.Caption) {
+				newEntity := entity
+				newEntity.Offset += int64(firstLineLength) + 1 // +1 for the newline character
+				updatedEntities = append(updatedEntities, newEntity)
+			}
+		}
+		updatedEntities = append(updatedEntities, firstLineEntities...)
+		finalMessage = firstLine + "\n" + msg.Caption
+	} else {
+		// Handle regular text
+		// Increase offset for all original entities
+		for _, entity := range msg.Entities {
+			// Check if the entity is within the bounds of the new text
+			if int(entity.Offset)+int(entity.Length) <= len(msg.Text) {
+				newEntity := entity
+				newEntity.Offset += int64(firstLineLength) + 1 // +1 for the newline character
+				updatedEntities = append(updatedEntities, newEntity)
+			}
+		}
+		updatedEntities = append(updatedEntities, firstLineEntities...)
+		finalMessage = firstLine + "\n" + msg.Text
+	}
+
 	// Forward the message
 	_, err := h.messageSender.SendCopy(msg.Chat.Id, &h.forwardingThreadId, finalMessage, updatedEntities, msg)
 	if err != nil {
