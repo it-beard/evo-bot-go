@@ -87,25 +87,18 @@ func (h *RepliesFromClosedThreadsHandler) getTopicName(threadId int64, chatId in
 		chatId, _ = strconv.ParseInt(chatIdStr, 10, 64)
 	}
 
-	// Get the specific message by ID
+	// Get the topic message by ID
 	message, err := clients.GetChatMessageById(chatId, messageId)
 	if err != nil {
 		return "Topic", fmt.Errorf("failed to get thread message: %w", err)
 	}
 
-	// Extract the topic name from the message
-	topicName := "Topic"
-
-	// In Telegram, forum topics have a special field for the topic name
-	// Try to extract the topic name from the message
-	if message.Message != "" {
-		// Use the message text as the topic name
-		topicName = message.Message
-
-		// If the message is too long, truncate it
-		if len(topicName) > 30 {
-			topicName = topicName[:27] + "..."
-		}
+	// Extract and truncate the topic name if needed
+	topicName := message.Message
+	if topicName == "" {
+		topicName = "Topic"
+	} else if len(topicName) > 30 {
+		topicName = topicName[:27] + "..."
 	}
 
 	return topicName, nil
@@ -130,10 +123,17 @@ func (h *RepliesFromClosedThreadsHandler) forwardReplyMessage(ctx *ext.Context) 
 	}
 
 	// Prepare the text with the topic name and user mention
+	username := msg.From.Username
+	prefixText := fmt.Sprintf(
+		"↩️ oтвет от @%s в канале ",
+		username)
+	prefixLength := utf8.RuneCountInString(prefixText)
+	topicNameLength := utf8.RuneCountInString(topicName)
+
 	firstLine := fmt.Sprintf(
-		"%s: ↩️ oтвет на пост от @%s",
-		topicName,
-		msg.From.Username)
+		"%s\"%s\"",
+		prefixText,
+		topicName)
 	firstLineLength := utf8.RuneCountInString(firstLine)
 	firstLineEntities := []gotgbot.MessageEntity{
 		{
@@ -148,8 +148,8 @@ func (h *RepliesFromClosedThreadsHandler) forwardReplyMessage(ctx *ext.Context) 
 		},
 		{
 			Type:   "text_link",
-			Offset: int64(len(topicName) + 2), // +2 for ": "
-			Length: 4,
+			Offset: int64(prefixLength) + 1,
+			Length: int64(topicNameLength),
 			Url:    replyToMessageUrl,
 		},
 	}
