@@ -71,6 +71,184 @@ func NewTelegramUserClientConfig() (*TelegramUserClientConfig, error) {
 	}, nil
 }
 
+// GetChatMessageById retrieves a specific message by its ID from a chat
+func GetChatMessageById(chatId int64, messageId int) (*tg.Message, error) {
+	// Get config from environment
+	config, err := NewTelegramUserClientConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get telegram config: %w", err)
+	}
+
+	var message *tg.Message
+
+	client := telegram.NewClient(config.appId, config.appHash, telegram.Options{SessionStorage: storage})
+
+	err = client.Run(context.Background(), func(ctx context.Context) error {
+		// Ensure we're authorized
+		if err := ensureAuthorized(ctx, client, config.phoneNumber, config.password); err != nil {
+			return err
+		}
+
+		// Get the API client
+		api := client.API()
+
+		// Get peer info by chat id
+		inputPeer, err := getPeerInfoByChatId(chatId, client, ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get peer info: %w", err)
+		}
+
+		// Log the peer type for debugging
+		log.Printf("GetChatMessageById: chatId=%d, messageId=%d, peerType=%T", chatId, messageId, inputPeer)
+
+		// Try to get the message using MessagesGetHistory first
+		// This is more reliable for getting topic messages
+		resp, err := api.MessagesGetHistory(ctx, &tg.MessagesGetHistoryRequest{
+			Peer:      inputPeer,
+			OffsetID:  messageId + 1, // Start from the message after our target
+			AddOffset: -1,            // Go back one message
+			Limit:     1,             // Get just one message
+		})
+		if err != nil {
+			log.Printf("GetChatMessageById: MessagesGetHistory failed: %v", err)
+		} else {
+			// Extract the message from the response
+			switch m := resp.(type) {
+			case *tg.MessagesMessages:
+				if len(m.Messages) > 0 {
+					if msg, ok := m.Messages[0].(*tg.Message); ok && msg.ID == messageId {
+						message = msg
+						log.Printf("GetChatMessageById: Found message using MessagesGetHistory")
+						return nil
+					}
+				}
+			case *tg.MessagesChannelMessages:
+				if len(m.Messages) > 0 {
+					if msg, ok := m.Messages[0].(*tg.Message); ok && msg.ID == messageId {
+						message = msg
+						log.Printf("GetChatMessageById: Found message using MessagesGetHistory")
+						return nil
+					}
+				}
+			}
+			log.Printf("GetChatMessageById: MessagesGetHistory didn't find the message, response type: %T", resp)
+		}
+
+		// If MessagesGetHistory didn't work, try other methods based on peer type
+		switch p := inputPeer.(type) {
+		case *tg.InputPeerChannel:
+			// For channels, use ChannelsGetMessages
+			channel := &tg.InputChannel{
+				ChannelID:  p.ChannelID,
+				AccessHash: p.AccessHash,
+			}
+
+			// Try to get the message using ChannelsGetMessages
+			msgIds := []tg.InputMessageClass{&tg.InputMessageID{ID: messageId}}
+			resp, err := api.ChannelsGetMessages(ctx, &tg.ChannelsGetMessagesRequest{
+				Channel: channel,
+				ID:      msgIds,
+			})
+			if err != nil {
+				log.Printf("GetChatMessageById: ChannelsGetMessages failed: %v", err)
+				return fmt.Errorf("failed to get message: %w", err)
+			}
+
+			log.Printf("GetChatMessageById: ChannelsGetMessages response type: %T", resp)
+
+			// Extract the message from the response
+			switch m := resp.(type) {
+			case *tg.MessagesMessages:
+				if len(m.Messages) > 0 {
+					if msg, ok := m.Messages[0].(*tg.Message); ok {
+						message = msg
+						return nil
+					}
+				}
+			case *tg.MessagesChannelMessages:
+				if len(m.Messages) > 0 {
+					if msg, ok := m.Messages[0].(*tg.Message); ok {
+						message = msg
+						return nil
+					}
+				}
+			}
+
+		default:
+			// For non-channels, use MessagesGetMessages
+			msgIds := []tg.InputMessageClass{&tg.InputMessageID{ID: messageId}}
+			resp, err := api.MessagesGetMessages(ctx, msgIds)
+			if err != nil {
+				log.Printf("GetChatMessageById: MessagesGetMessages failed: %v", err)
+				return fmt.Errorf("failed to get message: %w", err)
+			}
+
+			log.Printf("GetChatMessageById: MessagesGetMessages response type: %T", resp)
+
+			// Extract the message from the response
+			switch m := resp.(type) {
+			case *tg.MessagesMessages:
+				if len(m.Messages) > 0 {
+					if msg, ok := m.Messages[0].(*tg.Message); ok {
+						message = msg
+						return nil
+					}
+				}
+			}
+		}
+
+		// If we got here, we couldn't find the message
+		// As a fallback, let's try to get the topic directly
+		// For forum topics, we can use channels.getForumTopics
+		if channel, ok := inputPeer.(*tg.InputPeerChannel); ok {
+			inputChannel := &tg.InputChannel{
+				ChannelID:  channel.ChannelID,
+				AccessHash: channel.AccessHash,
+			}
+
+			// Try to get forum topics
+			forumTopics, err := api.ChannelsGetForumTopics(ctx, &tg.ChannelsGetForumTopicsRequest{
+				Channel: inputChannel,
+				Limit:   100,
+			})
+			if err != nil {
+				log.Printf("GetChatMessageById: ChannelsGetForumTopics failed: %v", err)
+			} else {
+				log.Printf("GetChatMessageById: ChannelsGetForumTopics response type: %T", forumTopics)
+
+				// Process the forum topics
+				log.Printf("GetChatMessageById: Got %d forum topics", len(forumTopics.Topics))
+				for _, topic := range forumTopics.Topics {
+					if forumTopic, ok := topic.(*tg.ForumTopic); ok {
+						if forumTopic.ID == messageId {
+							// Create a synthetic message with the topic name
+							message = &tg.Message{
+								ID:      messageId,
+								Message: forumTopic.Title,
+							}
+							log.Printf("GetChatMessageById: Found forum topic: %s", forumTopic.Title)
+							return nil
+						}
+					}
+				}
+			}
+		}
+
+		// If we still couldn't find the message, return an error
+		return fmt.Errorf("message not found or unexpected response type")
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get message: %w", err)
+	}
+
+	if message == nil {
+		return nil, fmt.Errorf("message not found")
+	}
+
+	return message, nil
+}
+
 func GetChatMessagesNew(chatId int64, topicId int) ([]tg.Message, error) {
 	var allMessages []tg.Message
 
