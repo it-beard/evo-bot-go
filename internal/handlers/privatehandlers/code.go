@@ -7,6 +7,7 @@ import (
 	"strings"
 	"your_module_name/internal/clients"
 	"your_module_name/internal/handlers"
+	"your_module_name/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -53,7 +54,7 @@ func (h *CodeHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 	}
 
 	if msg.Text != "" && strings.HasPrefix(msg.Text, codeCommand) && msg.Chat.Type == privateChat {
-		if !h.isUserAdminOrCreator(b, msg) {
+		if !utils.IsUserAdminOrCreator(b, msg.From.Id, h.chatId) {
 			msg.Reply(b, "Команда доступна только для администраторов.", nil)
 			log.Print("Trying to use /code command without admin rights")
 			return false
@@ -74,24 +75,4 @@ func reverseString(s string) string {
 		runes[i], runes[j] = runes[j], runes[i]
 	}
 	return string(runes)
-}
-
-func (h *CodeHandler) isUserAdminOrCreator(b *gotgbot.Bot, msg *gotgbot.Message) bool {
-	chatId, err := strconv.ParseInt("-100"+strconv.FormatInt(h.chatId, 10), 10, 64)
-	if err != nil {
-		log.Printf("Failed to parse chat ID: %v", err)
-		return false
-	}
-	// Check if user is member of target group
-	chatMember, err := b.GetChatMember(chatId, msg.From.Id, nil)
-	if err != nil {
-		log.Printf("Failed to get chat member: %v", err)
-		return false
-	}
-
-	status := chatMember.GetStatus()
-	if status == "administrator" || status == "creator" {
-		return true
-	}
-	return false
 }

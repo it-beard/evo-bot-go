@@ -76,12 +76,12 @@ func NewTgBotClient(token string, openaiClient *clients.OpenAiClient, appConfig 
 		scheduler:  dailyScheduler,
 	}
 
-	bot.registerHandlers(openaiClient, appConfig, messageStore)
+	bot.registerHandlers(openaiClient, appConfig, messageStore, summarizationService)
 
 	return bot, nil
 }
 
-func (b *TgBotClient) registerHandlers(openaiClient *clients.OpenAiClient, appConfig *config.Config, messageStore *storage.MessageStore) {
+func (b *TgBotClient) registerHandlers(openaiClient *clients.OpenAiClient, appConfig *config.Config, messageStore *storage.MessageStore, summarizationService *services.SummarizationService) {
 	messageSender := services.NewMessageSender(b.bot)
 
 	// Private handlers
@@ -90,6 +90,7 @@ func (b *TgBotClient) registerHandlers(openaiClient *clients.OpenAiClient, appCo
 	b.dispatcher.AddHandler(privatehandlers.NewToolHandler(openaiClient))
 	b.dispatcher.AddHandler(privatehandlers.NewContentHandler(openaiClient))
 	b.dispatcher.AddHandler(privatehandlers.NewCodeHandler())
+	b.dispatcher.AddHandler(privatehandlers.NewSummarizeHandler(summarizationService, appConfig.MainChatID))
 
 	// Public handlers
 	b.dispatcher.AddHandler(publichandlers.NewDeleteJoinLeftMessagesHandler())

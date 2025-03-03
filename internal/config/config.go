@@ -21,6 +21,9 @@ type Config struct {
 
 	// Time to run daily summary (24h format)
 	SummaryTime time.Time
+
+	// Main chat ID (for admin checks)
+	MainChatID int64
 }
 
 // LoadConfig loads the configuration from environment variables
@@ -73,6 +76,18 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("invalid summary time format: %s", summaryTimeStr)
 	}
 	config.SummaryTime = summaryTime
+
+	// Main chat ID
+	mainChatIDStr := os.Getenv("TG_EVO_BOT_MAIN_CHAT_ID")
+	if mainChatIDStr == "" {
+		return nil, fmt.Errorf("TG_EVO_BOT_MAIN_CHAT_ID environment variable is not set")
+	}
+
+	mainChatID, err := strconv.ParseInt(mainChatIDStr, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid main chat ID: %s", mainChatIDStr)
+	}
+	config.MainChatID = mainChatID
 
 	return config, nil
 }

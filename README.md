@@ -112,5 +112,6 @@ After that your bot will be able to use Telegram User Client and will update ses
   - Uses RAG (Retrieval-Augmented Generation) to find the most relevant messages
   - Generates a daily summary of chat activities
   - Posts summaries to a designated chat at a configured time
+  - Supports manual triggering via `/summarize` command (admin-only, uses Telegram's permission system)
 
 For more details on bot usage, use the `/help` command in the bot chat.
