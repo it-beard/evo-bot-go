@@ -17,7 +17,7 @@ import (
 
 const summarizeHandlerName = "summarize_handler"
 const summarizeCommand = "/summarize"
-const dmFlag = "--dm"
+const dmFlag = "-dm"
 
 // SummarizeHandler handles the summarize command
 type SummarizeHandler struct {
@@ -46,8 +46,28 @@ func (h *SummarizeHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error 
 		return err
 	}
 
+	// Send typing action using MessageSender.
+	sender := services.NewMessageSender(b)
+	sender.SendTypingAction(msg.Chat.Id)
+
 	// Run summarization in a goroutine to avoid blocking
 	go func() {
+		// Start periodic typing action every 5 seconds while waiting for the OpenAI response.
+		typingCtx, cancelTyping := context.WithCancel(context.Background())
+		defer cancelTyping() // ensure cancellation if function exits early
+
+		go func() {
+			ticker := time.NewTicker(5 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					sender.SendTypingAction(msg.Chat.Id)
+				case <-typingCtx.Done():
+					return
+				}
+			}
+		}()
 		// Create a context with timeout and user ID for DM
 		ctxWithValues := context.WithValue(context.Background(), "userID", msg.From.Id)
 		ctxTimeout, cancel := context.WithTimeout(ctxWithValues, 10*time.Minute)
@@ -69,6 +89,8 @@ func (h *SummarizeHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error 
 			}
 		}
 
+		// Cancel the periodic typing action immediately after getting the response.
+		cancelTyping()
 		_, _, err = b.EditMessageText(resultText, &gotgbot.EditMessageTextOpts{
 			ChatId:    msg.Chat.Id,
 			MessageId: replyMsg.MessageId,

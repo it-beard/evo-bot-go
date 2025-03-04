@@ -8,7 +8,7 @@ import (
 
 	"your_module_name/internal/clients"
 	"your_module_name/internal/config"
-	"your_module_name/internal/rag"
+	"your_module_name/internal/handlers/prompts"
 	"your_module_name/internal/storage"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -16,12 +16,10 @@ import (
 
 // SummarizationService handles the daily summarization of messages
 type SummarizationService struct {
-	config           *config.Config
-	messageStore     *storage.MessageStore
-	openaiClient     *clients.OpenAiClient
-	embeddingService *rag.EmbeddingService
-	retriever        *rag.Retriever
-	messageSender    MessageSender
+	config        *config.Config
+	messageStore  *storage.MessageStore
+	openaiClient  *clients.OpenAiClient
+	messageSender MessageSender
 }
 
 // NewSummarizationService creates a new summarization service
@@ -31,16 +29,11 @@ func NewSummarizationService(
 	openaiClient *clients.OpenAiClient,
 	messageSender MessageSender,
 ) *SummarizationService {
-	embeddingService := rag.NewEmbeddingService(openaiClient)
-	retriever := rag.NewRetriever(embeddingService)
-
 	return &SummarizationService{
-		config:           config,
-		messageStore:     messageStore,
-		openaiClient:     openaiClient,
-		embeddingService: embeddingService,
-		retriever:        retriever,
-		messageSender:    messageSender,
+		config:        config,
+		messageStore:  messageStore,
+		openaiClient:  openaiClient,
+		messageSender: messageSender,
 	}
 }
 
@@ -85,37 +78,27 @@ func (s *SummarizationService) summarizeChat(ctx context.Context, chatID int64, 
 
 	log.Printf("Found %d messages for chat %d", len(messages), chatID)
 
-	// Use RAG to find the most relevant messages
-	// For summarization, we'll use a generic query
-	query := "What are the main topics and important points discussed in this chat?"
-	topK := 20 // Number of most relevant messages to include
-
-	relevantMessages, err := s.retriever.RetrieveRelevantMessages(ctx, messages, query, topK)
-	if err != nil {
-		return fmt.Errorf("failed to retrieve relevant messages: %w", err)
+	// Build context directly from all messages without using RAG
+	context := ""
+	for _, msg := range messages {
+		context += fmt.Sprintf("[%s] %s: %s\n",
+			msg.CreatedAt.Format("2006-01-02 15:04:05"),
+			msg.Username,
+			msg.Text)
 	}
 
-	// Build context from relevant messages
-	context := rag.BuildContextFromMessages(relevantMessages)
-
-	// Generate summary using OpenAI
-	prompt := fmt.Sprintf(
-		"You are tasked with creating a daily summary of a chat conversation. "+
-			"Below are the most relevant messages from the chat '%s' in the last 24 hours.\n\n"+
-			"%s\n\n"+
-			"Please provide a concise summary of the main topics and important points discussed. "+
-			"Organize the summary in a clear and readable format. "+
-			"If there are distinct topics, separate them with headings. "+
-			"Include any important decisions, questions, or action items that emerged.",
-		chatName, context)
+	// Generate summary using OpenAI with the prompt from the prompts package
+	prompt := fmt.Sprintf(prompts.FairyTaleSummarizationPromptTemplate, chatName, context)
 
 	summary, err := s.openaiClient.GetCompletion(ctx, prompt)
 	if err != nil {
 		return fmt.Errorf("failed to generate summary: %w", err)
 	}
 
-	// Format the final summary message
-	finalSummary := fmt.Sprintf("📋 *Daily Summary: %s*\n\n%s", chatName, summary)
+	// Format the final summary message using the title format from the prompts package
+	titleFormat := prompts.FairyTaleSummaryTitleFormat
+	title := fmt.Sprintf(titleFormat, chatName)
+	finalSummary := fmt.Sprintf("%s\n\n%s", title, summary)
 
 	// Determine the target chat ID
 	targetChatID := s.config.SummaryChatID
@@ -137,7 +120,7 @@ func (s *SummarizationService) summarizeChat(ctx context.Context, chatID int64, 
 			{
 				Type:   "bold",
 				Offset: 0,
-				Length: int64(len(fmt.Sprintf("📋 Daily Summary: %s", chatName))),
+				Length: int64(len(title)),
 			},
 		},
 		nil,
@@ -146,6 +129,6 @@ func (s *SummarizationService) summarizeChat(ctx context.Context, chatID int64, 
 		return fmt.Errorf("failed to send summary: %w", err)
 	}
 
-	log.Printf("Summary for chat %d sent successfully", chatID)
+	log.Printf("Summary sent successfully", chatID)
 	return nil
 }
