@@ -60,7 +60,8 @@ func (s *DailyScheduler) run() {
 					ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 					defer cancel()
 
-					if err := s.summarizationService.RunDailySummarization(ctx); err != nil {
+					// For scheduled tasks, always send to the chat (not to DM)
+					if err := s.summarizationService.RunDailySummarization(ctx, false); err != nil {
 						log.Printf("Error running daily summarization: %v", err)
 					}
 				}()

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"your_module_name/internal/handlers"
@@ -16,6 +17,7 @@ import (
 
 const summarizeHandlerName = "summarize_handler"
 const summarizeCommand = "/summarize"
+const dmFlag = "--dm"
 
 // SummarizeHandler handles the summarize command
 type SummarizeHandler struct {
@@ -35,6 +37,9 @@ func NewSummarizeHandler(summarizationService *services.SummarizationService, ma
 func (h *SummarizeHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
+	// Check if the DM flag is present
+	sendToDM := strings.Contains(msg.Text, dmFlag)
+
 	// Send a message indicating that summarization has started
 	replyMsg, err := msg.Reply(b, "Запуск процесса создания сводки...", nil)
 	if err != nil {
@@ -43,12 +48,13 @@ func (h *SummarizeHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error 
 
 	// Run summarization in a goroutine to avoid blocking
 	go func() {
-		// Create a context with timeout
-		ctxTimeout, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		// Create a context with timeout and user ID for DM
+		ctxWithValues := context.WithValue(context.Background(), "userID", msg.From.Id)
+		ctxTimeout, cancel := context.WithTimeout(ctxWithValues, 10*time.Minute)
 		defer cancel()
 
-		// Run the summarization
-		err := h.summarizationService.RunDailySummarization(ctxTimeout)
+		// Run the summarization with the sendToDM flag
+		err := h.summarizationService.RunDailySummarization(ctxTimeout, sendToDM)
 
 		// Update the reply message with the result
 		var resultText string
@@ -56,7 +62,11 @@ func (h *SummarizeHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error 
 			resultText = fmt.Sprintf("Ошибка при создании сводки: %v", err)
 			log.Printf("Error running manual summarization: %v", err)
 		} else {
-			resultText = "Сводка успешно создана и отправлена в указанный чат."
+			if sendToDM {
+				resultText = "Сводка успешно создана и отправлена вам в личные сообщения."
+			} else {
+				resultText = "Сводка успешно создана и отправлена в указанный чат."
+			}
 		}
 
 		_, _, err = b.EditMessageText(resultText, &gotgbot.EditMessageTextOpts{
@@ -78,8 +88,8 @@ func (h *SummarizeHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 		return false
 	}
 
-	// Check if the message is the summarize command
-	if msg.Text != summarizeCommand {
+	// Check if the message is the summarize command (with or without DM flag)
+	if !strings.HasPrefix(msg.Text, summarizeCommand) {
 		return false
 	}
 

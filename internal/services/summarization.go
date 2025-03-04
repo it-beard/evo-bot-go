@@ -45,7 +45,7 @@ func NewSummarizationService(
 }
 
 // RunDailySummarization runs the daily summarization process
-func (s *SummarizationService) RunDailySummarization(ctx context.Context) error {
+func (s *SummarizationService) RunDailySummarization(ctx context.Context, sendToDM bool) error {
 	log.Println("Starting daily summarization process")
 
 	// Get the time 24 hours ago
@@ -53,7 +53,7 @@ func (s *SummarizationService) RunDailySummarization(ctx context.Context) error 
 
 	// Process each monitored chat
 	for _, chatID := range s.config.MonitoredChatIDs {
-		if err := s.summarizeChat(ctx, chatID, since); err != nil {
+		if err := s.summarizeChat(ctx, chatID, since, sendToDM); err != nil {
 			log.Printf("Error summarizing chat %d: %v", chatID, err)
 			// Continue with other chats even if one fails
 			continue
@@ -65,7 +65,7 @@ func (s *SummarizationService) RunDailySummarization(ctx context.Context) error 
 }
 
 // summarizeChat summarizes a single chat
-func (s *SummarizationService) summarizeChat(ctx context.Context, chatID int64, since time.Time) error {
+func (s *SummarizationService) summarizeChat(ctx context.Context, chatID int64, since time.Time, sendToDM bool) error {
 	// Get chat name
 	chatName, err := s.messageStore.GetChatName(ctx, chatID)
 	if err != nil {
@@ -117,9 +117,20 @@ func (s *SummarizationService) summarizeChat(ctx context.Context, chatID int64, 
 	// Format the final summary message
 	finalSummary := fmt.Sprintf("📋 *Daily Summary: %s*\n\n%s", chatName, summary)
 
-	// Send the summary to the designated chat
+	// Determine the target chat ID
+	targetChatID := s.config.SummaryChatID
+	if sendToDM {
+		// If sendToDM is true, try to get the user ID from context
+		if userID, ok := ctx.Value("userID").(int64); ok {
+			targetChatID = userID
+		} else {
+			log.Println("Warning: sendToDM is true but userID not found in context, using SummaryChatID instead")
+		}
+	}
+
+	// Send the summary to the target chat
 	_, err = s.messageSender.SendCopy(
-		s.config.SummaryChatID,
+		targetChatID,
 		nil,
 		finalSummary,
 		[]gotgbot.MessageEntity{
