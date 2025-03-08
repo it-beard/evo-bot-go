@@ -1,6 +1,6 @@
 # Telegram Bot
 
-This project contains a Telegram bot implemented in Go. Tested on Windows 11.
+This project contains a Telegram bot for Evocoders Club management. Bot implemented in Go.
 
 ## Building the Executable
 
@@ -115,3 +115,75 @@ After that your bot will be able to use Telegram User Client and will update ses
   - Supports manual triggering via `/summarize` command (admin-only, uses Telegram's permission system)
 
 For more details on bot usage, use the `/help` command in the bot chat.
+
+## Running Tests
+
+This project includes unit tests to ensure functionality works as expected. Here are various ways to run the tests:
+
+### Run All Tests
+
+To run all tests in the project:
+
+```shell
+go test ./...
+```
+
+This command will recursively run all tests in all packages of your project.
+
+### Run Tests in a Specific Package
+
+To run tests in a specific package:
+
+```shell
+go test github.com/it-beard/evo-bot-go/internal/handlers/privatehandlers
+```
+
+Or navigate to the package directory and run:
+
+```shell
+cd internal/handlers/privatehandlers
+go test
+```
+
+### Run a Specific Test
+
+To run a specific test function:
+
+```shell
+go test -run TestHelpHandler_Name github.com/it-beard/evo-bot-go/internal/handlers/privatehandlers
+```
+
+The `-run` flag accepts a regular expression that matches test function names.
+
+### Verbose Output
+
+For more detailed test output, add the `-v` flag:
+
+```shell
+go test -v ./...
+```
+
+### Code Coverage
+
+To see test coverage:
+
+```shell
+go test -cover ./...
+```
+
+For a detailed coverage report:
+
+```shell
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
+```
+
+This will generate an HTML report showing which lines of code are covered by tests.
+
+### Test with Race Detection
+
+To check for race conditions:
+
+```shell
+go test -race ./...
+```

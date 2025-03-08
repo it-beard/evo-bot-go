@@ -5,31 +5,27 @@ import (
 	"log"
 	"time"
 
-	"your_module_name/internal/config"
-	"your_module_name/internal/handlers"
-	"your_module_name/internal/storage"
+	"github.com/it-beard/evo-bot-go/internal/config"
+	"github.com/it-beard/evo-bot-go/internal/constants"
+	"github.com/it-beard/evo-bot-go/internal/handlers"
+	"github.com/it-beard/evo-bot-go/internal/storage"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
-const messageCollectorHandlerName = "message_collector_handler"
-
-// MessageCollectorHandler collects messages from monitored chats
 type MessageCollectorHandler struct {
 	config       *config.Config
 	messageStore *storage.MessageStore
 }
 
-// NewMessageCollectorHandler creates a new message collector handler
-func NewMessageCollectorHandler(config *config.Config, messageStore *storage.MessageStore) handlers.Handler {
+func NewMessageCollectorHandler(messageStore *storage.MessageStore, config *config.Config) handlers.Handler {
 	return &MessageCollectorHandler{
 		config:       config,
 		messageStore: messageStore,
 	}
 }
 
-// HandleUpdate handles the update
 func (h *MessageCollectorHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
@@ -39,7 +35,7 @@ func (h *MessageCollectorHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context)
 
 	// Store the message
 	if err := h.messageStore.StoreMessage(ctxTimeout, msg); err != nil {
-		log.Printf("%s: error storing message: %v", messageCollectorHandlerName, err)
+		log.Printf("%s: error storing message: %v", constants.MessageCollectorHandlerName, err)
 		return err
 	}
 
@@ -47,7 +43,6 @@ func (h *MessageCollectorHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context)
 	return nil
 }
 
-// CheckUpdate checks if the update should be handled
 func (h *MessageCollectorHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 	msg := ctx.EffectiveMessage
 	if msg == nil {
@@ -63,7 +58,6 @@ func (h *MessageCollectorHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) 
 	return h.config.IsMonitoredChat(msg.Chat.Id)
 }
 
-// Name returns the handler name
 func (h *MessageCollectorHandler) Name() string {
-	return messageCollectorHandlerName
+	return constants.MessageCollectorHandlerName
 }

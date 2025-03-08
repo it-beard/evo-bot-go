@@ -5,8 +5,8 @@ import (
 	"log"
 	"time"
 
-	"your_module_name/internal/config"
-	"your_module_name/internal/services"
+	"github.com/it-beard/evo-bot-go/internal/config"
+	"github.com/it-beard/evo-bot-go/internal/services"
 )
 
 // DailyScheduler handles scheduling of daily tasks

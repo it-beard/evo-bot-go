@@ -1,7 +1,8 @@
 package privatehandlers
 
 import (
-	"your_module_name/internal/handlers"
+	"github.com/it-beard/evo-bot-go/internal/constants"
+	"github.com/it-beard/evo-bot-go/internal/handlers"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -36,5 +37,5 @@ func (h *HelpHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 }
 
 func (h *HelpHandler) Name() string {
-	return helpHandlerName
+	return constants.HelpHandlerName
 }

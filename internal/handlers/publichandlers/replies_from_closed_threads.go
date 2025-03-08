@@ -3,51 +3,36 @@ package publichandlers
 import (
 	"fmt"
 	"log"
-	"os"
 	"strconv"
 	"strings"
 	"unicode/utf8"
-	"your_module_name/internal/clients"
-	"your_module_name/internal/handlers"
-	"your_module_name/internal/services"
+	"github.com/it-beard/evo-bot-go/internal/clients"
+	"github.com/it-beard/evo-bot-go/internal/config"
+	"github.com/it-beard/evo-bot-go/internal/constants"
+	"github.com/it-beard/evo-bot-go/internal/handlers"
+	"github.com/it-beard/evo-bot-go/internal/services"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
-const repliesFromClosedThreadsHandlerName = "replies_from_closed_threads_handler"
-
 type RepliesFromClosedThreadsHandler struct {
-	closedThreads      map[int64]bool
-	forwardingThreadId int64
-	messageSender      services.MessageSender
+	closedThreads map[int64]bool
+	messageSender services.MessageSender
+	config        *config.Config
 }
 
-func NewRepliesFromClosedThreadsHandler(messageSender services.MessageSender) handlers.Handler {
+func NewRepliesFromClosedThreadsHandler(messageSender services.MessageSender, config *config.Config) handlers.Handler {
+	// Create map of closed threads
 	closedThreads := make(map[int64]bool)
-	closedThreadsStr := os.Getenv("TG_EVO_BOT_CLOSED_THREADS_IDS")
-	for _, chatID := range strings.Split(closedThreadsStr, ",") {
-		if id, err := strconv.ParseInt(chatID, 10, 64); err == nil {
-			closedThreads[id] = true
-		} else {
-			log.Printf(
-				"%s: error >> failed to parse closed thread ID from env: %v",
-				repliesFromClosedThreadsHandlerName,
-				err)
-		}
+	for _, id := range config.ClosedThreadsIDs {
+		closedThreads[id] = true
 	}
-	forwardingThreadStr := os.Getenv("TG_EVO_BOT_FORWARDING_THREAD_ID")
-	forwardingThreadId, err := strconv.ParseInt(forwardingThreadStr, 10, 64)
-	if err != nil {
-		log.Printf(
-			"%s: error >> failed to parse forwarding thread ID from env: %v",
-			repliesFromClosedThreadsHandlerName,
-			err)
-	}
+
 	return &RepliesFromClosedThreadsHandler{
-		closedThreads:      closedThreads,
-		messageSender:      messageSender,
-		forwardingThreadId: forwardingThreadId,
+		closedThreads: closedThreads,
+		messageSender: messageSender,
+		config:        config,
 	}
 }
 
@@ -60,14 +45,14 @@ func (h *RepliesFromClosedThreadsHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.
 		if err := h.forwardReplyMessage(ctx); err != nil {
 			log.Printf(
 				"%s: error >> failed to forward reply message: %v",
-				repliesFromClosedThreadsHandlerName,
+				constants.RepliesFromClosedThreadsHandlerName,
 				err)
 		}
 		_, err := msg.Delete(b, nil)
 		if err != nil {
 			log.Printf(
 				"%s: error >> failed to delete original message after forwarding: %v",
-				repliesFromClosedThreadsHandlerName,
+				constants.RepliesFromClosedThreadsHandlerName,
 				err)
 		}
 	}
@@ -116,7 +101,7 @@ func (h *RepliesFromClosedThreadsHandler) forwardReplyMessage(ctx *ext.Context) 
 	if topicErr != nil {
 		log.Printf(
 			"%s: warning >> failed to get topic name: %v",
-			repliesFromClosedThreadsHandlerName,
+			constants.RepliesFromClosedThreadsHandlerName,
 			topicErr)
 		// Continue with a default topic name
 		topicName = "Topic"
@@ -187,9 +172,9 @@ func (h *RepliesFromClosedThreadsHandler) forwardReplyMessage(ctx *ext.Context) 
 	}
 
 	// Forward the message
-	_, err := h.messageSender.SendCopy(msg.Chat.Id, &h.forwardingThreadId, finalMessage, updatedEntities, msg)
+	_, err := h.messageSender.SendCopy(msg.Chat.Id, &h.config.ForwardingThreadID, finalMessage, updatedEntities, msg)
 	if err != nil {
-		return fmt.Errorf("%s: error >> failed to forward reply message: %w", repliesFromClosedThreadsHandlerName, err)
+		return fmt.Errorf("%s: error >> failed to forward reply message: %w", constants.RepliesFromClosedThreadsHandlerName, err)
 	}
 
 	return nil
@@ -211,5 +196,5 @@ func (h *RepliesFromClosedThreadsHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.C
 }
 
 func (h *RepliesFromClosedThreadsHandler) Name() string {
-	return repliesFromClosedThreadsHandlerName
+	return constants.RepliesFromClosedThreadsHandlerName
 }

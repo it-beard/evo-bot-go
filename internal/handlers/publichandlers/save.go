@@ -3,35 +3,30 @@ package publichandlers
 import (
 	"fmt"
 	"log"
-	"os"
 	"strconv"
 	"strings"
 	"unicode/utf8"
 
-	"your_module_name/internal/handlers"
-	"your_module_name/internal/services"
+	"github.com/it-beard/evo-bot-go/internal/config"
+	"github.com/it-beard/evo-bot-go/internal/constants"
+	"github.com/it-beard/evo-bot-go/internal/handlers"
+	"github.com/it-beard/evo-bot-go/internal/services"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
-const saveHandlerName = "save_handler"
+// Constants moved to internal/constants/public_handlers.go
 
 type SaveHandler struct {
-	messageSender   services.MessageSender
-	anonymousUserId int64
+	messageSender services.MessageSender
+	config        *config.Config
 }
 
-func NewSaveHandler(messageSender services.MessageSender) handlers.Handler {
-	anonymousUserIdString := os.Getenv("TG_EVO_BOT_ANONYMOUS_USER_ID")
-	anonymousUserId, err := strconv.ParseInt(anonymousUserIdString, 10, 64)
-	if err != nil {
-		log.Printf("%s: error >> error parsing anonymous user ID from env: %v", saveHandlerName, err)
-	}
-
+func NewSaveHandler(messageSender services.MessageSender, config *config.Config) handlers.Handler {
 	return &SaveHandler{
-		messageSender:   messageSender,
-		anonymousUserId: anonymousUserId,
+		messageSender: messageSender,
+		config:        config,
 	}
 }
 
@@ -40,17 +35,17 @@ func (h *SaveHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	// Delete the reply message before sending the copy
 	_, err := msg.Delete(b, nil)
 	if err != nil {
-		return fmt.Errorf("%s: err >> error deleting reply message: %v", saveHandlerName, err)
+		return fmt.Errorf("%s: err >> error deleting reply message: %v", constants.SaveHandlerName, err)
 	}
 
 	// Return warning if the reply to message is nil
 	if msg.ReplyToMessage == nil {
-		return fmt.Errorf("%s: warning >> reply to message is nil", saveHandlerName)
+		return fmt.Errorf("%s: warning >> reply to message is nil", constants.SaveHandlerName)
 	}
 
 	// Return warning if it is reply to first message in message thread (not a reply in thread context)
 	if msg.ReplyToMessage.MessageId == msg.ReplyToMessage.MessageThreadId {
-		return fmt.Errorf("%s: warning >> reply to message not exists", saveHandlerName)
+		return fmt.Errorf("%s: warning >> reply to message not exists", constants.SaveHandlerName)
 	}
 
 	// Setting up copy message
@@ -81,17 +76,17 @@ func (h *SaveHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 
 	var userId int64 = msg.From.Id
 	if msg.From.IsBot && msg.From.Username == "GroupAnonymousBot" {
-		userId = h.anonymousUserId
+		userId = h.config.AnonymousUserID
 	}
 
 	// Sending copied message
 	_, err = h.messageSender.SendCopy(userId, nil, originalText, originalMessage.Entities, originalMessage)
 	if err != nil {
-		return fmt.Errorf("%s: err >> error sending copied message: %v", saveHandlerName, err)
+		return fmt.Errorf("%s: err >> error sending copied message: %v", constants.SaveHandlerName, err)
 	}
 	log.Printf(
 		"%s: Copied message sent: %v\nUsername: %s\nUser ID: %d",
-		saveHandlerName,
+		constants.SaveHandlerName,
 		originalMessageUrl,
 		msg.From.Username,
 		userId)
@@ -99,7 +94,7 @@ func (h *SaveHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	// Sending info message
 	_, err = h.messageSender.SendCopy(userId, nil, infoMsgText, infoMsgEntities, nil)
 	if err != nil {
-		return fmt.Errorf("%s: err >> error sending info message: %v", saveHandlerName, err)
+		return fmt.Errorf("%s: err >> error sending info message: %v", constants.SaveHandlerName, err)
 	}
 	return nil
 }
@@ -110,10 +105,10 @@ func (h *SaveHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 		return false
 	}
 	return msg.Text != "" && (msg.Text == "@"+b.User.Username ||
-		strings.HasPrefix(msg.Text, "/save") ||
-		strings.HasPrefix(msg.Text, "/forward"))
+		strings.HasPrefix(msg.Text, constants.SaveCommand) ||
+		strings.HasPrefix(msg.Text, constants.ForwardCommand))
 }
 
 func (h *SaveHandler) Name() string {
-	return saveHandlerName
+	return constants.SaveHandlerName
 }

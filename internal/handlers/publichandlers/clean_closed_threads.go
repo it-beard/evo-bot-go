@@ -3,35 +3,28 @@ package publichandlers
 import (
 	"fmt"
 	"log"
-	"os"
 	"strconv"
 	"strings"
-	"your_module_name/internal/handlers"
-	"your_module_name/internal/services"
+	"github.com/it-beard/evo-bot-go/internal/config"
+	"github.com/it-beard/evo-bot-go/internal/constants"
+	"github.com/it-beard/evo-bot-go/internal/handlers"
+	"github.com/it-beard/evo-bot-go/internal/services"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
-const cleanClosedThreadsHandlerName = "clean_closed_thread_handler"
-
 type CleanClosedThreadsHandler struct {
 	closedThreads map[int64]bool
 	messageSender services.MessageSender
+	config        *config.Config
 }
 
-func NewCleanClosedThreadsHandler(messageSender services.MessageSender) handlers.Handler {
+func NewCleanClosedThreadsHandler(messageSender services.MessageSender, config *config.Config) handlers.Handler {
+	// Create map of closed threads
 	closedThreads := make(map[int64]bool)
-	closedThreadsStr := os.Getenv("TG_EVO_BOT_CLOSED_THREADS_IDS")
-	for _, chatID := range strings.Split(closedThreadsStr, ",") {
-		if id, err := strconv.ParseInt(chatID, 10, 64); err == nil {
-			closedThreads[id] = true
-		} else {
-			log.Printf(
-				"%s: error >> failed to parse closed thread ID from env: %v",
-				cleanClosedThreadsHandlerName,
-				err)
-		}
+	for _, id := range config.ClosedThreadsIDs {
+		closedThreads[id] = true
 	}
 	return &CleanClosedThreadsHandler{
 		closedThreads: closedThreads,
@@ -46,7 +39,7 @@ func (h *CleanClosedThreadsHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Contex
 	if err != nil {
 		return fmt.Errorf(
 			"%s: error >> failed to delete message: %w",
-			cleanClosedThreadsHandlerName,
+			constants.CleanClosedThreadsHandlerName,
 			err)
 	}
 
@@ -66,7 +59,7 @@ func (h *CleanClosedThreadsHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Contex
 	if err != nil {
 		return fmt.Errorf(
 			"%s: error >> failed to send message about deletion: %w",
-			cleanClosedThreadsHandlerName,
+			constants.CleanClosedThreadsHandlerName,
 			err)
 	}
 	// Send copy of the message to user
@@ -74,7 +67,7 @@ func (h *CleanClosedThreadsHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Contex
 	if err != nil {
 		return fmt.Errorf(
 			"%s: error >> failed to send copy message: %w",
-			cleanClosedThreadsHandlerName,
+			constants.CleanClosedThreadsHandlerName,
 			err)
 	}
 
@@ -83,7 +76,7 @@ func (h *CleanClosedThreadsHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Contex
 		"%s: Deleted message in topic %s\n"+
 			"User ID: %d\n"+
 			"Content: \"%s\"",
-		cleanClosedThreadsHandlerName, threadUrl, msg.From.Id, msg.Text)
+		constants.CleanClosedThreadsHandlerName, threadUrl, msg.From.Id, msg.Text)
 
 	return nil
 }
@@ -133,5 +126,5 @@ func (h *CleanClosedThreadsHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context
 }
 
 func (h *CleanClosedThreadsHandler) Name() string {
-	return cleanClosedThreadsHandlerName
+	return constants.CleanClosedThreadsHandlerName
 }

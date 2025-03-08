@@ -7,9 +7,9 @@ import (
 	"syscall"
 	"time"
 
-	"your_module_name/internal/bot"
-	"your_module_name/internal/clients"
-	"your_module_name/internal/config"
+	"github.com/it-beard/evo-bot-go/internal/bot"
+	"github.com/it-beard/evo-bot-go/internal/clients"
+	"github.com/it-beard/evo-bot-go/internal/config"
 )
 
 func keepTgUserClientSessionAlive() {
@@ -33,11 +33,6 @@ func keepTgUserClientSessionAlive() {
 }
 
 func main() {
-	token := os.Getenv("TG_EVO_BOT_TOKEN")
-	if token == "" {
-		log.Fatal("TG_EVO_BOT_TOKEN environment variable is empty")
-	}
-
 	// Load configuration
 	appConfig, err := config.LoadConfig()
 	if err != nil {
@@ -54,7 +49,7 @@ func main() {
 	keepTgUserClientSessionAlive()
 
 	// Create and start the bot
-	botClient, err := bot.NewTgBotClient(token, openaiClient, appConfig)
+	botClient, err := bot.NewTgBotClient(openaiClient, appConfig)
 	if err != nil {
 		log.Fatal("Failed to create Telegram Bot Client: " + err.Error())
 	}

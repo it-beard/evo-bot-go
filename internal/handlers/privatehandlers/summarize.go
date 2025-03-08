@@ -7,29 +7,29 @@ import (
 	"strings"
 	"time"
 
-	"your_module_name/internal/handlers"
-	"your_module_name/internal/services"
-	"your_module_name/internal/utils"
+	"github.com/it-beard/evo-bot-go/internal/config"
+	"github.com/it-beard/evo-bot-go/internal/constants"
+	"github.com/it-beard/evo-bot-go/internal/handlers"
+	"github.com/it-beard/evo-bot-go/internal/services"
+	"github.com/it-beard/evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
-const summarizeHandlerName = "summarize_handler"
-const summarizeCommand = "/summarize"
-const dmFlag = "-dm"
+// Constants moved to internal/constants/private_handlers.go
 
 // SummarizeHandler handles the summarize command
 type SummarizeHandler struct {
 	summarizationService *services.SummarizationService
-	mainChatID           int64
+	config               *config.Config
 }
 
 // NewSummarizeHandler creates a new summarize handler
-func NewSummarizeHandler(summarizationService *services.SummarizationService, mainChatID int64) handlers.Handler {
+func NewSummarizeHandler(summarizationService *services.SummarizationService, config *config.Config) handlers.Handler {
 	return &SummarizeHandler{
 		summarizationService: summarizationService,
-		mainChatID:           mainChatID,
+		config:               config,
 	}
 }
 
@@ -38,7 +38,7 @@ func (h *SummarizeHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error 
 	msg := ctx.EffectiveMessage
 
 	// Check if the DM flag is present
-	sendToDM := strings.Contains(msg.Text, dmFlag)
+	sendToDM := strings.Contains(msg.Text, constants.SummarizeDmFlag)
 
 	// Send a message indicating that summarization has started
 	replyMsg, err := msg.Reply(b, "Запуск процесса создания сводки...", nil)
@@ -111,12 +111,12 @@ func (h *SummarizeHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 	}
 
 	// Check if the message is the summarize command (with or without DM flag)
-	if !strings.HasPrefix(msg.Text, summarizeCommand) {
+	if !strings.HasPrefix(msg.Text, constants.SummarizeCommand) {
 		return false
 	}
 
 	// Check if the user is an admin
-	if !utils.IsUserAdminOrCreator(b, msg.From.Id, h.mainChatID) {
+	if !utils.IsUserAdminOrCreator(b, msg.From.Id, h.config.MainChatID) {
 		msg.Reply(b, "Эта команда доступна только администраторам.", nil)
 		return false
 	}
@@ -126,5 +126,5 @@ func (h *SummarizeHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 
 // Name returns the handler name
 func (h *SummarizeHandler) Name() string {
-	return summarizeHandlerName
+	return constants.SummarizeHandlerName
 }

@@ -10,10 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"your_module_name/internal/clients"
-	"your_module_name/internal/handlers"
-	"your_module_name/internal/handlers/prompts"
-	"your_module_name/internal/services"
+	"github.com/it-beard/evo-bot-go/internal/clients"
+	"github.com/it-beard/evo-bot-go/internal/config"
+	"github.com/it-beard/evo-bot-go/internal/constants"
+	"github.com/it-beard/evo-bot-go/internal/handlers"
+	"github.com/it-beard/evo-bot-go/internal/handlers/prompts"
+	"github.com/it-beard/evo-bot-go/internal/services"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -22,29 +24,13 @@ import (
 
 type ContentHandler struct {
 	openaiClient *clients.OpenAiClient
-	chatId       int64 // Add field for chat ID
-	topicId      int   // Add field for topic ID
+	config       *config.Config
 }
 
-func NewContentHandler(openaiClient *clients.OpenAiClient) handlers.Handler {
-	// Parse environment variables
-	chatIdStr := os.Getenv("TG_EVO_BOT_MAIN_CHAT_ID")
-	topicIdStr := os.Getenv("TG_EVO_BOT_CONTENT_TOPIC_ID")
-
-	chatId, err := strconv.ParseInt(chatIdStr, 10, 64)
-	if err != nil {
-		log.Fatalf("Invalid TG_EVO_BOT_MAIN_CHAT_ID: %v", err)
-	}
-
-	topicId, err := strconv.Atoi(topicIdStr)
-	if err != nil {
-		log.Fatalf("Invalid TG_EVO_BOT_CONTENT_TOPIC_ID: %v", err)
-	}
-
+func NewContentHandler(openaiClient *clients.OpenAiClient, config *config.Config) handlers.Handler {
 	return &ContentHandler{
 		openaiClient: openaiClient,
-		chatId:       chatId,
-		topicId:      topicId,
+		config:       config,
 	}
 }
 
@@ -54,7 +40,7 @@ func (h *ContentHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	// Extract text after command
 	commandText := h.extractCommandText(msg)
 	if commandText == "" {
-		_, err := msg.Reply(b, fmt.Sprintf("Пожалуйста, введи поисковый запрос после команды. Например: %s <текст>", contentCommand), nil)
+		_, err := msg.Reply(b, fmt.Sprintf("Пожалуйста, введи поисковый запрос после команды. Например: %s <текст>", constants.ContentCommand), nil)
 		return err
 	}
 
@@ -63,7 +49,7 @@ func (h *ContentHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	sender.SendTypingAction(msg.Chat.Id)
 
 	// Get messages from chat
-	messages, err := clients.GetChatMessages(h.chatId, h.topicId) // Get last 100 messages
+	messages, err := clients.GetChatMessages(h.config.MainChatID, h.config.ContentTopicID) // Get last 100 messages
 	if err != nil {
 		return fmt.Errorf("failed to get chat messages: %w", err)
 	}
@@ -73,7 +59,7 @@ func (h *ContentHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 		return err
 	}
 
-	topicLink := fmt.Sprintf("https://t.me/c/%d/%d", h.chatId, h.topicId)
+	topicLink := fmt.Sprintf("https://t.me/c/%d/%d", h.config.MainChatID, h.config.ContentTopicID)
 	prompt := fmt.Sprintf(
 		prompts.GetContentPromptTemplate,
 		topicLink,
@@ -125,8 +111,8 @@ func (h *ContentHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 	}
 
 	if msg.Text != "" &&
-		strings.HasPrefix(msg.Text, contentCommand) &&
-		msg.Chat.Type == privateChat {
+		strings.HasPrefix(msg.Text, constants.ContentCommand) &&
+		msg.Chat.Type == constants.PrivateChat {
 
 		if !h.isUserClubMember(b, msg) {
 			msg.Reply(b, "Команда доступна только для членов клуба.", nil)
@@ -140,19 +126,19 @@ func (h *ContentHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 }
 
 func (h *ContentHandler) Name() string {
-	return contentHandlerName
+	return constants.ContentHandlerName
 }
 
 func (h *ContentHandler) extractCommandText(msg *gotgbot.Message) string {
 	var commandText string
-	if strings.HasPrefix(msg.Text, contentCommand) {
-		commandText = strings.TrimPrefix(msg.Text, contentCommand)
+	if strings.HasPrefix(msg.Text, constants.ContentCommand) {
+		commandText = strings.TrimPrefix(msg.Text, constants.ContentCommand)
 	}
 	return strings.TrimSpace(commandText)
 }
 
 func (h *ContentHandler) isUserClubMember(b *gotgbot.Bot, msg *gotgbot.Message) bool {
-	chatId, err := strconv.ParseInt("-100"+strconv.FormatInt(h.chatId, 10), 10, 64)
+	chatId, err := strconv.ParseInt("-100"+strconv.FormatInt(h.config.MainChatID, 10), 10, 64)
 	if err != nil {
 		log.Printf("Failed to parse chat ID: %v", err)
 		return false

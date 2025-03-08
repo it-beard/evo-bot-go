@@ -2,34 +2,31 @@ package privatehandlers
 
 import (
 	"log"
-	"os"
-	"strconv"
 	"strings"
-	"your_module_name/internal/clients"
-	"your_module_name/internal/handlers"
-	"your_module_name/internal/utils"
+	"github.com/it-beard/evo-bot-go/internal/clients"
+	"github.com/it-beard/evo-bot-go/internal/config"
+	"github.com/it-beard/evo-bot-go/internal/constants"
+	"github.com/it-beard/evo-bot-go/internal/handlers"
+	"github.com/it-beard/evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
 type CodeHandler struct {
-	chatId int64
+	config *config.Config
 }
 
-func NewCodeHandler() handlers.Handler {
-	chatIdStr := os.Getenv("TG_EVO_BOT_MAIN_CHAT_ID")
-	chatId, err := strconv.ParseInt(chatIdStr, 10, 64)
-	if err != nil {
-		log.Fatalf("Invalid TG_EVO_BOT_MAIN_CHAT_ID: %v", err)
+func NewCodeHandler(config *config.Config) handlers.Handler {
+	return &CodeHandler{
+		config: config,
 	}
-	return &CodeHandler{chatId: chatId}
 }
 
 func (h *CodeHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	// Extract code from command
-	revertedCode := strings.TrimPrefix(msg.Text, codeCommand)
+	revertedCode := strings.TrimPrefix(msg.Text, constants.CodeCommand)
 	revertedCode = strings.TrimSpace(revertedCode)
 	code := reverseString(revertedCode)
 	if code == "" {
@@ -53,8 +50,8 @@ func (h *CodeHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 		return false
 	}
 
-	if msg.Text != "" && strings.HasPrefix(msg.Text, codeCommand) && msg.Chat.Type == privateChat {
-		if !utils.IsUserAdminOrCreator(b, msg.From.Id, h.chatId) {
+	if msg.Text != "" && strings.HasPrefix(msg.Text, constants.CodeCommand) && msg.Chat.Type == constants.PrivateChat {
+		if !utils.IsUserAdminOrCreator(b, msg.From.Id, h.config.MainChatID) {
 			msg.Reply(b, "Команда доступна только для администраторов.", nil)
 			log.Print("Trying to use /code command without admin rights")
 			return false
@@ -66,7 +63,7 @@ func (h *CodeHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 }
 
 func (h *CodeHandler) Name() string {
-	return codeHandlerName
+	return constants.CodeHandlerName
 }
 
 func reverseString(s string) string {

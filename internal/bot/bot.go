@@ -4,13 +4,13 @@ import (
 	"log"
 	"time"
 
-	"your_module_name/internal/clients"
-	"your_module_name/internal/config"
-	"your_module_name/internal/handlers/privatehandlers"
-	"your_module_name/internal/handlers/publichandlers"
-	"your_module_name/internal/scheduler"
-	"your_module_name/internal/services"
-	"your_module_name/internal/storage"
+	"github.com/it-beard/evo-bot-go/internal/clients"
+	"github.com/it-beard/evo-bot-go/internal/config"
+	"github.com/it-beard/evo-bot-go/internal/handlers/privatehandlers"
+	"github.com/it-beard/evo-bot-go/internal/handlers/publichandlers"
+	"github.com/it-beard/evo-bot-go/internal/scheduler"
+	"github.com/it-beard/evo-bot-go/internal/services"
+	"github.com/it-beard/evo-bot-go/internal/storage"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -24,8 +24,8 @@ type TgBotClient struct {
 	scheduler  *scheduler.DailyScheduler
 }
 
-func NewTgBotClient(token string, openaiClient *clients.OpenAiClient, appConfig *config.Config) (*TgBotClient, error) {
-	b, err := gotgbot.NewBot(token, nil)
+func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config) (*TgBotClient, error) {
+	b, err := gotgbot.NewBot(appConfig.BotToken, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -87,17 +87,17 @@ func (b *TgBotClient) registerHandlers(openaiClient *clients.OpenAiClient, appCo
 	// Private handlers
 	b.dispatcher.AddHandler(privatehandlers.NewStartHandler())
 	b.dispatcher.AddHandler(privatehandlers.NewHelpHandler())
-	b.dispatcher.AddHandler(privatehandlers.NewToolHandler(openaiClient))
-	b.dispatcher.AddHandler(privatehandlers.NewContentHandler(openaiClient))
-	b.dispatcher.AddHandler(privatehandlers.NewCodeHandler())
-	b.dispatcher.AddHandler(privatehandlers.NewSummarizeHandler(summarizationService, appConfig.MainChatID))
+	b.dispatcher.AddHandler(privatehandlers.NewToolHandler(openaiClient, appConfig))
+	b.dispatcher.AddHandler(privatehandlers.NewContentHandler(openaiClient, appConfig))
+	b.dispatcher.AddHandler(privatehandlers.NewCodeHandler(appConfig))
+	b.dispatcher.AddHandler(privatehandlers.NewSummarizeHandler(summarizationService, appConfig))
 
 	// Public handlers
 	b.dispatcher.AddHandler(publichandlers.NewDeleteJoinLeftMessagesHandler())
-	b.dispatcher.AddHandler(publichandlers.NewSaveHandler(messageSender))
-	b.dispatcher.AddHandler(publichandlers.NewRepliesFromClosedThreadsHandler(messageSender))
-	b.dispatcher.AddHandler(publichandlers.NewCleanClosedThreadsHandler(messageSender))
-	b.dispatcher.AddHandler(publichandlers.NewMessageCollectorHandler(appConfig, messageStore))
+	b.dispatcher.AddHandler(publichandlers.NewSaveHandler(messageSender, appConfig))
+	b.dispatcher.AddHandler(publichandlers.NewRepliesFromClosedThreadsHandler(messageSender, appConfig))
+	b.dispatcher.AddHandler(publichandlers.NewCleanClosedThreadsHandler(messageSender, appConfig))
+	b.dispatcher.AddHandler(publichandlers.NewMessageCollectorHandler(messageStore, appConfig))
 }
 
 func (b *TgBotClient) Start() {

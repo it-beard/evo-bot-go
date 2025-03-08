@@ -3,7 +3,8 @@ package clients
 import (
 	"context"
 	"fmt"
-	"os"
+
+	"github.com/it-beard/evo-bot-go/internal/config"
 
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
@@ -14,10 +15,13 @@ type OpenAiClient struct {
 }
 
 func NewOpenAiClient() (*OpenAiClient, error) {
-	apiKey := os.Getenv("TG_EVO_BOT_OPENAI_API_KEY")
-	if apiKey == "" {
-		return nil, fmt.Errorf("TG_EVO_BOT_OPENAI_API_KEY environment variable is not set")
+	// Load configuration
+	appConfig, err := config.LoadConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
+
+	apiKey := appConfig.OpenAIAPIKey
 
 	client := openai.NewClient(
 		option.WithAPIKey(apiKey),

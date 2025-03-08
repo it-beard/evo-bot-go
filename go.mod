@@ -1,4 +1,4 @@
-module your_module_name
+module github.com/it-beard/evo-bot-go
 
 go 1.23.3
 
@@ -7,6 +7,7 @@ toolchain go1.23.5
 require (
 	github.com/PaulSonOfLars/gotgbot/v2 v2.0.0-rc.29
 	github.com/gotd/td v0.118.0
+	github.com/lib/pq v1.10.9
 	github.com/openai/openai-go v0.1.0-alpha.51
 	github.com/stretchr/testify v1.10.0
 )
@@ -26,7 +27,6 @@ require (
 	github.com/gotd/ige v0.2.2 // indirect
 	github.com/gotd/neo v0.1.5 // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
-	github.com/lib/pq v1.10.9 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/ogen-go/ogen v1.8.1 // indirect

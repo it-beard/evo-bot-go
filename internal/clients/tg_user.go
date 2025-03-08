@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
-	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/it-beard/evo-bot-go/internal/config"
 
 	"github.com/gotd/td/session"
 	"github.com/gotd/td/telegram"
@@ -34,9 +34,16 @@ var (
 )
 
 func init() {
-	// Initialize session storage based on environment configuration
-	sessionType := os.Getenv(envSessionType)
-	if strings.ToLower(sessionType) == "file" {
+	// Initialize session storage based on configuration
+	// Load configuration
+	appConfig, err := config.LoadConfig()
+	if err != nil {
+		log.Printf("Failed to load configuration, using in-memory session storage: %v", err)
+		storage = new(session.StorageMemory)
+		return
+	}
+
+	if strings.ToLower(appConfig.TGUserClientSessionType) == "file" {
 		storage = &session.FileStorage{Path: defaultSessionFile}
 		log.Printf("Using file session storage (%s)", defaultSessionFile)
 	} else {
@@ -53,19 +60,20 @@ type TelegramConfig struct {
 	Password    string
 }
 
-// NewTelegramConfig creates a new TelegramConfig from environment variables
+// NewTelegramConfig creates a new TelegramConfig from config values
 func NewTelegramConfig() (*TelegramConfig, error) {
-	appIDStr := os.Getenv(envAppID)
-	appHash := os.Getenv(envAppHash)
-	phoneNumber := os.Getenv(envPhoneNumber)
-	password := os.Getenv(envPassword)
-
-	appID, err := strconv.Atoi(appIDStr)
+	// Load configuration
+	appConfig, err := config.LoadConfig()
 	if err != nil {
-		return nil, fmt.Errorf("invalid app ID: %w", err)
+		return nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	if appHash == "" || phoneNumber == "" || password == "" {
+	appID := appConfig.TGUserClientAppID
+	appHash := appConfig.TGUserClientAppHash
+	phoneNumber := appConfig.TGUserClientPhoneNumber
+	password := appConfig.TGUserClient2FAPass
+
+	if appID == 0 || appHash == "" || phoneNumber == "" || password == "" {
 		return nil, fmt.Errorf("missing required telegram client configuration")
 	}
 

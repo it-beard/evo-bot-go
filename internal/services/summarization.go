@@ -6,10 +6,10 @@ import (
 	"log"
 	"time"
 
-	"your_module_name/internal/clients"
-	"your_module_name/internal/config"
-	"your_module_name/internal/handlers/prompts"
-	"your_module_name/internal/storage"
+	"github.com/it-beard/evo-bot-go/internal/clients"
+	"github.com/it-beard/evo-bot-go/internal/config"
+	"github.com/it-beard/evo-bot-go/internal/handlers/prompts"
+	"github.com/it-beard/evo-bot-go/internal/storage"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 )
@@ -129,6 +129,6 @@ func (s *SummarizationService) summarizeChat(ctx context.Context, chatID int64, 
 		return fmt.Errorf("failed to send summary: %w", err)
 	}
 
-	log.Printf("Summary sent successfully", chatID)
+	log.Printf("Summary sent successfully")
 	return nil
 }
