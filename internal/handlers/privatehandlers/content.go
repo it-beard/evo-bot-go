@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -16,6 +15,7 @@ import (
 	"github.com/it-beard/evo-bot-go/internal/handlers"
 	"github.com/it-beard/evo-bot-go/internal/handlers/prompts"
 	"github.com/it-beard/evo-bot-go/internal/services"
+	"github.com/it-beard/evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -114,7 +114,7 @@ func (h *ContentHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 		strings.HasPrefix(msg.Text, constants.ContentCommand) &&
 		msg.Chat.Type == constants.PrivateChat {
 
-		if !h.isUserClubMember(b, msg) {
+		if !utils.IsUserClubMember(b, msg, h.config) {
 			msg.Reply(b, "Команда доступна только для членов клуба.", nil)
 			log.Print("Trying to use /content command without club membership")
 			return false
@@ -135,26 +135,6 @@ func (h *ContentHandler) extractCommandText(msg *gotgbot.Message) string {
 		commandText = strings.TrimPrefix(msg.Text, constants.ContentCommand)
 	}
 	return strings.TrimSpace(commandText)
-}
-
-func (h *ContentHandler) isUserClubMember(b *gotgbot.Bot, msg *gotgbot.Message) bool {
-	chatId, err := strconv.ParseInt("-100"+strconv.FormatInt(h.config.MainChatID, 10), 10, 64)
-	if err != nil {
-		log.Printf("Failed to parse chat ID: %v", err)
-		return false
-	}
-	// Check if user is member of target group
-	chatMember, err := b.GetChatMember(chatId, msg.From.Id, nil)
-	if err != nil {
-		log.Printf("Failed to get chat member: %v", err)
-		return false
-	}
-
-	status := chatMember.GetStatus()
-	if status == "left" || status == "kicked" {
-		return false
-	}
-	return true
 }
 
 func (h *ContentHandler) prepareTelegramMessages(messages []tg.Message) ([]byte, error) {
