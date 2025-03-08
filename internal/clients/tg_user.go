@@ -8,6 +8,8 @@ import (
 	"sync"
 
 	"github.com/it-beard/evo-bot-go/internal/config"
+	"github.com/it-beard/evo-bot-go/internal/constants"
+	"github.com/it-beard/evo-bot-go/internal/storage"
 
 	"github.com/gotd/td/session"
 	"github.com/gotd/td/telegram"
@@ -15,22 +17,10 @@ import (
 	"github.com/gotd/td/tg"
 )
 
-// Environment variable names
-const (
-	envSessionType = "TG_EVO_BOT_TGUSERCLIENT_SESSION_TYPE"
-	envAppID       = "TG_EVO_BOT_TGUSERCLIENT_APPID"
-	envAppHash     = "TG_EVO_BOT_TGUSERCLIENT_APPHASH"
-	envPhoneNumber = "TG_EVO_BOT_TGUSERCLIENT_PHONENUMBER"
-	envPassword    = "TG_EVO_BOT_TGUSERCLIENT_2FAPASS"
-
-	defaultSessionFile = "session.json"
-	defaultLimit       = 100
-)
-
 var (
 	verificationCode string
 	codeMutex        sync.RWMutex
-	storage          session.Storage
+	sessionStorage   session.Storage
 )
 
 func init() {
@@ -39,17 +29,51 @@ func init() {
 	appConfig, err := config.LoadConfig()
 	if err != nil {
 		log.Printf("Failed to load configuration, using in-memory session storage: %v", err)
-		storage = new(session.StorageMemory)
+		sessionStorage = new(session.StorageMemory)
 		return
 	}
 
-	if strings.ToLower(appConfig.TGUserClientSessionType) == "file" {
-		storage = &session.FileStorage{Path: defaultSessionFile}
-		log.Printf("Using file session storage (%s)", defaultSessionFile)
-	} else {
-		storage = new(session.StorageMemory)
+	sessionType := strings.ToLower(appConfig.TGUserClientSessionType)
+
+	switch sessionType {
+	case constants.TGUserClientSessionTypeFile:
+		sessionStorage = &session.FileStorage{Path: constants.TGUserClientDefaultSessionFile}
+		log.Printf("Using file session storage (%s)", constants.TGUserClientDefaultSessionFile)
+	case constants.TGUserClientSessionTypeDatabase:
+		// Initialize database storage
+		dbSessionStorage, err := initDatabaseStorage(appConfig.DBConnection)
+		if err != nil {
+			log.Printf("Failed to initialize database session storage: %v, falling back to in-memory storage", err)
+			sessionStorage = new(session.StorageMemory)
+		} else {
+			sessionStorage = dbSessionStorage
+			log.Print("Using database session storage")
+		}
+	default:
+		sessionStorage = new(session.StorageMemory)
 		log.Print("Using in-memory session storage")
 	}
+}
+
+// initDatabaseStorage initializes a database-backed session storage
+func initDatabaseStorage(connectionString string) (session.Storage, error) {
+	if connectionString == "" {
+		return nil, fmt.Errorf("database connection string is empty")
+	}
+
+	// Create database connection
+	db, err := storage.NewDB(connectionString)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
+	}
+
+	// Create session store
+	sessionStore, err := storage.NewSessionStore(db)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create session store: %w", err)
+	}
+
+	return sessionStore, nil
 }
 
 // TelegramConfig holds the configuration for Telegram client
@@ -99,7 +123,7 @@ func NewTelegramClient() (*TelegramClient, error) {
 	}
 
 	client := telegram.NewClient(config.AppID, config.AppHash, telegram.Options{
-		SessionStorage: storage,
+		SessionStorage: sessionStorage,
 	})
 
 	return &TelegramClient{
@@ -145,7 +169,7 @@ func GetChatMessageById(chatID int64, messageID int) (*tg.Message, error) {
 			// Try to get forum topics
 			forumTopics, err := api.ChannelsGetForumTopics(ctx, &tg.ChannelsGetForumTopicsRequest{
 				Channel: inputChannel,
-				Limit:   defaultLimit,
+				Limit:   constants.TGUserClientDefaultLimit,
 			})
 			if err == nil {
 				for _, topic := range forumTopics.Topics {
@@ -209,7 +233,7 @@ func GetChatMessages(chatID int64, topicID int) ([]tg.Message, error) {
 // fetchMessages retrieves messages with pagination
 func (t *TelegramClient) fetchMessages(ctx context.Context, api *tg.Client, inputPeer tg.InputPeerClass, topicID int, allMessages *[]tg.Message) error {
 	offset := 0
-	limit := defaultLimit
+	limit := constants.TGUserClientDefaultLimit
 
 	for {
 		// Get messages from chat with pagination
@@ -301,7 +325,7 @@ func (t *TelegramClient) getPeerInfoByChatID(ctx context.Context, chatID int64) 
 
 	// Fetch dialogs to find the chat and get its AccessHash if needed
 	dialogs, err := api.MessagesGetDialogs(ctx, &tg.MessagesGetDialogsRequest{
-		Limit:      defaultLimit,
+		Limit:      constants.TGUserClientDefaultLimit,
 		OffsetPeer: &tg.InputPeerChat{},
 	})
 	if err != nil {
