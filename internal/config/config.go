@@ -11,16 +11,16 @@ import (
 // Config holds the application configuration
 type Config struct {
 	// Basic Bot Configuration
-	BotToken     string
-	MainChatID   int64
-	OpenAIAPIKey string
+	BotToken         string
+	SuperGroupChatID int64
+	OpenAIAPIKey     string
+	AnonymousUserID  int64
 
-	// Chat Management
-	ClosedThreadsIDs   []int64
-	AnonymousUserID    int64
-	ForwardingThreadID int64
-	ToolTopicID        int
-	ContentTopicID     int
+	// Topics Management
+	ClosedTopicsIDs   []int
+	ForwardingTopicID int
+	ToolTopicID       int
+	ContentTopicID    int
 
 	// Telegram User Client
 	TGUserClientAppID       int
@@ -46,32 +46,32 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("TG_EVO_BOT_TOKEN environment variable is not set")
 	}
 
-	mainChatIDStr := os.Getenv("TG_EVO_BOT_MAIN_CHAT_ID")
-	if mainChatIDStr == "" {
-		return nil, fmt.Errorf("TG_EVO_BOT_MAIN_CHAT_ID environment variable is not set")
+	supergroupChatIDStr := os.Getenv("TG_EVO_BOT_SUPERGROUP_CHAT_ID")
+	if supergroupChatIDStr == "" {
+		return nil, fmt.Errorf("TG_EVO_BOT_SUPERGROUP_CHAT_ID environment variable is not set")
 	}
 
-	mainChatID, err := strconv.ParseInt(mainChatIDStr, 10, 64)
+	supergroupChatID, err := strconv.ParseInt(supergroupChatIDStr, 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("invalid main chat ID: %s", mainChatIDStr)
+		return nil, fmt.Errorf("invalid supergroup chat ID: %s", supergroupChatIDStr)
 	}
-	config.MainChatID = mainChatID
+	config.SuperGroupChatID = supergroupChatID
 
 	config.OpenAIAPIKey = os.Getenv("TG_EVO_BOT_OPENAI_API_KEY")
 	if config.OpenAIAPIKey == "" {
 		return nil, fmt.Errorf("TG_EVO_BOT_OPENAI_API_KEY environment variable is not set")
 	}
 
-	// Chat Management
-	closedThreadsIDsStr := os.Getenv("TG_EVO_BOT_CLOSED_THREADS_IDS")
-	if closedThreadsIDsStr != "" {
-		threadIDs := strings.Split(closedThreadsIDsStr, ",")
-		for _, threadIDStr := range threadIDs {
-			threadID, err := strconv.ParseInt(strings.TrimSpace(threadIDStr), 10, 64)
+	// Topics Management
+	closedTopicsIDsStr := os.Getenv("TG_EVO_BOT_CLOSED_TOPICS_IDS")
+	if closedTopicsIDsStr != "" {
+		topicIDs := strings.Split(closedTopicsIDsStr, ",")
+		for _, topicIDStr := range topicIDs {
+			topicID, err := strconv.Atoi(strings.TrimSpace(topicIDStr))
 			if err != nil {
-				return nil, fmt.Errorf("invalid thread ID in TG_EVO_BOT_CLOSED_THREADS_IDS: %s", threadIDStr)
+				return nil, fmt.Errorf("invalid topic ID in TG_EVO_BOT_CLOSED_TOPICS_IDS: %s", topicIDStr)
 			}
-			config.ClosedThreadsIDs = append(config.ClosedThreadsIDs, threadID)
+			config.ClosedTopicsIDs = append(config.ClosedTopicsIDs, topicID)
 		}
 	}
 
@@ -84,13 +84,13 @@ func LoadConfig() (*Config, error) {
 		config.AnonymousUserID = anonymousUserID
 	}
 
-	forwardingThreadIDStr := os.Getenv("TG_EVO_BOT_FORWARDING_THREAD_ID")
-	if forwardingThreadIDStr != "" {
-		forwardingThreadID, err := strconv.ParseInt(forwardingThreadIDStr, 10, 64)
+	forwardingTopicIDStr := os.Getenv("TG_EVO_BOT_FORWARDING_TOPIC_ID")
+	if forwardingTopicIDStr != "" {
+		forwardingTopicID, err := strconv.Atoi(forwardingTopicIDStr)
 		if err != nil {
-			return nil, fmt.Errorf("invalid forwarding thread ID: %s", forwardingThreadIDStr)
+			return nil, fmt.Errorf("invalid forwarding topic ID: %s", forwardingTopicIDStr)
 		}
-		config.ForwardingThreadID = forwardingThreadID
+		config.ForwardingTopicID = forwardingTopicID
 	}
 
 	toolTopicIDStr := os.Getenv("TG_EVO_BOT_TOOL_TOPIC_ID")

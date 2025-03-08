@@ -10,7 +10,7 @@ import (
 type MessageSender interface {
 	SendCopy(
 		chatId int64,
-		threadId *int64,
+		topicId *int,
 		text string,
 		entities []gotgbot.MessageEntity,
 		originalMessage *gotgbot.Message,
@@ -29,7 +29,7 @@ func NewMessageSender(bot *gotgbot.Bot) MessageSender {
 // Sends a copy of the original message to the chat
 func (s *TelegramMessageSender) SendCopy(
 	chatId int64,
-	threadId *int64,
+	topicId *int,
 	text string,
 	entities []gotgbot.MessageEntity,
 	originalMessage *gotgbot.Message,
@@ -108,16 +108,16 @@ func (s *TelegramMessageSender) SendCopy(
 		}
 	}
 
-	if threadId != nil {
+	if topicId != nil {
 		switch o := opts.(type) {
 		case *gotgbot.SendMessageOpts:
-			o.MessageThreadId = *threadId
+			o.MessageThreadId = int64(*topicId)
 		case *gotgbot.SendAnimationOpts:
-			o.MessageThreadId = *threadId
+			o.MessageThreadId = int64(*topicId)
 		case *gotgbot.SendPhotoOpts:
-			o.MessageThreadId = *threadId
+			o.MessageThreadId = int64(*topicId)
 		case *gotgbot.SendVideoOpts:
-			o.MessageThreadId = *threadId
+			o.MessageThreadId = int64(*topicId)
 		}
 	}
 

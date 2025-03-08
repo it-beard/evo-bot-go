@@ -116,7 +116,7 @@ func (h *SummarizeHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 	}
 
 	// Check if the user is an admin
-	if !utils.IsUserAdminOrCreator(b, msg.From.Id, h.config.MainChatID) {
+	if !utils.IsUserAdminOrCreator(b, msg.From.Id, h.config.SuperGroupChatID) {
 		msg.Reply(b, "Эта команда доступна только администраторам.", nil)
 		return false
 	}

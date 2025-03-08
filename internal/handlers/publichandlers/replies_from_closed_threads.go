@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"unicode/utf8"
+
 	"github.com/it-beard/evo-bot-go/internal/clients"
 	"github.com/it-beard/evo-bot-go/internal/config"
 	"github.com/it-beard/evo-bot-go/internal/constants"
@@ -17,20 +18,20 @@ import (
 )
 
 type RepliesFromClosedThreadsHandler struct {
-	closedThreads map[int64]bool
+	closedTopics  map[int]bool
 	messageSender services.MessageSender
 	config        *config.Config
 }
 
 func NewRepliesFromClosedThreadsHandler(messageSender services.MessageSender, config *config.Config) handlers.Handler {
-	// Create map of closed threads
-	closedThreads := make(map[int64]bool)
-	for _, id := range config.ClosedThreadsIDs {
-		closedThreads[id] = true
+	// Create map of closed topics
+	closedTopics := make(map[int]bool)
+	for _, id := range config.ClosedTopicsIDs {
+		closedTopics[id] = true
 	}
 
 	return &RepliesFromClosedThreadsHandler{
-		closedThreads: closedThreads,
+		closedTopics:  closedTopics,
 		messageSender: messageSender,
 		config:        config,
 	}
@@ -40,7 +41,7 @@ func (h *RepliesFromClosedThreadsHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.
 	msg := ctx.EffectiveMessage
 
 	if msg.ReplyToMessage != nil &&
-		h.closedThreads[msg.MessageThreadId] &&
+		h.closedTopics[int(msg.MessageThreadId)] &&
 		msg.ReplyToMessage.MessageId != msg.MessageThreadId {
 		if err := h.forwardReplyMessage(ctx); err != nil {
 			log.Printf(
@@ -172,7 +173,7 @@ func (h *RepliesFromClosedThreadsHandler) forwardReplyMessage(ctx *ext.Context) 
 	}
 
 	// Forward the message
-	_, err := h.messageSender.SendCopy(msg.Chat.Id, &h.config.ForwardingThreadID, finalMessage, updatedEntities, msg)
+	_, err := h.messageSender.SendCopy(msg.Chat.Id, &h.config.ForwardingTopicID, finalMessage, updatedEntities, msg)
 	if err != nil {
 		return fmt.Errorf("%s: error >> failed to forward reply message: %w", constants.RepliesFromClosedThreadsHandlerName, err)
 	}
@@ -191,8 +192,8 @@ func (h *RepliesFromClosedThreadsHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.C
 		return false
 	}
 
-	// Trigger if message is in closed threads and not reply to itself
-	return h.closedThreads[msg.MessageThreadId] && msg.ReplyToMessage.MessageId != msg.MessageThreadId
+	// Trigger if message is in closed topics and not reply to itself
+	return h.closedTopics[int(msg.MessageThreadId)] && msg.ReplyToMessage.MessageId != msg.MessageThreadId
 }
 
 func (h *RepliesFromClosedThreadsHandler) Name() string {

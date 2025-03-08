@@ -9,7 +9,7 @@ import (
 )
 
 func IsUserClubMember(b *gotgbot.Bot, msg *gotgbot.Message, config *config.Config) bool {
-	chatId, err := strconv.ParseInt("-100"+strconv.FormatInt(config.MainChatID, 10), 10, 64)
+	chatId, err := strconv.ParseInt("-100"+strconv.FormatInt(config.SuperGroupChatID, 10), 10, 64)
 	if err != nil {
 		log.Printf("Failed to parse chat ID: %v", err)
 		return false

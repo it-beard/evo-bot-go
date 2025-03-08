@@ -49,7 +49,7 @@ func (h *ContentHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	sender.SendTypingAction(msg.Chat.Id)
 
 	// Get messages from chat
-	messages, err := clients.GetChatMessages(h.config.MainChatID, h.config.ContentTopicID) // Get last 100 messages
+	messages, err := clients.GetChatMessages(h.config.SuperGroupChatID, h.config.ContentTopicID) // Get last 100 messages
 	if err != nil {
 		return fmt.Errorf("failed to get chat messages: %w", err)
 	}
@@ -59,7 +59,7 @@ func (h *ContentHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 		return err
 	}
 
-	topicLink := fmt.Sprintf("https://t.me/c/%d/%d", h.config.MainChatID, h.config.ContentTopicID)
+	topicLink := fmt.Sprintf("https://t.me/c/%d/%d", h.config.SuperGroupChatID, h.config.ContentTopicID)
 	prompt := fmt.Sprintf(
 		prompts.GetContentPromptTemplate,
 		topicLink,

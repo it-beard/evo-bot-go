@@ -5,6 +5,7 @@ import (
 	"log"
 	"strconv"
 	"strings"
+
 	"github.com/it-beard/evo-bot-go/internal/config"
 	"github.com/it-beard/evo-bot-go/internal/constants"
 	"github.com/it-beard/evo-bot-go/internal/handlers"
@@ -15,19 +16,19 @@ import (
 )
 
 type CleanClosedThreadsHandler struct {
-	closedThreads map[int64]bool
+	closedTopics  map[int]bool
 	messageSender services.MessageSender
 	config        *config.Config
 }
 
 func NewCleanClosedThreadsHandler(messageSender services.MessageSender, config *config.Config) handlers.Handler {
-	// Create map of closed threads
-	closedThreads := make(map[int64]bool)
-	for _, id := range config.ClosedThreadsIDs {
-		closedThreads[id] = true
+	// Create map of closed topics
+	closedTopics := make(map[int]bool)
+	for _, id := range config.ClosedTopicsIDs {
+		closedTopics[id] = true
 	}
 	return &CleanClosedThreadsHandler{
-		closedThreads: closedThreads,
+		closedTopics:  closedTopics,
 		messageSender: messageSender,
 	}
 }
@@ -87,8 +88,8 @@ func (h *CleanClosedThreadsHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context
 		return false
 	}
 
-	// Check if the thread is in closed threads list
-	if !h.closedThreads[msg.MessageThreadId] {
+	// Check if the topic is in closed topics list
+	if !h.closedTopics[int(msg.MessageThreadId)] {
 		return false
 	}
 
@@ -109,7 +110,7 @@ func (h *CleanClosedThreadsHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context
 	}
 
 	// Do not trigger if message is reply to another message in thread (this already handled by RepliesFromThreadsHandler)
-	if h.closedThreads[msg.MessageThreadId] &&
+	if h.closedTopics[int(msg.MessageThreadId)] &&
 		msg.ReplyToMessage != nil &&
 		msg.ReplyToMessage.MessageId != msg.MessageThreadId {
 		return false

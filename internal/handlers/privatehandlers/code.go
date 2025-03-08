@@ -3,6 +3,7 @@ package privatehandlers
 import (
 	"log"
 	"strings"
+
 	"github.com/it-beard/evo-bot-go/internal/clients"
 	"github.com/it-beard/evo-bot-go/internal/config"
 	"github.com/it-beard/evo-bot-go/internal/constants"
@@ -51,7 +52,7 @@ func (h *CodeHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 	}
 
 	if msg.Text != "" && strings.HasPrefix(msg.Text, constants.CodeCommand) && msg.Chat.Type == constants.PrivateChat {
-		if !utils.IsUserAdminOrCreator(b, msg.From.Id, h.config.MainChatID) {
+		if !utils.IsUserAdminOrCreator(b, msg.From.Id, h.config.SuperGroupChatID) {
 			msg.Reply(b, "Команда доступна только для администраторов.", nil)
 			log.Print("Trying to use /code command without admin rights")
 			return false
