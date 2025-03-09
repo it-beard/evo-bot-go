@@ -8,7 +8,7 @@ import (
 
 	"github.com/it-beard/evo-bot-go/internal/clients"
 	"github.com/it-beard/evo-bot-go/internal/config"
-	"github.com/it-beard/evo-bot-go/internal/database/storages"
+	"github.com/it-beard/evo-bot-go/internal/database/repositories"
 	"github.com/it-beard/evo-bot-go/internal/handlers/prompts"
 	"github.com/it-beard/evo-bot-go/internal/utils"
 
@@ -18,7 +18,7 @@ import (
 // SummarizationService handles the daily summarization of messages
 type SummarizationService struct {
 	config        *config.Config
-	messageStore  *storages.MessageStore
+	messages      *repositories.MessageRepository
 	openaiClient  *clients.OpenAiClient
 	messageSender MessageSender
 }
@@ -26,13 +26,13 @@ type SummarizationService struct {
 // NewSummarizationService creates a new summarization service
 func NewSummarizationService(
 	config *config.Config,
-	messageStore *storages.MessageStore,
+	messages *repositories.MessageRepository,
 	openaiClient *clients.OpenAiClient,
 	messageSender MessageSender,
 ) *SummarizationService {
 	return &SummarizationService{
 		config:        config,
-		messageStore:  messageStore,
+		messages:      messages,
 		openaiClient:  openaiClient,
 		messageSender: messageSender,
 	}
@@ -67,7 +67,7 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 	}
 
 	// Get recent messages
-	messages, err := s.messageStore.GetRecentMessages(ctx, topicID, since)
+	messages, err := s.messages.GetRecent(ctx, topicID, since)
 	if err != nil {
 		return fmt.Errorf("failed to get recent messages: %w", err)
 	}

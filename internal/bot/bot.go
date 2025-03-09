@@ -7,7 +7,7 @@ import (
 	"github.com/it-beard/evo-bot-go/internal/clients"
 	"github.com/it-beard/evo-bot-go/internal/config"
 	"github.com/it-beard/evo-bot-go/internal/database"
-	"github.com/it-beard/evo-bot-go/internal/database/storages"
+	"github.com/it-beard/evo-bot-go/internal/database/repositories"
 	"github.com/it-beard/evo-bot-go/internal/handlers/privatehandlers"
 	"github.com/it-beard/evo-bot-go/internal/handlers/publichandlers"
 	"github.com/it-beard/evo-bot-go/internal/services"
@@ -53,8 +53,8 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 		return nil, err
 	}
 
-	// Create message store
-	messageStore := storages.NewMessageStore(db)
+	// Create message repository
+	messageRepository := repositories.NewMessageRepository(db)
 
 	// Create message sender
 	messageSender := services.NewMessageSender(b)
@@ -62,7 +62,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	// Create summarization service
 	summarizationService := services.NewSummarizationService(
 		appConfig,
-		messageStore,
+		messageRepository,
 		openaiClient,
 		messageSender,
 	)
@@ -82,12 +82,17 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 		sessionKeepAliveTask:   sessionKeepAliveTask,
 	}
 
-	bot.registerHandlers(openaiClient, appConfig, messageStore, summarizationService)
+	bot.registerHandlers(openaiClient, appConfig, messageRepository, summarizationService)
 
 	return bot, nil
 }
 
-func (b *TgBotClient) registerHandlers(openaiClient *clients.OpenAiClient, appConfig *config.Config, messageStore *storages.MessageStore, summarizationService *services.SummarizationService) {
+func (b *TgBotClient) registerHandlers(
+	openaiClient *clients.OpenAiClient,
+	appConfig *config.Config,
+	messageRepository *repositories.MessageRepository,
+	summarizationService *services.SummarizationService,
+) {
 	messageSender := services.NewMessageSender(b.bot)
 
 	// Private handlers
@@ -103,7 +108,7 @@ func (b *TgBotClient) registerHandlers(openaiClient *clients.OpenAiClient, appCo
 	b.dispatcher.AddHandler(publichandlers.NewSaveHandler(messageSender, appConfig))
 	b.dispatcher.AddHandler(publichandlers.NewRepliesFromClosedThreadsHandler(messageSender, appConfig))
 	b.dispatcher.AddHandler(publichandlers.NewCleanClosedThreadsHandler(messageSender, appConfig))
-	b.dispatcher.AddHandler(publichandlers.NewMessageCollectorHandler(messageStore, appConfig))
+	b.dispatcher.AddHandler(publichandlers.NewMessageCollectorHandler(messageRepository, appConfig))
 }
 
 func (b *TgBotClient) Start() {

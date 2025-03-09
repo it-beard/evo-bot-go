@@ -1,4 +1,4 @@
-package storages
+package repositories
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"github.com/it-beard/evo-bot-go/internal/database"
 )
 
-// Message represents a stored message
+// Message represents a stored message in the database
 type Message struct {
 	ID               int64
 	TopicID          int
@@ -21,18 +21,18 @@ type Message struct {
 	CreatedAt        time.Time
 }
 
-// MessageStore handles message storage operations
-type MessageStore struct {
+// MessageRepository handles message persistence operations
+type MessageRepository struct {
 	db *database.DB
 }
 
-// NewMessageStore creates a new message store
-func NewMessageStore(db *database.DB) *MessageStore {
-	return &MessageStore{db: db}
+// NewMessageRepository creates a new message repository
+func NewMessageRepository(db *database.DB) *MessageRepository {
+	return &MessageRepository{db: db}
 }
 
-// StoreMessage stores a message in the database
-func (s *MessageStore) StoreMessage(ctx context.Context, msg *gotgbot.Message) error {
+// Store persists a Telegram message to the database
+func (r *MessageRepository) Store(ctx context.Context, msg *gotgbot.Message) error {
 	// Extract message text (could be in Caption for media messages)
 	text := msg.Text
 	if text == "" {
@@ -53,33 +53,31 @@ func (s *MessageStore) StoreMessage(ctx context.Context, msg *gotgbot.Message) e
 	// Convert Unix timestamp to time.Time
 	createdAt := time.Unix(int64(msg.Date), 0)
 
-	// if msg.ReplyToMessage is nil set reply_to_message_id to null
-	var replyToMessageId *int64
+	// Handle reply references
+	var replyToMessageID *int64
 	if msg.ReplyToMessage != nil {
-		replyToMessageId = &msg.ReplyToMessage.MessageId
+		replyToMessageID = &msg.ReplyToMessage.MessageId
 	}
 
-	// if replyToMessageId is the same as MessageThreadId, set it to null
-	if replyToMessageId != nil && *replyToMessageId == msg.MessageThreadId {
-		replyToMessageId = nil
+	// If reply is to the topic starter message, treat as no reply
+	if replyToMessageID != nil && *replyToMessageID == msg.MessageThreadId {
+		replyToMessageID = nil
 	}
 
-	//small hack for root topic 0 (1 in links)
-	var messageTopicId int
-	if !msg.IsTopicMessage {
-		messageTopicId = 0
-	} else {
-		messageTopicId = int(msg.MessageThreadId)
+	// Determine topic ID (0 for non-topic messages)
+	topicID := 0
+	if msg.IsTopicMessage {
+		topicID = int(msg.MessageThreadId)
 	}
 
-	// Insert message into database
-	_, err := s.db.ExecContext(
+	// Insert or update message in database
+	_, err := r.db.ExecContext(
 		ctx,
 		`INSERT INTO messages (topic_id, message_id, reply_to_message_id, user_id, username, message_text, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		ON CONFLICT (topic_id, message_id) DO UPDATE
 		SET message_text = $6, username = $5`,
-		messageTopicId, msg.MessageId, replyToMessageId, msg.From.Id, username, text, createdAt,
+		topicID, msg.MessageId, replyToMessageID, msg.From.Id, username, text, createdAt,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to store message: %w", err)
@@ -88,15 +86,15 @@ func (s *MessageStore) StoreMessage(ctx context.Context, msg *gotgbot.Message) e
 	return nil
 }
 
-// GetRecentMessages retrieves messages from the past 24 hours for a specific topic
-func (s *MessageStore) GetRecentMessages(ctx context.Context, chatID int, since time.Time) ([]Message, error) {
-	rows, err := s.db.QueryContext(
+// GetRecent retrieves messages from a specific topic since the provided time
+func (r *MessageRepository) GetRecent(ctx context.Context, topicID int, since time.Time) ([]Message, error) {
+	rows, err := r.db.QueryContext(
 		ctx,
 		`SELECT id, topic_id, message_id, reply_to_message_id, user_id, username, message_text, created_at
 		FROM messages
 		WHERE topic_id = $1 AND created_at >= $2
 		ORDER BY created_at ASC`,
-		chatID, since,
+		topicID, since,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query messages: %w", err)

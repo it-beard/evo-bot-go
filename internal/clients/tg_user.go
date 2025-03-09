@@ -10,7 +10,7 @@ import (
 	"github.com/it-beard/evo-bot-go/internal/config"
 	"github.com/it-beard/evo-bot-go/internal/constants"
 	"github.com/it-beard/evo-bot-go/internal/database"
-	"github.com/it-beard/evo-bot-go/internal/database/storages"
+	"github.com/it-beard/evo-bot-go/internal/database/repositories"
 
 	"github.com/gotd/td/session"
 	"github.com/gotd/td/telegram"
@@ -68,13 +68,11 @@ func initDatabaseStorage(connectionString string) (session.Storage, error) {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	// Create session storeS
-	sessionStore, err := storages.NewSessionStore(db)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create session store: %w", err)
-	}
+	// Create session repository
+	sessionRepository := repositories.NewSessionRepository(db)
+	// No error handling needed as the constructor doesn't return an error anymore
 
-	return sessionStore, nil
+	return sessionRepository, nil
 }
 
 // TelegramConfig holds the configuration for Telegram client

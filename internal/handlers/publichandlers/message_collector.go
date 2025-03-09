@@ -7,7 +7,7 @@ import (
 
 	"github.com/it-beard/evo-bot-go/internal/config"
 	"github.com/it-beard/evo-bot-go/internal/constants"
-	"github.com/it-beard/evo-bot-go/internal/database/storages"
+	"github.com/it-beard/evo-bot-go/internal/database/repositories"
 	"github.com/it-beard/evo-bot-go/internal/handlers"
 	"github.com/it-beard/evo-bot-go/internal/utils"
 
@@ -16,14 +16,14 @@ import (
 )
 
 type MessageCollectorHandler struct {
-	config       *config.Config
-	messageStore *storages.MessageStore
+	config   *config.Config
+	messages *repositories.MessageRepository
 }
 
-func NewMessageCollectorHandler(messageStore *storages.MessageStore, config *config.Config) handlers.Handler {
+func NewMessageCollectorHandler(messages *repositories.MessageRepository, config *config.Config) handlers.Handler {
 	return &MessageCollectorHandler{
-		config:       config,
-		messageStore: messageStore,
+		config:   config,
+		messages: messages,
 	}
 }
 
@@ -35,7 +35,7 @@ func (h *MessageCollectorHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context)
 	defer cancel()
 
 	// Store the message
-	if err := h.messageStore.StoreMessage(ctxTimeout, msg); err != nil {
+	if err := h.messages.Store(ctxTimeout, msg); err != nil {
 		log.Printf("%s: error storing message: %v", constants.MessageCollectorHandlerName, err)
 		return err
 	}
