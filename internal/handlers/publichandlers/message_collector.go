@@ -7,8 +7,8 @@ import (
 
 	"github.com/it-beard/evo-bot-go/internal/config"
 	"github.com/it-beard/evo-bot-go/internal/constants"
+	"github.com/it-beard/evo-bot-go/internal/database/storages"
 	"github.com/it-beard/evo-bot-go/internal/handlers"
-	"github.com/it-beard/evo-bot-go/internal/storage"
 	"github.com/it-beard/evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -17,10 +17,10 @@ import (
 
 type MessageCollectorHandler struct {
 	config       *config.Config
-	messageStore *storage.MessageStore
+	messageStore *storages.MessageStore
 }
 
-func NewMessageCollectorHandler(messageStore *storage.MessageStore, config *config.Config) handlers.Handler {
+func NewMessageCollectorHandler(messageStore *storages.MessageStore, config *config.Config) handlers.Handler {
 	return &MessageCollectorHandler{
 		config:       config,
 		messageStore: messageStore,

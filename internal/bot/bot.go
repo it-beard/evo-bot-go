@@ -6,11 +6,12 @@ import (
 
 	"github.com/it-beard/evo-bot-go/internal/clients"
 	"github.com/it-beard/evo-bot-go/internal/config"
+	"github.com/it-beard/evo-bot-go/internal/database"
+	"github.com/it-beard/evo-bot-go/internal/database/storages"
 	"github.com/it-beard/evo-bot-go/internal/handlers/privatehandlers"
 	"github.com/it-beard/evo-bot-go/internal/handlers/publichandlers"
 	"github.com/it-beard/evo-bot-go/internal/scheduler"
 	"github.com/it-beard/evo-bot-go/internal/services"
-	"github.com/it-beard/evo-bot-go/internal/storage"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -20,7 +21,7 @@ type TgBotClient struct {
 	bot        *gotgbot.Bot
 	dispatcher *ext.Dispatcher
 	updater    *ext.Updater
-	db         *storage.DB
+	db         *database.DB
 	scheduler  *scheduler.DailyScheduler
 }
 
@@ -41,7 +42,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	updater := ext.NewUpdater(dispatcher, nil)
 
 	// Initialize database
-	db, err := storage.NewDB(appConfig.DBConnection)
+	db, err := database.NewDB(appConfig.DBConnection)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +53,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	}
 
 	// Create message store
-	messageStore := storage.NewMessageStore(db)
+	messageStore := storages.NewMessageStore(db)
 
 	// Create message sender
 	messageSender := services.NewMessageSender(b)
@@ -81,7 +82,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	return bot, nil
 }
 
-func (b *TgBotClient) registerHandlers(openaiClient *clients.OpenAiClient, appConfig *config.Config, messageStore *storage.MessageStore, summarizationService *services.SummarizationService) {
+func (b *TgBotClient) registerHandlers(openaiClient *clients.OpenAiClient, appConfig *config.Config, messageStore *storages.MessageStore, summarizationService *services.SummarizationService) {
 	messageSender := services.NewMessageSender(b.bot)
 
 	// Private handlers

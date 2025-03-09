@@ -9,7 +9,8 @@ import (
 
 	"github.com/it-beard/evo-bot-go/internal/config"
 	"github.com/it-beard/evo-bot-go/internal/constants"
-	"github.com/it-beard/evo-bot-go/internal/storage"
+	"github.com/it-beard/evo-bot-go/internal/database"
+	"github.com/it-beard/evo-bot-go/internal/database/storages"
 
 	"github.com/gotd/td/session"
 	"github.com/gotd/td/telegram"
@@ -62,13 +63,13 @@ func initDatabaseStorage(connectionString string) (session.Storage, error) {
 	}
 
 	// Create database connection
-	db, err := storage.NewDB(connectionString)
+	db, err := database.NewDB(connectionString)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	// Create session store
-	sessionStore, err := storage.NewSessionStore(db)
+	// Create session storeS
+	sessionStore, err := storages.NewSessionStore(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create session store: %w", err)
 	}

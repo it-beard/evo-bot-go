@@ -8,8 +8,8 @@ import (
 
 	"github.com/it-beard/evo-bot-go/internal/clients"
 	"github.com/it-beard/evo-bot-go/internal/config"
+	"github.com/it-beard/evo-bot-go/internal/database/storages"
 	"github.com/it-beard/evo-bot-go/internal/handlers/prompts"
-	"github.com/it-beard/evo-bot-go/internal/storage"
 	"github.com/it-beard/evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -18,7 +18,7 @@ import (
 // SummarizationService handles the daily summarization of messages
 type SummarizationService struct {
 	config        *config.Config
-	messageStore  *storage.MessageStore
+	messageStore  *storages.MessageStore
 	openaiClient  *clients.OpenAiClient
 	messageSender MessageSender
 }
@@ -26,7 +26,7 @@ type SummarizationService struct {
 // NewSummarizationService creates a new summarization service
 func NewSummarizationService(
 	config *config.Config,
-	messageStore *storage.MessageStore,
+	messageStore *storages.MessageStore,
 	openaiClient *clients.OpenAiClient,
 	messageSender MessageSender,
 ) *SummarizationService {

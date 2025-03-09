@@ -1,4 +1,4 @@
-package storage
+package storages
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/it-beard/evo-bot-go/internal/database"
 )
 
 // Message represents a stored message
@@ -22,11 +23,11 @@ type Message struct {
 
 // MessageStore handles message storage operations
 type MessageStore struct {
-	db *DB
+	db *database.DB
 }
 
 // NewMessageStore creates a new message store
-func NewMessageStore(db *DB) *MessageStore {
+func NewMessageStore(db *database.DB) *MessageStore {
 	return &MessageStore{db: db}
 }
 

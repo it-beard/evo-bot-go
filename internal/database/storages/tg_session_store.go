@@ -1,4 +1,4 @@
-package storage
+package storages
 
 import (
 	"context"
@@ -7,19 +7,20 @@ import (
 	"time"
 
 	"github.com/gotd/td/session"
+	"github.com/it-beard/evo-bot-go/internal/database"
 )
 
 // SessionStore is a PostgreSQL implementation of session.Storage interface
 // from github.com/gotd/td/session
 type SessionStore struct {
-	db *DB
+	db *database.DB
 }
 
 // Ensure SessionStore implements session.Storage interface
 var _ session.Storage = (*SessionStore)(nil)
 
 // NewSessionStore creates a new session store with the given DB connection
-func NewSessionStore(db *DB) (*SessionStore, error) {
+func NewSessionStore(db *database.DB) (*SessionStore, error) {
 	return &SessionStore{db: db}, nil
 }
 
