@@ -2,6 +2,58 @@
 
 This project contains a Telegram bot for Evocoders Club management. Bot implemented in Go.
 
+## Features
+
+- Deletes non-admin messages in closed threads (read-only threads)
+- Forwards replies from closed threads to the forwarding thread (usualy it is General topic)
+- Deletes join/leave messages in all threads
+- Forwards messages to direct chat on request (command: `/save`)
+- Provides help information (command: `/help`)
+- AI-powered tool search functionality (command: `/tool`)
+  - Searches through a database of AI tools
+  - Provides relevant tool recommendations based on user queries
+- AI-powered content search functionality (command: `/content`)
+  - Searches through messages in the designated content topic
+  - Retrieves relevant information based on user queries
+- Automatic daily chat summarization
+  - Collects messages from monitored chats
+  - Generates a daily summary of chat activities
+  - Posts summaries to a designated chat at a configured time
+  - Supports manual triggering via `/summarize` command (admin-only, uses Telegram's permission system)
+- Dynamic prompting template management
+  - Flexible configuration of AI prompting templates stored in the database
+  - Allows customization of AI behaviors and responses for summarization, content, and tool features
+  - Templates can be updated without code changes
+
+For more details on bot usage, use the `/help` command in the bot chat.
+
+## Database Schema
+
+The bot uses a PostgreSQL database with the following schema that is automatically initialized on startup:
+
+### Tables
+
+1. **messages** - Stores chat messages for summarization
+   - `id`: Serial primary key
+   - `topic_id`: Topic ID where the message was sent
+   - `message_id`: Telegram message ID
+   - `reply_to_message_id`: ID of the message being replied to (if applicable)
+   - `user_id`: Telegram user ID of the sender
+   - `username`: Username of the sender
+   - `message_text`: Message content
+   - `created_at`: Timestamp when the message was sent
+
+2. **tg_sessions** - Stores Telegram User Client session data
+   - `id`: Session ID (primary key)
+   - `data`: Session data in binary format
+   - `updated_at`: Timestamp when the session was last updated
+
+3. **prompting_templates** - Stores AI prompting templates
+   - `template_key`: Template identifier (primary key)
+   - `template_text`: The actual template content
+
+The database connection is configured using the `TG_EVO_BOT_DB_CONNECTION` environment variable.
+
 ## Building the Executable
 
 To build the executable for Windows, use the following command:
@@ -99,58 +151,6 @@ After first run you will get this **code in your telegram app**.
 Send this code **REVERTED** by /code command to your bot.
 
 After that your bot will be able to use Telegram User Client and will update session automaticaly once per _30 minutes_.
-
-## Features
-
-- Deletes non-admin messages in closed threads (read-only threads)
-- Forwards replies from closed threads to the forwarding thread (usualy it is General topic)
-- Deletes join/leave messages in all threads
-- Forwards messages to direct chat on request (command: `/save`)
-- Provides help information (command: `/help`)
-- AI-powered tool search functionality (command: `/tool`)
-  - Searches through a database of AI tools
-  - Provides relevant tool recommendations based on user queries
-- AI-powered content search functionality (command: `/content`)
-  - Searches through messages in the designated content topic
-  - Retrieves relevant information based on user queries
-- Automatic daily chat summarization
-  - Collects messages from monitored chats
-  - Generates a daily summary of chat activities
-  - Posts summaries to a designated chat at a configured time
-  - Supports manual triggering via `/summarize` command (admin-only, uses Telegram's permission system)
-- Dynamic prompting template management
-  - Flexible configuration of AI prompting templates stored in the database
-  - Allows customization of AI behaviors and responses for summarization, content, and tool features
-  - Templates can be updated without code changes
-
-For more details on bot usage, use the `/help` command in the bot chat.
-
-## Database Schema
-
-The bot uses a PostgreSQL database with the following schema that is automatically initialized on startup:
-
-### Tables
-
-1. **messages** - Stores chat messages for summarization
-   - `id`: Serial primary key
-   - `topic_id`: Topic ID where the message was sent
-   - `message_id`: Telegram message ID
-   - `reply_to_message_id`: ID of the message being replied to (if applicable)
-   - `user_id`: Telegram user ID of the sender
-   - `username`: Username of the sender
-   - `message_text`: Message content
-   - `created_at`: Timestamp when the message was sent
-
-2. **tg_sessions** - Stores Telegram User Client session data
-   - `id`: Session ID (primary key)
-   - `data`: Session data in binary format
-   - `updated_at`: Timestamp when the session was last updated
-
-3. **prompting_templates** - Stores AI prompting templates
-   - `template_key`: Template identifier (primary key)
-   - `template_text`: The actual template content
-
-The database connection is configured using the `TG_EVO_BOT_DB_CONNECTION` environment variable.
 
 ## Running Tests
 
