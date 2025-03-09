@@ -53,7 +53,7 @@ Before running the bot, make sure to set the following environment variables:
   - `memory` or empty: Uses in-memory session storage (session will be lost after restart)
 
 ### Daily Summarization Feature
-- `TG_EVO_BOT_DB_CONNECTION`: PostgreSQL connection string (e.g., `postgresql://user:password@localhost:5432/dbname`)
+- `TG_EVO_BOT_DB_CONNECTION`: PostgreSQL connection string (e.g., `postgresql://user:password@localhost:5432/dbname`) - the database will be automatically initialized with required tables
 - `TG_EVO_BOT_MONITORED_TOPICS_IDS`: Comma-separated list of topic IDs to monitor for summarization
 - `TG_EVO_BOT_SUMMARY_TOPIC_ID`: Topic ID where daily summaries will be posted
 - `TG_EVO_BOT_SUMMARY_TIME`: Time to run daily summary in 24-hour format (e.g., `03:00` for 3 AM)
@@ -110,15 +110,47 @@ After that your bot will be able to use Telegram User Client and will update ses
 - AI-powered tool search functionality (command: `/tool`)
   - Searches through a database of AI tools
   - Provides relevant tool recommendations based on user queries
-  - Supports Russian language queries and responses
-- Daily chat summarization
+- AI-powered content search functionality (command: `/content`)
+  - Searches through messages in the designated content topic
+  - Retrieves relevant information based on user queries
+- Automatic daily chat summarization
   - Collects messages from monitored chats
-  - Uses RAG (Retrieval-Augmented Generation) to find the most relevant messages
   - Generates a daily summary of chat activities
   - Posts summaries to a designated chat at a configured time
   - Supports manual triggering via `/summarize` command (admin-only, uses Telegram's permission system)
+- Dynamic prompting template management
+  - Flexible configuration of AI prompting templates stored in the database
+  - Allows customization of AI behaviors and responses for summarization, content, and tool features
+  - Templates can be updated without code changes
 
 For more details on bot usage, use the `/help` command in the bot chat.
+
+## Database Schema
+
+The bot uses a PostgreSQL database with the following schema that is automatically initialized on startup:
+
+### Tables
+
+1. **messages** - Stores chat messages for summarization
+   - `id`: Serial primary key
+   - `topic_id`: Topic ID where the message was sent
+   - `message_id`: Telegram message ID
+   - `reply_to_message_id`: ID of the message being replied to (if applicable)
+   - `user_id`: Telegram user ID of the sender
+   - `username`: Username of the sender
+   - `message_text`: Message content
+   - `created_at`: Timestamp when the message was sent
+
+2. **tg_sessions** - Stores Telegram User Client session data
+   - `id`: Session ID (primary key)
+   - `data`: Session data in binary format
+   - `updated_at`: Timestamp when the session was last updated
+
+3. **prompting_templates** - Stores AI prompting templates
+   - `template_key`: Template identifier (primary key)
+   - `template_text`: The actual template content
+
+The database connection is configured using the `TG_EVO_BOT_DB_CONNECTION` environment variable.
 
 ## Running Tests
 
