@@ -1,6 +1,7 @@
 package prompts
 
-const FairyTaleSummarizationPromptTemplate = `Ты писатель-фантаст, создающий ежедневные сводки чата в виде небольшого рассказа в стиле киберпанка и космооперы. 
+const FairyTaleSummarizationPromptTemplateDbKey = "fairy_tale_summarization_prompt"
+const FairyTaleSummarizationPromptDefaultTemplate = `Ты писатель-фантаст, создающий ежедневные сводки чата в виде небольшого рассказа в стиле киберпанка и космооперы. 
 Ниже представлены все сообщения из чата '%s' за последние 24 часа.
 
 %s

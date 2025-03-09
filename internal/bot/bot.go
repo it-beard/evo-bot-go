@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"context"
 	"log"
 	"time"
 
@@ -53,11 +54,14 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 		return nil, err
 	}
 
-	// Initialize services and repositories
+	// Initialize repositories
 	messageRepo := repositories.NewMessageRepository(db)
+	promptingTemplateService := services.NewPromptingTemplateService(repositories.NewPromptingTemplateRepository(db))
+
+	// Initialize services
 	messageSenderService := services.NewMessageSenderService(bot)
 	summarizationService := services.NewSummarizationService(
-		appConfig, messageRepo, openaiClient, messageSenderService,
+		appConfig, messageRepo, openaiClient, messageSenderService, promptingTemplateService,
 	)
 
 	// Initialize scheduled tasks
@@ -75,7 +79,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	}
 
 	// Register all handlers
-	client.registerHandlers(openaiClient, appConfig, messageRepo, summarizationService, messageSenderService)
+	client.registerHandlers(openaiClient, appConfig, messageRepo, promptingTemplateService, summarizationService, messageSenderService)
 
 	return client, nil
 }
@@ -91,6 +95,14 @@ func setupDatabase(connectionString string) (*database.DB, error) {
 		return nil, err
 	}
 
+	// Initialize default prompting templates
+	ctx := context.Background()
+	promptingTemplateRepo := repositories.NewPromptingTemplateRepository(db)
+	promptingTemplateService := services.NewPromptingTemplateService(promptingTemplateRepo)
+	if err := promptingTemplateService.InitializeDefaultTemplates(ctx); err != nil {
+		log.Printf("Warning: Failed to initialize default prompting templates: %v", err)
+	}
+
 	return db, nil
 }
 
@@ -99,6 +111,7 @@ func (b *TgBotClient) registerHandlers(
 	openaiClient *clients.OpenAiClient,
 	appConfig *config.Config,
 	messageRepository *repositories.MessageRepository,
+	promptingTemplateService *services.PromptingTemplateService,
 	summarizationService *services.SummarizationService,
 	messageSenderService services.MessageSenderService,
 ) {
@@ -106,8 +119,8 @@ func (b *TgBotClient) registerHandlers(
 	privateHandlers := []ext.Handler{
 		privatehandlers.NewStartHandler(),
 		privatehandlers.NewHelpHandler(),
-		privatehandlers.NewToolHandler(openaiClient, messageSenderService, appConfig),
-		privatehandlers.NewContentHandler(openaiClient, messageSenderService, appConfig),
+		privatehandlers.NewToolHandler(openaiClient, messageSenderService, promptingTemplateService, appConfig),
+		privatehandlers.NewContentHandler(openaiClient, messageSenderService, promptingTemplateService, appConfig),
 		privatehandlers.NewCodeHandler(appConfig),
 		privatehandlers.NewSummarizeHandler(summarizationService, messageSenderService, appConfig),
 	}

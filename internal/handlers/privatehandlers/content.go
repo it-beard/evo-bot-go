@@ -12,8 +12,8 @@ import (
 	"github.com/it-beard/evo-bot-go/internal/clients"
 	"github.com/it-beard/evo-bot-go/internal/config"
 	"github.com/it-beard/evo-bot-go/internal/constants"
+	"github.com/it-beard/evo-bot-go/internal/constants/prompts"
 	"github.com/it-beard/evo-bot-go/internal/handlers"
-	"github.com/it-beard/evo-bot-go/internal/handlers/prompts"
 	"github.com/it-beard/evo-bot-go/internal/services"
 	"github.com/it-beard/evo-bot-go/internal/utils"
 
@@ -23,20 +23,23 @@ import (
 )
 
 type ContentHandler struct {
-	openaiClient         *clients.OpenAiClient
-	config               *config.Config
-	messageSenderService services.MessageSenderService
+	openaiClient             *clients.OpenAiClient
+	promptingTemplateService *services.PromptingTemplateService
+	messageSenderService     services.MessageSenderService
+	config                   *config.Config
 }
 
 func NewContentHandler(
 	openaiClient *clients.OpenAiClient,
 	messageSenderService services.MessageSenderService,
+	promptingTemplateService *services.PromptingTemplateService,
 	config *config.Config,
 ) handlers.Handler {
 	return &ContentHandler{
-		openaiClient:         openaiClient,
-		config:               config,
-		messageSenderService: messageSenderService,
+		openaiClient:             openaiClient,
+		promptingTemplateService: promptingTemplateService,
+		messageSenderService:     messageSenderService,
+		config:                   config,
 	}
 }
 
@@ -65,8 +68,16 @@ func (h *ContentHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	topicLink := fmt.Sprintf("https://t.me/c/%d/%d", h.config.SuperGroupChatID, h.config.ContentTopicID)
+
+	// Get the prompt template from the database
+	templateText := h.promptingTemplateService.GetTemplateWithFallback(
+		context.Background(),
+		prompts.GetContentPromptTemplateDbKey,
+		prompts.GetContentPromptDefaultTemplate,
+	)
+
 	prompt := fmt.Sprintf(
-		prompts.GetContentPromptTemplate,
+		templateText,
 		topicLink,
 		topicLink,
 		string(dataMessages),

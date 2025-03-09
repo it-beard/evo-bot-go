@@ -39,6 +39,13 @@ const (
 			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 		)
 	`
+
+	createPromptingTemplatesTableSQL = `
+		CREATE TABLE IF NOT EXISTS prompting_templates (
+			template_key TEXT PRIMARY KEY,
+			template_text TEXT NOT NULL
+		)
+	`
 )
 
 // DB represents a database connection
@@ -68,6 +75,10 @@ func (db *DB) InitSchema() error {
 	}
 
 	if err := db.initSessionSchema(); err != nil {
+		return err
+	}
+
+	if err := db.initPromptingTemplatesSchema(); err != nil {
 		return err
 	}
 
@@ -104,6 +115,18 @@ func (db *DB) initSessionSchema() error {
 	log.Println("Session schema initialized successfully")
 	return nil
 }
+
+// initPromptingTemplatesSchema initializes the prompting templates schema
+func (db *DB) initPromptingTemplatesSchema() error {
+	if _, err := db.Exec(createPromptingTemplatesTableSQL); err != nil {
+		return fmt.Errorf("failed to create prompting_templates table: %w", err)
+	}
+
+	log.Println("Prompting templates schema initialized successfully")
+	return nil
+}
+
+
 
 // Close closes the database connection
 func (db *DB) Close() error {

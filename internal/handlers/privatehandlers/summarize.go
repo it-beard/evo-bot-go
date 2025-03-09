@@ -22,8 +22,8 @@ import (
 // SummarizeHandler handles the summarize command
 type SummarizeHandler struct {
 	summarizationService *services.SummarizationService
-	config               *config.Config
 	messageSenderService services.MessageSenderService
+	config               *config.Config
 }
 
 // NewSummarizeHandler creates a new summarize handler
@@ -34,8 +34,8 @@ func NewSummarizeHandler(
 ) handlers.Handler {
 	return &SummarizeHandler{
 		summarizationService: summarizationService,
-		config:               config,
 		messageSenderService: messageSenderService,
+		config:               config,
 	}
 }
 

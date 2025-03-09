@@ -8,8 +8,8 @@ import (
 
 	"github.com/it-beard/evo-bot-go/internal/clients"
 	"github.com/it-beard/evo-bot-go/internal/config"
+	"github.com/it-beard/evo-bot-go/internal/constants/prompts"
 	"github.com/it-beard/evo-bot-go/internal/database/repositories"
-	"github.com/it-beard/evo-bot-go/internal/handlers/prompts"
 	"github.com/it-beard/evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -17,10 +17,11 @@ import (
 
 // SummarizationService handles the daily summarization of messages
 type SummarizationService struct {
-	config               *config.Config
-	messages             *repositories.MessageRepository
-	openaiClient         *clients.OpenAiClient
-	messageSenderService MessageSenderService
+	config                   *config.Config
+	messages                 *repositories.MessageRepository
+	openaiClient             *clients.OpenAiClient
+	messageSenderService     MessageSenderService
+	promptingTemplateService *PromptingTemplateService
 }
 
 // NewSummarizationService creates a new summarization service
@@ -29,12 +30,14 @@ func NewSummarizationService(
 	messages *repositories.MessageRepository,
 	openaiClient *clients.OpenAiClient,
 	messageSenderService MessageSenderService,
+	promptingTemplateService *PromptingTemplateService,
 ) *SummarizationService {
 	return &SummarizationService{
-		config:               config,
-		messages:             messages,
-		openaiClient:         openaiClient,
-		messageSenderService: messageSenderService,
+		config:                   config,
+		messages:                 messages,
+		openaiClient:             openaiClient,
+		messageSenderService:     messageSenderService,
+		promptingTemplateService: promptingTemplateService,
 	}
 }
 
@@ -88,8 +91,15 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 			msg.Text)
 	}
 
-	// Generate summary using OpenAI with the prompt from the prompts package
-	prompt := fmt.Sprintf(prompts.FairyTaleSummarizationPromptTemplate, topicName, context)
+	// Get the prompt template from the database with fallback to default
+	templateText := s.promptingTemplateService.GetTemplateWithFallback(
+		ctx,
+		prompts.FairyTaleSummarizationPromptTemplateDbKey,
+		prompts.FairyTaleSummarizationPromptDefaultTemplate,
+	)
+
+	// Generate summary using OpenAI with the prompt from the database
+	prompt := fmt.Sprintf(templateText, topicName, context)
 
 	summary, err := s.openaiClient.GetCompletion(ctx, prompt)
 	if err != nil {

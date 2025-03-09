@@ -12,8 +12,8 @@ import (
 	"github.com/it-beard/evo-bot-go/internal/clients"
 	"github.com/it-beard/evo-bot-go/internal/config"
 	"github.com/it-beard/evo-bot-go/internal/constants"
+	"github.com/it-beard/evo-bot-go/internal/constants/prompts"
 	"github.com/it-beard/evo-bot-go/internal/handlers"
-	"github.com/it-beard/evo-bot-go/internal/handlers/prompts"
 	"github.com/it-beard/evo-bot-go/internal/services"
 	"github.com/it-beard/evo-bot-go/internal/utils"
 
@@ -23,20 +23,23 @@ import (
 )
 
 type ToolHandler struct {
-	openaiClient         *clients.OpenAiClient
-	config               *config.Config
-	messageSenderService services.MessageSenderService
+	openaiClient             *clients.OpenAiClient
+	config                   *config.Config
+	promptingTemplateService *services.PromptingTemplateService
+	messageSenderService     services.MessageSenderService
 }
 
 func NewToolHandler(
 	openaiClient *clients.OpenAiClient,
 	messageSenderService services.MessageSenderService,
+	promptingTemplateService *services.PromptingTemplateService,
 	config *config.Config,
 ) handlers.Handler {
 	return &ToolHandler{
-		openaiClient:         openaiClient,
-		config:               config,
-		messageSenderService: messageSenderService,
+		openaiClient:             openaiClient,
+		config:                   config,
+		promptingTemplateService: promptingTemplateService,
+		messageSenderService:     messageSenderService,
 	}
 }
 
@@ -65,8 +68,15 @@ func (h *ToolHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	topicLink := fmt.Sprintf("https://t.me/c/%d/%d", h.config.SuperGroupChatID, h.config.ToolTopicID)
+
+	templateText := h.promptingTemplateService.GetTemplateWithFallback(
+		context.Background(),
+		prompts.GetToolPromptTemplateDbKey,
+		prompts.GetToolPromptDefaultTemplate,
+	)
+
 	prompt := fmt.Sprintf(
-		prompts.GetToolPromptTemplate,
+		templateText,
 		topicLink,
 		topicLink,
 		string(dataMessages),
