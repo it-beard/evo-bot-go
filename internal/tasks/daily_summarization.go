@@ -27,6 +27,10 @@ func NewDailySummarizationTask(config *config.Config, summarizationService *serv
 
 // Start starts the daily summarization task
 func (s *DailySummarizationTask) Start() {
+	if !s.config.SummarizationTaskEnabled {
+		log.Println("Daily summarization task is disabled")
+		return
+	}
 	log.Println("Starting daily summarization task")
 	go s.run()
 }

@@ -30,10 +30,11 @@ type Config struct {
 	TGUserClientSessionType string
 
 	// Daily Summarization Feature
-	DBConnection       string
-	MonitoredTopicsIDs []int
-	SummaryTopicID     int
-	SummaryTime        time.Time
+	DBConnection             string
+	MonitoredTopicsIDs       []int
+	SummaryTopicID           int
+	SummaryTime              time.Time
+	SummarizationTaskEnabled bool
 }
 
 // LoadConfig loads the configuration from environment variables
@@ -172,6 +173,19 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("invalid summary time format: %s", summaryTimeStr)
 	}
 	config.SummaryTime = summaryTime
+
+	// Summarization task enabled/disabled
+	summarizationTaskEnabledStr := os.Getenv("TG_EVO_BOT_SUMMARIZATION_TASK_ENABLED")
+	if summarizationTaskEnabledStr == "" {
+		// Default to enabled if not specified
+		config.SummarizationTaskEnabled = true
+	} else {
+		summarizationTaskEnabled, err := strconv.ParseBool(summarizationTaskEnabledStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid summarization task enabled value: %s", summarizationTaskEnabledStr)
+		}
+		config.SummarizationTaskEnabled = summarizationTaskEnabled
+	}
 
 	return config, nil
 }

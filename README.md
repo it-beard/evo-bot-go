@@ -57,6 +57,7 @@ Before running the bot, make sure to set the following environment variables:
 - `TG_EVO_BOT_MONITORED_TOPICS_IDS`: Comma-separated list of topic IDs to monitor for summarization
 - `TG_EVO_BOT_SUMMARY_TOPIC_ID`: Topic ID where daily summaries will be posted
 - `TG_EVO_BOT_SUMMARY_TIME`: Time to run daily summary in 24-hour format (e.g., `03:00` for 3 AM)
+- `TG_EVO_BOT_SUMMARIZATION_TASK_ENABLED`: Enable or disable the daily summarization task (`true` or `false`, defaults to `true` if not specified)
 
 On Windows, you can set the environment variables using the following commands in Command Prompt:
 
@@ -85,6 +86,7 @@ set TG_EVO_BOT_DB_CONNECTION=postgresql://user:password@localhost:5432/dbname
 set TG_EVO_BOT_MONITORED_TOPICS_IDS=0,2
 set TG_EVO_BOT_SUMMARY_TOPIC_ID=3
 set TG_EVO_BOT_SUMMARY_TIME=03:00
+set TG_EVO_BOT_SUMMARIZATION_TASK_ENABLED=true
 ```
 
 Then run the executable.
