@@ -9,6 +9,7 @@ import (
 	"github.com/it-beard/evo-bot-go/internal/constants"
 	"github.com/it-beard/evo-bot-go/internal/handlers"
 	"github.com/it-beard/evo-bot-go/internal/storage"
+	"github.com/it-beard/evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -54,8 +55,11 @@ func (h *MessageCollectorHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) 
 		return false
 	}
 
-	// Check if the chat is in the monitored list
-	return h.config.IsMonitoredChat(msg.Chat.Id)
+	formattedSuperGroupChatId := utils.ChatIdToFullChatId(h.config.SuperGroupChatID)
+	// Check if the chat is in the monitored list and from the supergroup
+	return msg.SenderChat != nil && msg.SenderChat.Id == formattedSuperGroupChatId &&
+		(h.config.IsMonitoredTopic(int(msg.MessageThreadId)) ||
+			(h.config.IsMonitoredTopic(0) && !msg.IsTopicMessage)) // small hack for root topic 0 (1 in links)
 }
 
 func (h *MessageCollectorHandler) Name() string {

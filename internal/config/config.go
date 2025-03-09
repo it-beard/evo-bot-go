@@ -30,10 +30,10 @@ type Config struct {
 	TGUserClientSessionType string
 
 	// Daily Summarization Feature
-	DBConnection     string
-	MonitoredChatIDs []int64
-	SummaryChatID    int64
-	SummaryTime      time.Time
+	DBConnection       string
+	MonitoredTopicsIDs []int
+	SummaryTopicID     int
+	SummaryTime        time.Time
 }
 
 // LoadConfig loads the configuration from environment variables
@@ -132,32 +132,32 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("TG_EVO_BOT_DB_CONNECTION environment variable is not set")
 	}
 
-	// Monitored chat IDs
-	monitoredChatIDsStr := os.Getenv("TG_EVO_BOT_MONITORED_CHAT_IDS")
-	if monitoredChatIDsStr == "" {
-		return nil, fmt.Errorf("TG_EVO_BOT_MONITORED_CHAT_IDS environment variable is not set")
+	// Monitored topic IDs
+	monitoredTopicsIDsStr := os.Getenv("TG_EVO_BOT_MONITORED_TOPICS_IDS")
+	if monitoredTopicsIDsStr == "" {
+		return nil, fmt.Errorf("TG_EVO_BOT_MONITORED_TOPICS_IDS environment variable is not set")
 	}
 
-	chatIDs := strings.Split(monitoredChatIDsStr, ",")
-	for _, chatIDStr := range chatIDs {
-		chatID, err := strconv.ParseInt(strings.TrimSpace(chatIDStr), 10, 64)
+	topicID := strings.Split(monitoredTopicsIDsStr, ",")
+	for _, topicIDStr := range topicID {
+		topicID, err := strconv.Atoi(strings.TrimSpace(topicIDStr))
 		if err != nil {
-			return nil, fmt.Errorf("invalid chat ID in TG_EVO_BOT_MONITORED_CHAT_IDS: %s", chatIDStr)
+			return nil, fmt.Errorf("invalid topic ID in TG_EVO_BOT_MONITORED_TOPICS_IDS: %s", topicIDStr)
 		}
-		config.MonitoredChatIDs = append(config.MonitoredChatIDs, chatID)
+		config.MonitoredTopicsIDs = append(config.MonitoredTopicsIDs, topicID)
 	}
 
-	// Summary chat ID
-	summaryChatIDStr := os.Getenv("TG_EVO_BOT_SUMMARY_CHAT_ID")
-	if summaryChatIDStr == "" {
-		return nil, fmt.Errorf("TG_EVO_BOT_SUMMARY_CHAT_ID environment variable is not set")
+	// Summary topic ID
+	summaryTopicIDStr := os.Getenv("TG_EVO_BOT_SUMMARY_TOPIC_ID")
+	if summaryTopicIDStr == "" {
+		return nil, fmt.Errorf("TG_EVO_BOT_SUMMARY_TOPIC_ID environment variable is not set")
 	}
 
-	summaryChatID, err := strconv.ParseInt(summaryChatIDStr, 10, 64)
+	summaryTopicID, err := strconv.Atoi(summaryTopicIDStr)
 	if err != nil {
-		return nil, fmt.Errorf("invalid summary chat ID: %s", summaryChatIDStr)
+		return nil, fmt.Errorf("invalid summary topic ID: %s", summaryTopicIDStr)
 	}
-	config.SummaryChatID = summaryChatID
+	config.SummaryTopicID = summaryTopicID
 
 	// Summary time
 	summaryTimeStr := os.Getenv("TG_EVO_BOT_SUMMARY_TIME")
@@ -176,10 +176,10 @@ func LoadConfig() (*Config, error) {
 	return config, nil
 }
 
-// IsMonitoredChat checks if a chat ID is in the monitored list
-func (c *Config) IsMonitoredChat(chatID int64) bool {
-	for _, id := range c.MonitoredChatIDs {
-		if id == chatID {
+// IsMonitoredTopic checks if a topic ID is in the monitored list
+func (c *Config) IsMonitoredTopic(topicID int) bool {
+	for _, id := range c.MonitoredTopicsIDs {
+		if id == topicID {
 			return true
 		}
 	}

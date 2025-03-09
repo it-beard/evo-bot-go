@@ -10,6 +10,7 @@ import (
 	"github.com/it-beard/evo-bot-go/internal/config"
 	"github.com/it-beard/evo-bot-go/internal/handlers/prompts"
 	"github.com/it-beard/evo-bot-go/internal/storage"
+	"github.com/it-beard/evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 )
@@ -44,10 +45,10 @@ func (s *SummarizationService) RunDailySummarization(ctx context.Context, sendTo
 	// Get the time 24 hours ago
 	since := time.Now().Add(-24 * time.Hour)
 
-	// Process each monitored chat
-	for _, chatID := range s.config.MonitoredChatIDs {
-		if err := s.summarizeChat(ctx, chatID, since, sendToDM); err != nil {
-			log.Printf("Error summarizing chat %d: %v", chatID, err)
+	// Process each monitored topic
+	for _, topicID := range s.config.MonitoredTopicsIDs {
+		if err := s.summarizeTopicMessages(ctx, topicID, since, sendToDM); err != nil {
+			log.Printf("Error summarizing topic %d: %v", topicID, err)
 			// Continue with other chats even if one fails
 			continue
 		}
@@ -57,26 +58,26 @@ func (s *SummarizationService) RunDailySummarization(ctx context.Context, sendTo
 	return nil
 }
 
-// summarizeChat summarizes a single chat
-func (s *SummarizationService) summarizeChat(ctx context.Context, chatID int64, since time.Time, sendToDM bool) error {
-	// Get chat name
-	chatName, err := s.messageStore.GetChatName(ctx, chatID)
+// summarizeTopicMessages summarizes a single topic
+func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topicID int, since time.Time, sendToDM bool) error {
+	// Get topic name
+	topicName, err := utils.GetTopicName(topicID)
 	if err != nil {
-		return fmt.Errorf("failed to get chat name: %w", err)
+		return fmt.Errorf("failed to get topic name: %w", err)
 	}
 
 	// Get recent messages
-	messages, err := s.messageStore.GetRecentMessages(ctx, chatID, since)
+	messages, err := s.messageStore.GetRecentMessages(ctx, topicID, since)
 	if err != nil {
 		return fmt.Errorf("failed to get recent messages: %w", err)
 	}
 
 	if len(messages) == 0 {
-		log.Printf("No messages found for chat %d since %v", chatID, since)
+		log.Printf("No messages found for topic %d since %v", topicID, since)
 		return nil
 	}
 
-	log.Printf("Found %d messages for chat %d", len(messages), chatID)
+	log.Printf("Found %d messages for topic %d", len(messages), topicID)
 
 	// Build context directly from all messages without using RAG
 	context := ""
@@ -88,7 +89,7 @@ func (s *SummarizationService) summarizeChat(ctx context.Context, chatID int64, 
 	}
 
 	// Generate summary using OpenAI with the prompt from the prompts package
-	prompt := fmt.Sprintf(prompts.FairyTaleSummarizationPromptTemplate, chatName, context)
+	prompt := fmt.Sprintf(prompts.FairyTaleSummarizationPromptTemplate, topicName, context)
 
 	summary, err := s.openaiClient.GetCompletion(ctx, prompt)
 	if err != nil {
@@ -97,23 +98,23 @@ func (s *SummarizationService) summarizeChat(ctx context.Context, chatID int64, 
 
 	// Format the final summary message using the title format from the prompts package
 	titleFormat := prompts.FairyTaleSummaryTitleFormat
-	title := fmt.Sprintf(titleFormat, chatName)
+	title := fmt.Sprintf(titleFormat, topicName)
 	finalSummary := fmt.Sprintf("%s\n\n%s", title, summary)
 
-	// Determine the target chat ID
-	targetChatID := s.config.SummaryChatID
+	// Determine the target topic ID
+	var targetTopicID int64 = int64(s.config.SummaryTopicID)
 	if sendToDM {
 		// If sendToDM is true, try to get the user ID from context
 		if userID, ok := ctx.Value("userID").(int64); ok {
-			targetChatID = userID
+			targetTopicID = userID
 		} else {
-			log.Println("Warning: sendToDM is true but userID not found in context, using SummaryChatID instead")
+			log.Println("Warning: sendToDM is true but userID not found in context, using SummaryTopicID instead")
 		}
 	}
 
 	// Send the summary to the target chat
 	_, err = s.messageSender.SendCopy(
-		targetChatID,
+		targetTopicID,
 		nil,
 		finalSummary,
 		[]gotgbot.MessageEntity{

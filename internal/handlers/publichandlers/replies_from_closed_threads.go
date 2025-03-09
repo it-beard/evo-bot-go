@@ -4,14 +4,13 @@ import (
 	"fmt"
 	"log"
 	"strconv"
-	"strings"
 	"unicode/utf8"
 
-	"github.com/it-beard/evo-bot-go/internal/clients"
 	"github.com/it-beard/evo-bot-go/internal/config"
 	"github.com/it-beard/evo-bot-go/internal/constants"
 	"github.com/it-beard/evo-bot-go/internal/handlers"
 	"github.com/it-beard/evo-bot-go/internal/services"
+	"github.com/it-beard/evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -61,35 +60,6 @@ func (h *RepliesFromClosedThreadsHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.
 	return nil
 }
 
-// getTopicName retrieves the topic name from the thread ID using the Telegram API
-func (h *RepliesFromClosedThreadsHandler) getTopicName(threadId int64, chatId int64) (string, error) {
-	// Convert threadId to int since GetChatMessageById expects an int
-	messageId := int(threadId)
-
-	// Remove "-100" prefix from chatId if present
-	chatIdStr := strconv.FormatInt(chatId, 10)
-	if strings.HasPrefix(chatIdStr, "-100") {
-		chatIdStr = chatIdStr[4:] // Remove the first 4 characters ("-100")
-		chatId, _ = strconv.ParseInt(chatIdStr, 10, 64)
-	}
-
-	// Get the topic message by ID
-	message, err := clients.GetChatMessageById(chatId, messageId)
-	if err != nil {
-		return "Topic", fmt.Errorf("failed to get thread message: %w", err)
-	}
-
-	// Extract and truncate the topic name if needed
-	topicName := message.Message
-	if topicName == "" {
-		topicName = "Topic"
-	} else if len(topicName) > 30 {
-		topicName = topicName[:27] + "..."
-	}
-
-	return topicName, nil
-}
-
 func (h *RepliesFromClosedThreadsHandler) forwardReplyMessage(ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	replyToMessageUrl := fmt.Sprintf(
@@ -98,7 +68,7 @@ func (h *RepliesFromClosedThreadsHandler) forwardReplyMessage(ctx *ext.Context) 
 		msg.ReplyToMessage.MessageId)
 
 	// Get the topic name
-	topicName, topicErr := h.getTopicName(msg.MessageThreadId, msg.Chat.Id)
+	topicName, topicErr := utils.GetTopicName(int(msg.MessageThreadId))
 	if topicErr != nil {
 		log.Printf(
 			"%s: warning >> failed to get topic name: %v",

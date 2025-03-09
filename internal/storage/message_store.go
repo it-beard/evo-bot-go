@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
@@ -11,13 +10,14 @@ import (
 
 // Message represents a stored message
 type Message struct {
-	ID        int64
-	ChatID    int64
-	MessageID int64
-	UserID    int64
-	Username  string
-	Text      string
-	CreatedAt time.Time
+	ID               int64
+	TopicID          int
+	MessageID        int
+	ReplyToMessageID *int
+	UserID           int64
+	Username         string
+	Text             string
+	CreatedAt        time.Time
 }
 
 // MessageStore handles message storage operations
@@ -52,14 +52,33 @@ func (s *MessageStore) StoreMessage(ctx context.Context, msg *gotgbot.Message) e
 	// Convert Unix timestamp to time.Time
 	createdAt := time.Unix(int64(msg.Date), 0)
 
+	// if msg.ReplyToMessage is nil set reply_to_message_id to null
+	var replyToMessageId *int64
+	if msg.ReplyToMessage != nil {
+		replyToMessageId = &msg.ReplyToMessage.MessageId
+	}
+
+	// if replyToMessageId is the same as MessageThreadId, set it to null
+	if replyToMessageId != nil && *replyToMessageId == msg.MessageThreadId {
+		replyToMessageId = nil
+	}
+
+	//small hack for root topic 0 (1 in links)
+	var messageTopicId int
+	if !msg.IsTopicMessage {
+		messageTopicId = 0
+	} else {
+		messageTopicId = int(msg.MessageThreadId)
+	}
+
 	// Insert message into database
 	_, err := s.db.ExecContext(
 		ctx,
-		`INSERT INTO messages (chat_id, message_id, user_id, username, message_text, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		ON CONFLICT (chat_id, message_id) DO UPDATE
-		SET message_text = $5, username = $4`,
-		msg.Chat.Id, msg.MessageId, msg.From.Id, username, text, createdAt,
+		`INSERT INTO messages (topic_id, message_id, reply_to_message_id, user_id, username, message_text, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (topic_id, message_id) DO UPDATE
+		SET message_text = $6, username = $5`,
+		messageTopicId, msg.MessageId, replyToMessageId, msg.From.Id, username, text, createdAt,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to store message: %w", err)
@@ -68,13 +87,13 @@ func (s *MessageStore) StoreMessage(ctx context.Context, msg *gotgbot.Message) e
 	return nil
 }
 
-// GetRecentMessages retrieves messages from the past 24 hours for a specific chat
-func (s *MessageStore) GetRecentMessages(ctx context.Context, chatID int64, since time.Time) ([]Message, error) {
+// GetRecentMessages retrieves messages from the past 24 hours for a specific topic
+func (s *MessageStore) GetRecentMessages(ctx context.Context, chatID int, since time.Time) ([]Message, error) {
 	rows, err := s.db.QueryContext(
 		ctx,
-		`SELECT id, chat_id, message_id, user_id, username, message_text, created_at
+		`SELECT id, topic_id, message_id, reply_to_message_id, user_id, username, message_text, created_at
 		FROM messages
-		WHERE chat_id = $1 AND created_at >= $2
+		WHERE topic_id = $1 AND created_at >= $2
 		ORDER BY created_at ASC`,
 		chatID, since,
 	)
@@ -88,8 +107,9 @@ func (s *MessageStore) GetRecentMessages(ctx context.Context, chatID int64, sinc
 		var msg Message
 		if err := rows.Scan(
 			&msg.ID,
-			&msg.ChatID,
+			&msg.TopicID,
 			&msg.MessageID,
+			&msg.ReplyToMessageID,
 			&msg.UserID,
 			&msg.Username,
 			&msg.Text,
@@ -105,22 +125,4 @@ func (s *MessageStore) GetRecentMessages(ctx context.Context, chatID int64, sinc
 	}
 
 	return messages, nil
-}
-
-// GetChatName retrieves the chat name for a given chat ID
-func (s *MessageStore) GetChatName(ctx context.Context, chatID int64) (string, error) {
-	var chatName string
-	err := s.db.QueryRowContext(
-		ctx,
-		`SELECT username FROM messages WHERE chat_id = $1 LIMIT 1`,
-		chatID,
-	).Scan(&chatName)
-
-	if err == sql.ErrNoRows {
-		return fmt.Sprintf("Chat %d", chatID), nil
-	} else if err != nil {
-		return "", fmt.Errorf("failed to get chat name: %w", err)
-	}
-
-	return chatName, nil
 }

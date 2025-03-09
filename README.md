@@ -54,8 +54,8 @@ Before running the bot, make sure to set the following environment variables:
 
 ### Daily Summarization Feature
 - `TG_EVO_BOT_DB_CONNECTION`: PostgreSQL connection string (e.g., `postgresql://user:password@localhost:5432/dbname`)
-- `TG_EVO_BOT_MONITORED_CHAT_IDS`: Comma-separated list of chat IDs to monitor for summarization
-- `TG_EVO_BOT_SUMMARY_CHAT_ID`: Chat ID where daily summaries will be posted
+- `TG_EVO_BOT_MONITORED_TOPICS_IDS`: Comma-separated list of topic IDs to monitor for summarization
+- `TG_EVO_BOT_SUMMARY_TOPIC_ID`: Topic ID where daily summaries will be posted
 - `TG_EVO_BOT_SUMMARY_TIME`: Time to run daily summary in 24-hour format (e.g., `03:00` for 3 AM)
 
 On Windows, you can set the environment variables using the following commands in Command Prompt:
@@ -82,8 +82,8 @@ set TG_EVO_BOT_TGUSERCLIENT_SESSION_TYPE=file
 
 # Daily Summarization Feature
 set TG_EVO_BOT_DB_CONNECTION=postgresql://user:password@localhost:5432/dbname
-set TG_EVO_BOT_MONITORED_CHAT_IDS=-1001234567890,-1001987654321
-set TG_EVO_BOT_SUMMARY_CHAT_ID=-1001234567890
+set TG_EVO_BOT_MONITORED_TOPICS_IDS=0,2
+set TG_EVO_BOT_SUMMARY_TOPIC_ID=3
 set TG_EVO_BOT_SUMMARY_TIME=03:00
 ```
 

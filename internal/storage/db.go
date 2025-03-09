@@ -13,18 +13,19 @@ const (
 	createMessagesTableSQL = `
 		CREATE TABLE IF NOT EXISTS messages (
 			id SERIAL PRIMARY KEY,
-			chat_id BIGINT NOT NULL,
-			message_id BIGINT NOT NULL,
+			topic_id INT NOT NULL,
+			message_id INT NOT NULL,
+			reply_to_message_id INT,
 			user_id BIGINT,
 			username TEXT,
 			message_text TEXT,
 			created_at TIMESTAMP WITH TIME ZONE,
-			UNIQUE(chat_id, message_id)
+			UNIQUE(topic_id, message_id)
 		)
 	`
 
 	createMessagesChatIdxSQL = `
-		CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id)
+		CREATE INDEX IF NOT EXISTS idx_messages_topic_id ON messages(topic_id)
 	`
 
 	createMessagesTimeIdxSQL = `
