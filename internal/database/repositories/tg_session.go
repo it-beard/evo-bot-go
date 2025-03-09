@@ -12,20 +12,20 @@ import (
 
 // SessionRepository implements the session.Storage interface for
 // persisting Telegram session data in PostgreSQL
-type SessionRepository struct {
+type TgSessionRepository struct {
 	db *database.DB
 }
 
-// Ensure SessionRepository implements session.Storage interface
-var _ session.Storage = (*SessionRepository)(nil)
+// Ensure TgSessionRepository implements session.Storage interface
+var _ session.Storage = (*TgSessionRepository)(nil)
 
-// NewSessionRepository creates a new session repository
-func NewSessionRepository(db *database.DB) *SessionRepository {
-	return &SessionRepository{db: db}
+// NewTgSessionRepository creates a new session repository
+func NewTgSessionRepository(db *database.DB) *TgSessionRepository {
+	return &TgSessionRepository{db: db}
 }
 
 // LoadSession retrieves session data from the database
-func (r *SessionRepository) LoadSession(ctx context.Context) ([]byte, error) {
+func (r *TgSessionRepository) LoadSession(ctx context.Context) ([]byte, error) {
 	var data []byte
 	err := r.db.QueryRowContext(ctx, `
 		SELECT data FROM tg_sessions 
@@ -43,7 +43,7 @@ func (r *SessionRepository) LoadSession(ctx context.Context) ([]byte, error) {
 }
 
 // StoreSession saves session data to the database
-func (r *SessionRepository) StoreSession(ctx context.Context, data []byte) error {
+func (r *TgSessionRepository) StoreSession(ctx context.Context, data []byte) error {
 	_, err := r.db.ExecContext(ctx, `
 		INSERT INTO tg_sessions (id, data, updated_at)
 		VALUES ('telegram_session', $1, $2)

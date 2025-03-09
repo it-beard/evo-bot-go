@@ -69,7 +69,7 @@ func initDatabaseStorage(connectionString string) (session.Storage, error) {
 	}
 
 	// Create session repository
-	sessionRepository := repositories.NewSessionRepository(db)
+	sessionRepository := repositories.NewTgSessionRepository(db)
 	// No error handling needed as the constructor doesn't return an error anymore
 
 	return sessionRepository, nil
