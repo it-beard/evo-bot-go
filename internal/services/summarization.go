@@ -97,7 +97,7 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 	}
 
 	// Format the final summary message using the title format from the prompts package
-	titleFormat := prompts.FairyTaleSummaryTitleFormat
+	titleFormat := "Сводка чата %s"
 	title := fmt.Sprintf(titleFormat, topicName)
 	finalSummary := fmt.Sprintf("%s\n\n%s", title, summary)
 
