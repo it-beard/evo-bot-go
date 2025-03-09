@@ -1,4 +1,4 @@
-package scheduler
+package tasks
 
 import (
 	"context"
@@ -9,36 +9,36 @@ import (
 	"github.com/it-beard/evo-bot-go/internal/services"
 )
 
-// DailyScheduler handles scheduling of daily tasks
-type DailyScheduler struct {
+// DailySummarizationTask handles scheduling of daily summarization tasks
+type DailySummarizationTask struct {
 	config               *config.Config
 	summarizationService *services.SummarizationService
 	stop                 chan struct{}
 }
 
-// NewDailyScheduler creates a new daily scheduler
-func NewDailyScheduler(config *config.Config, summarizationService *services.SummarizationService) *DailyScheduler {
-	return &DailyScheduler{
+// NewDailySummarizationTask creates a new daily summarization task
+func NewDailySummarizationTask(config *config.Config, summarizationService *services.SummarizationService) *DailySummarizationTask {
+	return &DailySummarizationTask{
 		config:               config,
 		summarizationService: summarizationService,
 		stop:                 make(chan struct{}),
 	}
 }
 
-// Start starts the daily scheduler
-func (s *DailyScheduler) Start() {
-	log.Println("Starting daily scheduler")
+// Start starts the daily summarization task
+func (s *DailySummarizationTask) Start() {
+	log.Println("Starting daily summarization task")
 	go s.run()
 }
 
-// Stop stops the daily scheduler
-func (s *DailyScheduler) Stop() {
-	log.Println("Stopping daily scheduler")
+// Stop stops the daily summarization task
+func (s *DailySummarizationTask) Stop() {
+	log.Println("Stopping daily summarization task")
 	close(s.stop)
 }
 
-// run runs the daily scheduler
-func (s *DailyScheduler) run() {
+// run runs the daily summarization task
+func (s *DailySummarizationTask) run() {
 	// Calculate time until next run
 	nextRun := s.calculateNextRun()
 	log.Printf("Next summarization scheduled for: %v", nextRun)
@@ -75,7 +75,7 @@ func (s *DailyScheduler) run() {
 }
 
 // calculateNextRun calculates the next run time
-func (s *DailyScheduler) calculateNextRun() time.Time {
+func (s *DailySummarizationTask) calculateNextRun() time.Time {
 	now := time.Now()
 
 	// Get the configured hour and minute

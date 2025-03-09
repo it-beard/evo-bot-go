@@ -133,16 +133,16 @@ func NewTelegramClient() (*TelegramClient, error) {
 	}, nil
 }
 
-// SetVerificationCode sets the verification code for authentication
-func SetVerificationCode(code string) {
+// TgSetVerificationCode sets the verification code for authentication
+func TgSetVerificationCode(code string) {
 	codeMutex.Lock()
 	defer codeMutex.Unlock()
 	verificationCode = code
 }
 
-// GetChatMessageById retrieves a specific message by its ID from a chat
+// TgGetChatMessageById retrieves a specific message by its ID from a chat
 // For forum topics, it returns a synthetic message with the topic name
-func GetChatMessageById(chatID int64, messageID int) (*tg.Message, error) {
+func TgGetChatMessageById(chatID int64, messageID int) (*tg.Message, error) {
 	tgClient, err := NewTelegramClient()
 	if err != nil {
 		return nil, err
@@ -292,8 +292,8 @@ func extractMessages(resp tg.MessagesMessagesClass) ([]tg.Message, error) {
 	return messages, nil
 }
 
-// KeepSessionAlive keeps the Telegram session alive
-func KeepSessionAlive() error {
+// TgKeepSessionAlive keeps the Telegram session alive
+func TgKeepSessionAlive() error {
 	tgClient, err := NewTelegramClient()
 	if err != nil {
 		return err

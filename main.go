@@ -5,32 +5,13 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/it-beard/evo-bot-go/internal/bot"
 	"github.com/it-beard/evo-bot-go/internal/clients"
 	"github.com/it-beard/evo-bot-go/internal/config"
 )
 
-func keepTgUserClientSessionAlive() {
-	// First time refresh
-	if err := clients.KeepSessionAlive(); err != nil {
-		log.Printf("Failed to keep session alive: %v", err)
-	} else {
-		log.Printf("Session refresh successful")
-	}
-	// Keep session alive every 30 minutes
-	ticker := time.NewTicker(30 * time.Minute)
-	go func() {
-		for range ticker.C {
-			if err := clients.KeepSessionAlive(); err != nil {
-				log.Printf("Failed to keep session alive: %v", err)
-			} else {
-				log.Printf("Session refresh successful")
-			}
-		}
-	}()
-}
+
 
 func main() {
 	// Load configuration
@@ -45,8 +26,6 @@ func main() {
 		log.Fatalf("Failed to create OpenAI client: %v", err)
 	}
 
-	// Start session keep-alive routine
-	keepTgUserClientSessionAlive()
 
 	// Create and start the bot
 	botClient, err := bot.NewTgBotClient(openaiClient, appConfig)

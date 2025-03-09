@@ -36,9 +36,9 @@ func (h *CodeHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	// Store the code in memory
-	clients.SetVerificationCode(code)
+	clients.TgSetVerificationCode(code)
 	log.Print("Code stored")
-	err := clients.KeepSessionAlive() // Refresh session
+	err := clients.TgKeepSessionAlive() // Refresh session
 	if err == nil {
 		msg.Reply(b, "Код принят", nil)
 	}

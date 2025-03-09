@@ -25,7 +25,7 @@ func GetTopicName(topicId int) (string, error) {
 	chatId := appConfig.SuperGroupChatID
 
 	// Get the topic message by ID
-	message, err := clients.GetChatMessageById(chatId, topicIdInt)
+	message, err := clients.TgGetChatMessageById(chatId, topicIdInt)
 	if err != nil {
 		return "Topic", fmt.Errorf("failed to get thread message: %w", err)
 	}

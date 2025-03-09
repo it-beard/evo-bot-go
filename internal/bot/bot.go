@@ -10,19 +10,20 @@ import (
 	"github.com/it-beard/evo-bot-go/internal/database/storages"
 	"github.com/it-beard/evo-bot-go/internal/handlers/privatehandlers"
 	"github.com/it-beard/evo-bot-go/internal/handlers/publichandlers"
-	"github.com/it-beard/evo-bot-go/internal/scheduler"
 	"github.com/it-beard/evo-bot-go/internal/services"
+	"github.com/it-beard/evo-bot-go/internal/tasks"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
 type TgBotClient struct {
-	bot        *gotgbot.Bot
-	dispatcher *ext.Dispatcher
-	updater    *ext.Updater
-	db         *database.DB
-	scheduler  *scheduler.DailyScheduler
+	bot                    *gotgbot.Bot
+	dispatcher             *ext.Dispatcher
+	updater                *ext.Updater
+	db                     *database.DB
+	dailySummarizationTask *tasks.DailySummarizationTask
+	sessionKeepAliveTask   *tasks.SessionKeepAliveTask
 }
 
 func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config) (*TgBotClient, error) {
@@ -67,14 +68,18 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	)
 
 	// Create daily scheduler
-	dailyScheduler := scheduler.NewDailyScheduler(appConfig, summarizationService)
+	dailySummarizationTask := tasks.NewDailySummarizationTask(appConfig, summarizationService)
+
+	// Create session keep-alive task (30 minutes interval)
+	sessionKeepAliveTask := tasks.NewSessionKeepAliveTask(30 * time.Minute)
 
 	bot := &TgBotClient{
-		bot:        b,
-		dispatcher: dispatcher,
-		updater:    updater,
-		db:         db,
-		scheduler:  dailyScheduler,
+		bot:                    b,
+		dispatcher:             dispatcher,
+		updater:                updater,
+		db:                     db,
+		dailySummarizationTask: dailySummarizationTask,
+		sessionKeepAliveTask:   sessionKeepAliveTask,
 	}
 
 	bot.registerHandlers(openaiClient, appConfig, messageStore, summarizationService)
@@ -102,8 +107,10 @@ func (b *TgBotClient) registerHandlers(openaiClient *clients.OpenAiClient, appCo
 }
 
 func (b *TgBotClient) Start() {
-	// Start the daily scheduler
-	b.scheduler.Start()
+	// Start tasks
+	b.dailySummarizationTask.Start()
+	b.sessionKeepAliveTask.Start()
+
 	err := b.updater.StartPolling(b.bot, &ext.PollingOpts{
 		DropPendingUpdates: true,
 		GetUpdatesOpts: &gotgbot.GetUpdatesOpts{
@@ -123,8 +130,9 @@ func (b *TgBotClient) Start() {
 
 // Close closes the bot client
 func (b *TgBotClient) Close() error {
-	// Stop the scheduler
-	b.scheduler.Stop()
+	// Stop tasks
+	b.dailySummarizationTask.Stop()
+	b.sessionKeepAliveTask.Stop()
 
 	// Close the database connection
 	if err := b.db.Close(); err != nil {
