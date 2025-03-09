@@ -7,7 +7,7 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2"
 )
 
-type MessageSender interface {
+type MessageSenderService interface {
 	SendCopy(
 		chatId int64,
 		topicId *int,
@@ -22,7 +22,7 @@ type TelegramMessageSender struct {
 	bot *gotgbot.Bot
 }
 
-func NewMessageSender(bot *gotgbot.Bot) MessageSender {
+func NewMessageSenderService(bot *gotgbot.Bot) MessageSenderService {
 	return &TelegramMessageSender{bot: bot}
 }
 

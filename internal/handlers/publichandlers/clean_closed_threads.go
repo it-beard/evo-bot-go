@@ -16,20 +16,21 @@ import (
 )
 
 type CleanClosedThreadsHandler struct {
-	closedTopics  map[int]bool
-	messageSender services.MessageSender
-	config        *config.Config
+	closedTopics         map[int]bool
+	messageSenderService services.MessageSenderService
+	config               *config.Config
 }
 
-func NewCleanClosedThreadsHandler(messageSender services.MessageSender, config *config.Config) handlers.Handler {
+func NewCleanClosedThreadsHandler(messageSenderService services.MessageSenderService, config *config.Config) handlers.Handler {
 	// Create map of closed topics
 	closedTopics := make(map[int]bool)
 	for _, id := range config.ClosedTopicsIDs {
 		closedTopics[id] = true
 	}
 	return &CleanClosedThreadsHandler{
-		closedTopics:  closedTopics,
-		messageSender: messageSender,
+		closedTopics:         closedTopics,
+		messageSenderService: messageSenderService,
+		config:               config,
 	}
 }
 
@@ -64,7 +65,7 @@ func (h *CleanClosedThreadsHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Contex
 			err)
 	}
 	// Send copy of the message to user
-	_, err = h.messageSender.SendCopy(msg.From.Id, nil, msg.Text, msg.Entities, msg)
+	_, err = h.messageSenderService.SendCopy(msg.From.Id, nil, msg.Text, msg.Entities, msg)
 	if err != nil {
 		return fmt.Errorf(
 			"%s: error >> failed to send copy message: %w",

@@ -4,6 +4,8 @@ import (
 	"log"
 	"time"
 
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/it-beard/evo-bot-go/internal/clients"
 	"github.com/it-beard/evo-bot-go/internal/config"
 	"github.com/it-beard/evo-bot-go/internal/database"
@@ -12,11 +14,9 @@ import (
 	"github.com/it-beard/evo-bot-go/internal/handlers/publichandlers"
 	"github.com/it-beard/evo-bot-go/internal/services"
 	"github.com/it-beard/evo-bot-go/internal/tasks"
-
-	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
+// TgBotClient represents a Telegram bot client with all required dependencies
 type TgBotClient struct {
 	bot                    *gotgbot.Bot
 	dispatcher             *ext.Dispatcher
@@ -26,12 +26,16 @@ type TgBotClient struct {
 	sessionKeepAliveTask   *tasks.SessionKeepAliveTask
 }
 
+// NewTgBotClient creates and initializes a new Telegram bot client
 func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config) (*TgBotClient, error) {
-	b, err := gotgbot.NewBot(appConfig.BotToken, nil)
+
+	// Initialize bot
+	bot, err := gotgbot.NewBot(appConfig.BotToken, nil)
 	if err != nil {
 		return nil, err
 	}
 
+	// Setup dispatcher with error handling
 	dispatcher := ext.NewDispatcher(&ext.DispatcherOpts{
 		Error: func(b *gotgbot.Bot, ctx *ext.Context, err error) ext.DispatcherAction {
 			log.Println(err.Error())
@@ -40,83 +44,98 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 		MaxRoutines: ext.DefaultMaxRoutines,
 	})
 
+	// Initialize updater
 	updater := ext.NewUpdater(dispatcher, nil)
 
-	// Initialize database
-	db, err := database.NewDB(appConfig.DBConnection)
+	// Setup database
+	db, err := setupDatabase(appConfig.DBConnection)
 	if err != nil {
 		return nil, err
 	}
 
-	// Initialize schema
+	// Initialize services and repositories
+	messageRepo := repositories.NewMessageRepository(db)
+	messageSenderService := services.NewMessageSenderService(bot)
+	summarizationService := services.NewSummarizationService(
+		appConfig, messageRepo, openaiClient, messageSenderService,
+	)
+
+	// Initialize scheduled tasks
+	dailySummarization := tasks.NewDailySummarizationTask(appConfig, summarizationService)
+	sessionKeepAlive := tasks.NewSessionKeepAliveTask(30 * time.Minute)
+
+	// Create bot client
+	client := &TgBotClient{
+		bot:                    bot,
+		dispatcher:             dispatcher,
+		updater:                updater,
+		db:                     db,
+		dailySummarizationTask: dailySummarization,
+		sessionKeepAliveTask:   sessionKeepAlive,
+	}
+
+	// Register all handlers
+	client.registerHandlers(openaiClient, appConfig, messageRepo, summarizationService, messageSenderService)
+
+	return client, nil
+}
+
+// setupDatabase initializes the database connection and schema
+func setupDatabase(connectionString string) (*database.DB, error) {
+	db, err := database.NewDB(connectionString)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := db.InitSchema(); err != nil {
 		return nil, err
 	}
 
-	// Create message repository
-	messageRepository := repositories.NewMessageRepository(db)
-
-	// Create message sender
-	messageSender := services.NewMessageSender(b)
-
-	// Create summarization service
-	summarizationService := services.NewSummarizationService(
-		appConfig,
-		messageRepository,
-		openaiClient,
-		messageSender,
-	)
-
-	// Create daily scheduler
-	dailySummarizationTask := tasks.NewDailySummarizationTask(appConfig, summarizationService)
-
-	// Create session keep-alive task (30 minutes interval)
-	sessionKeepAliveTask := tasks.NewSessionKeepAliveTask(30 * time.Minute)
-
-	bot := &TgBotClient{
-		bot:                    b,
-		dispatcher:             dispatcher,
-		updater:                updater,
-		db:                     db,
-		dailySummarizationTask: dailySummarizationTask,
-		sessionKeepAliveTask:   sessionKeepAliveTask,
-	}
-
-	bot.registerHandlers(openaiClient, appConfig, messageRepository, summarizationService)
-
-	return bot, nil
+	return db, nil
 }
 
+// registerHandlers registers all bot handlers
 func (b *TgBotClient) registerHandlers(
 	openaiClient *clients.OpenAiClient,
 	appConfig *config.Config,
 	messageRepository *repositories.MessageRepository,
 	summarizationService *services.SummarizationService,
+	messageSenderService services.MessageSenderService,
 ) {
-	messageSender := services.NewMessageSender(b.bot)
+	// Register private chat handlers
+	privateHandlers := []ext.Handler{
+		privatehandlers.NewStartHandler(),
+		privatehandlers.NewHelpHandler(),
+		privatehandlers.NewToolHandler(openaiClient, messageSenderService, appConfig),
+		privatehandlers.NewContentHandler(openaiClient, messageSenderService, appConfig),
+		privatehandlers.NewCodeHandler(appConfig),
+		privatehandlers.NewSummarizeHandler(summarizationService, messageSenderService, appConfig),
+	}
+	for _, handler := range privateHandlers {
+		b.dispatcher.AddHandler(handler)
+	}
 
-	// Private handlers
-	b.dispatcher.AddHandler(privatehandlers.NewStartHandler())
-	b.dispatcher.AddHandler(privatehandlers.NewHelpHandler())
-	b.dispatcher.AddHandler(privatehandlers.NewToolHandler(openaiClient, appConfig))
-	b.dispatcher.AddHandler(privatehandlers.NewContentHandler(openaiClient, appConfig))
-	b.dispatcher.AddHandler(privatehandlers.NewCodeHandler(appConfig))
-	b.dispatcher.AddHandler(privatehandlers.NewSummarizeHandler(summarizationService, appConfig))
-
-	// Public handlers
-	b.dispatcher.AddHandler(publichandlers.NewDeleteJoinLeftMessagesHandler())
-	b.dispatcher.AddHandler(publichandlers.NewSaveHandler(messageSender, appConfig))
-	b.dispatcher.AddHandler(publichandlers.NewRepliesFromClosedThreadsHandler(messageSender, appConfig))
-	b.dispatcher.AddHandler(publichandlers.NewCleanClosedThreadsHandler(messageSender, appConfig))
-	b.dispatcher.AddHandler(publichandlers.NewMessageCollectorHandler(messageRepository, appConfig))
+	// Register public chat handlers
+	publicHandlers := []ext.Handler{
+		publichandlers.NewDeleteJoinLeftMessagesHandler(),
+		publichandlers.NewSaveHandler(messageSenderService, appConfig),
+		publichandlers.NewRepliesFromClosedThreadsHandler(messageSenderService, appConfig),
+		publichandlers.NewCleanClosedThreadsHandler(messageSenderService, appConfig),
+		publichandlers.NewMessageCollectorHandler(messageRepository, appConfig),
+	}
+	for _, handler := range publicHandlers {
+		b.dispatcher.AddHandler(handler)
+	}
 }
 
+// Start begins the bot polling and starts scheduled tasks
 func (b *TgBotClient) Start() {
-	// Start tasks
+	// Start scheduled tasks
 	b.dailySummarizationTask.Start()
 	b.sessionKeepAliveTask.Start()
 
-	err := b.updater.StartPolling(b.bot, &ext.PollingOpts{
+	// Configure and start polling
+	pollingOpts := &ext.PollingOpts{
 		DropPendingUpdates: true,
 		GetUpdatesOpts: &gotgbot.GetUpdatesOpts{
 			Timeout: 9,
@@ -124,25 +143,22 @@ func (b *TgBotClient) Start() {
 				Timeout: time.Second * 10,
 			},
 		},
-	})
-	if err != nil {
-		log.Fatal("failed to start polling: " + err.Error())
 	}
-	log.Printf("%s has been started...\n", b.bot.User.Username)
 
+	if err := b.updater.StartPolling(b.bot, pollingOpts); err != nil {
+		log.Fatal("Failed to start polling: " + err.Error())
+	}
+
+	log.Printf("Bot @%s has been started successfully\n", b.bot.User.Username)
 	b.updater.Idle()
 }
 
-// Close closes the bot client
+// Close gracefully shuts down the bot and all its resources
 func (b *TgBotClient) Close() error {
-	// Stop tasks
+	// Stop scheduled tasks
 	b.dailySummarizationTask.Stop()
 	b.sessionKeepAliveTask.Stop()
 
-	// Close the database connection
-	if err := b.db.Close(); err != nil {
-		return err
-	}
-
-	return nil
+	// Close database connection
+	return b.db.Close()
 }

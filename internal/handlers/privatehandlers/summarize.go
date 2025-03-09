@@ -23,13 +23,19 @@ import (
 type SummarizeHandler struct {
 	summarizationService *services.SummarizationService
 	config               *config.Config
+	messageSenderService services.MessageSenderService
 }
 
 // NewSummarizeHandler creates a new summarize handler
-func NewSummarizeHandler(summarizationService *services.SummarizationService, config *config.Config) handlers.Handler {
+func NewSummarizeHandler(
+	summarizationService *services.SummarizationService,
+	messageSenderService services.MessageSenderService,
+	config *config.Config,
+) handlers.Handler {
 	return &SummarizeHandler{
 		summarizationService: summarizationService,
 		config:               config,
+		messageSenderService: messageSenderService,
 	}
 }
 
@@ -47,8 +53,7 @@ func (h *SummarizeHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error 
 	}
 
 	// Send typing action using MessageSender.
-	sender := services.NewMessageSender(b)
-	sender.SendTypingAction(msg.Chat.Id)
+	h.messageSenderService.SendTypingAction(msg.Chat.Id)
 
 	// Run summarization in a goroutine to avoid blocking
 	go func() {
@@ -62,7 +67,7 @@ func (h *SummarizeHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error 
 			for {
 				select {
 				case <-ticker.C:
-					sender.SendTypingAction(msg.Chat.Id)
+					h.messageSenderService.SendTypingAction(msg.Chat.Id)
 				case <-typingCtx.Done():
 					return
 				}

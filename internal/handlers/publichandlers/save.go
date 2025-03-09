@@ -19,14 +19,14 @@ import (
 // Constants moved to internal/constants/public_handlers.go
 
 type SaveHandler struct {
-	messageSender services.MessageSender
-	config        *config.Config
+	messageSenderService services.MessageSenderService
+	config               *config.Config
 }
 
-func NewSaveHandler(messageSender services.MessageSender, config *config.Config) handlers.Handler {
+func NewSaveHandler(messageSenderService services.MessageSenderService, config *config.Config) handlers.Handler {
 	return &SaveHandler{
-		messageSender: messageSender,
-		config:        config,
+		messageSenderService: messageSenderService,
+		config:               config,
 	}
 }
 
@@ -80,7 +80,7 @@ func (h *SaveHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	// Sending copied message
-	_, err = h.messageSender.SendCopy(userId, nil, originalText, originalMessage.Entities, originalMessage)
+	_, err = h.messageSenderService.SendCopy(userId, nil, originalText, originalMessage.Entities, originalMessage)
 	if err != nil {
 		return fmt.Errorf("%s: err >> error sending copied message: %v", constants.SaveHandlerName, err)
 	}
@@ -92,7 +92,7 @@ func (h *SaveHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 		userId)
 
 	// Sending info message
-	_, err = h.messageSender.SendCopy(userId, nil, infoMsgText, infoMsgEntities, nil)
+	_, err = h.messageSenderService.SendCopy(userId, nil, infoMsgText, infoMsgEntities, nil)
 	if err != nil {
 		return fmt.Errorf("%s: err >> error sending info message: %v", constants.SaveHandlerName, err)
 	}

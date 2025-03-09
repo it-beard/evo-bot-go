@@ -23,14 +23,20 @@ import (
 )
 
 type ContentHandler struct {
-	openaiClient *clients.OpenAiClient
-	config       *config.Config
+	openaiClient         *clients.OpenAiClient
+	config               *config.Config
+	messageSenderService services.MessageSenderService
 }
 
-func NewContentHandler(openaiClient *clients.OpenAiClient, config *config.Config) handlers.Handler {
+func NewContentHandler(
+	openaiClient *clients.OpenAiClient,
+	messageSenderService services.MessageSenderService,
+	config *config.Config,
+) handlers.Handler {
 	return &ContentHandler{
-		openaiClient: openaiClient,
-		config:       config,
+		openaiClient:         openaiClient,
+		config:               config,
+		messageSenderService: messageSenderService,
 	}
 }
 
@@ -45,8 +51,7 @@ func (h *ContentHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	// Send typing action using MessageSender.
-	sender := services.NewMessageSender(b)
-	sender.SendTypingAction(msg.Chat.Id)
+	h.messageSenderService.SendTypingAction(msg.Chat.Id)
 
 	// Get messages from chat
 	messages, err := clients.GetChatMessages(h.config.SuperGroupChatID, h.config.ContentTopicID) // Get last 100 messages
@@ -83,7 +88,7 @@ func (h *ContentHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 		for {
 			select {
 			case <-ticker.C:
-				sender.SendTypingAction(msg.Chat.Id)
+				h.messageSenderService.SendTypingAction(msg.Chat.Id)
 			case <-typingCtx.Done():
 				return
 			}

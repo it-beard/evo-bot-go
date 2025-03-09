@@ -17,12 +17,12 @@ import (
 )
 
 type RepliesFromClosedThreadsHandler struct {
-	closedTopics  map[int]bool
-	messageSender services.MessageSender
-	config        *config.Config
+	closedTopics         map[int]bool
+	messageSenderService services.MessageSenderService
+	config               *config.Config
 }
 
-func NewRepliesFromClosedThreadsHandler(messageSender services.MessageSender, config *config.Config) handlers.Handler {
+func NewRepliesFromClosedThreadsHandler(messageSenderService services.MessageSenderService, config *config.Config) handlers.Handler {
 	// Create map of closed topics
 	closedTopics := make(map[int]bool)
 	for _, id := range config.ClosedTopicsIDs {
@@ -30,9 +30,9 @@ func NewRepliesFromClosedThreadsHandler(messageSender services.MessageSender, co
 	}
 
 	return &RepliesFromClosedThreadsHandler{
-		closedTopics:  closedTopics,
-		messageSender: messageSender,
-		config:        config,
+		closedTopics:         closedTopics,
+		messageSenderService: messageSenderService,
+		config:               config,
 	}
 }
 
@@ -143,7 +143,7 @@ func (h *RepliesFromClosedThreadsHandler) forwardReplyMessage(ctx *ext.Context) 
 	}
 
 	// Forward the message
-	_, err := h.messageSender.SendCopy(msg.Chat.Id, &h.config.ForwardingTopicID, finalMessage, updatedEntities, msg)
+	_, err := h.messageSenderService.SendCopy(msg.Chat.Id, &h.config.ForwardingTopicID, finalMessage, updatedEntities, msg)
 	if err != nil {
 		return fmt.Errorf("%s: error >> failed to forward reply message: %w", constants.RepliesFromClosedThreadsHandlerName, err)
 	}

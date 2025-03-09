@@ -17,10 +17,10 @@ import (
 
 // SummarizationService handles the daily summarization of messages
 type SummarizationService struct {
-	config        *config.Config
-	messages      *repositories.MessageRepository
-	openaiClient  *clients.OpenAiClient
-	messageSender MessageSender
+	config               *config.Config
+	messages             *repositories.MessageRepository
+	openaiClient         *clients.OpenAiClient
+	messageSenderService MessageSenderService
 }
 
 // NewSummarizationService creates a new summarization service
@@ -28,13 +28,13 @@ func NewSummarizationService(
 	config *config.Config,
 	messages *repositories.MessageRepository,
 	openaiClient *clients.OpenAiClient,
-	messageSender MessageSender,
+	messageSenderService MessageSenderService,
 ) *SummarizationService {
 	return &SummarizationService{
-		config:        config,
-		messages:      messages,
-		openaiClient:  openaiClient,
-		messageSender: messageSender,
+		config:               config,
+		messages:             messages,
+		openaiClient:         openaiClient,
+		messageSenderService: messageSenderService,
 	}
 }
 
@@ -113,7 +113,7 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 	}
 
 	// Send the summary to the target chat
-	_, err = s.messageSender.SendCopy(
+	_, err = s.messageSenderService.SendCopy(
 		targetTopicID,
 		nil,
 		finalSummary,
