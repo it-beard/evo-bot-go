@@ -1,58 +1,39 @@
-# Telegram Bot
+# Evocoders Telegram Bot
 
-This project contains a Telegram bot for Evocoders Club management. Bot implemented in Go.
+![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)
 
-## Features
+A Telegram bot for Evocoders Club management implemented in Go. Helps moderate discussions, provides AI-powered search, and generates daily chat summaries.
 
-- Deletes non-admin messages in closed threads (read-only threads)
-- Forwards replies from closed threads to the forwarding thread (usualy it is General topic)
-- Deletes join/leave messages in all threads
-- Forwards messages to direct chat on request (command: `/save`)
-- Provides help information (command: `/help`)
-- AI-powered tool search functionality (command: `/tool`)
-  - Searches through a database of AI tools
-  - Provides relevant tool recommendations based on user queries
-- AI-powered content search functionality (command: `/content`)
-  - Searches through messages in the designated content topic
-  - Retrieves relevant information based on user queries
-- Automatic daily chat summarization
-  - Collects messages from monitored chats
-  - Generates a daily summary of chat activities
-  - Posts summaries to a designated chat at a configured time
-  - Supports manual triggering via `/summarize` command (admin-only, uses Telegram's permission system)
-- Dynamic prompting template management
-  - Flexible configuration of AI prompting templates stored in the database
-  - Allows customization of AI behaviors and responses for summarization, content, and tool features
-  - Templates can be updated without code changes
+## 🚀 Features
+
+### Moderation
+- ✅ **Thread Management**: Deletes non-admin messages in read-only threads
+- ✅ **Message Forwarding**: Forwards replies from closed threads to the general topic
+- ✅ **Join/Leave Cleanup**: Removes join/leave messages for cleaner conversations
+
+### AI-Powered Functionality
+- 🔍 **Tool Search** (`/tool`): Finds relevant AI tools based on user queries
+- 📚 **Content Search** (`/content`): Searches through designated topics for information
+- 📋 **Chat Summarization**: Creates daily summaries of conversations
+  - Auto-posts at configured times
+  - Manual trigger with `/summarize` (admin-only)
+
+### Utility
+- 💾 **Save Messages** (`/save`): Forwards messages to direct chat
+- ℹ️ **Help** (`/help`): Provides usage information
+- 🧩 **Dynamic Templates**: Customizable AI prompts stored in database
 
 For more details on bot usage, use the `/help` command in the bot chat.
 
-## Database Schema
+## 💾 Database
 
-The bot uses a PostgreSQL database with the following schema that is automatically initialized on startup:
+The bot uses PostgreSQL with automatically initialized tables:
 
-### Tables
-
-1. **messages** - Stores chat messages for summarization
-   - `id`: Serial primary key
-   - `topic_id`: Topic ID where the message was sent
-   - `message_id`: Telegram message ID
-   - `reply_to_message_id`: ID of the message being replied to (if applicable)
-   - `user_id`: Telegram user ID of the sender
-   - `username`: Username of the sender
-   - `message_text`: Message content
-   - `created_at`: Timestamp when the message was sent
-
-2. **tg_sessions** - Stores Telegram User Client session data
-   - `id`: Session ID (primary key)
-   - `data`: Session data in binary format
-   - `updated_at`: Timestamp when the session was last updated
-
-3. **prompting_templates** - Stores AI prompting templates
-   - `template_key`: Template identifier (primary key)
-   - `template_text`: The actual template content
-
-The database connection is configured using the `TG_EVO_BOT_DB_CONNECTION` environment variable.
+| Table | Purpose | Key Fields |
+|-------|---------|------------|
+| **messages** | Stores chat data for summarization | `id`, `topic_id`, `message_text`, `created_at` |
+| **tg_sessions** | Manages Telegram User Client sessions | `id`, `data`, `updated_at` |
+| **prompting_templates** | Stores AI prompting templates | `template_key`, `template_text` |
 
 ## Building the Executable
 
@@ -78,9 +59,9 @@ Command for update dependencies:
 go mod tidy
 ```
 
-## Running the Bot
+## ⚙️ Configuration
 
-Before running the bot, make sure to set the following environment variables:
+The bot uses environment variables for configuration, make sure to set them all:
 
 ### Basic Bot Configuration
 - `TG_EVO_BOT_TOKEN`: Your Telegram bot token
