@@ -6,14 +6,16 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
-	"your_module_name/internal/clients"
-	"your_module_name/internal/handlers"
-	"your_module_name/internal/handlers/prompts"
-	"your_module_name/internal/services"
+	"github.com/it-beard/evo-bot-go/internal/clients"
+	"github.com/it-beard/evo-bot-go/internal/config"
+	"github.com/it-beard/evo-bot-go/internal/constants"
+	"github.com/it-beard/evo-bot-go/internal/constants/prompts"
+	"github.com/it-beard/evo-bot-go/internal/handlers"
+	"github.com/it-beard/evo-bot-go/internal/services"
+	"github.com/it-beard/evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -21,30 +23,23 @@ import (
 )
 
 type ContentHandler struct {
-	openaiClient *clients.OpenAiClient
-	chatId       int64 // Add field for chat ID
-	topicId      int   // Add field for topic ID
+	openaiClient             *clients.OpenAiClient
+	promptingTemplateService *services.PromptingTemplateService
+	messageSenderService     services.MessageSenderService
+	config                   *config.Config
 }
 
-func NewContentHandler(openaiClient *clients.OpenAiClient) handlers.Handler {
-	// Parse environment variables
-	chatIdStr := os.Getenv("TG_EVO_BOT_MAIN_CHAT_ID")
-	topicIdStr := os.Getenv("TG_EVO_BOT_CONTENT_TOPIC_ID")
-
-	chatId, err := strconv.ParseInt(chatIdStr, 10, 64)
-	if err != nil {
-		log.Fatalf("Invalid TG_EVO_BOT_MAIN_CHAT_ID: %v", err)
-	}
-
-	topicId, err := strconv.Atoi(topicIdStr)
-	if err != nil {
-		log.Fatalf("Invalid TG_EVO_BOT_CONTENT_TOPIC_ID: %v", err)
-	}
-
+func NewContentHandler(
+	openaiClient *clients.OpenAiClient,
+	messageSenderService services.MessageSenderService,
+	promptingTemplateService *services.PromptingTemplateService,
+	config *config.Config,
+) handlers.Handler {
 	return &ContentHandler{
-		openaiClient: openaiClient,
-		chatId:       chatId,
-		topicId:      topicId,
+		openaiClient:             openaiClient,
+		promptingTemplateService: promptingTemplateService,
+		messageSenderService:     messageSenderService,
+		config:                   config,
 	}
 }
 
@@ -54,16 +49,15 @@ func (h *ContentHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	// Extract text after command
 	commandText := h.extractCommandText(msg)
 	if commandText == "" {
-		_, err := msg.Reply(b, fmt.Sprintf("Пожалуйста, введи поисковый запрос после команды. Например: %s <текст>", contentCommand), nil)
+		_, err := msg.Reply(b, fmt.Sprintf("Пожалуйста, введи поисковый запрос после команды. Например: %s <текст>", constants.ContentCommand), nil)
 		return err
 	}
 
 	// Send typing action using MessageSender.
-	sender := services.NewMessageSender(b)
-	sender.SendTypingAction(msg.Chat.Id)
+	h.messageSenderService.SendTypingAction(msg.Chat.Id)
 
 	// Get messages from chat
-	messages, err := clients.GetChatMessages(h.chatId, h.topicId) // Get last 100 messages
+	messages, err := clients.GetChatMessages(h.config.SuperGroupChatID, h.config.ContentTopicID) // Get last 100 messages
 	if err != nil {
 		return fmt.Errorf("failed to get chat messages: %w", err)
 	}
@@ -73,9 +67,17 @@ func (h *ContentHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 		return err
 	}
 
-	topicLink := fmt.Sprintf("https://t.me/c/%d/%d", h.chatId, h.topicId)
+	topicLink := fmt.Sprintf("https://t.me/c/%d/%d", h.config.SuperGroupChatID, h.config.ContentTopicID)
+
+	// Get the prompt template from the database
+	templateText := h.promptingTemplateService.GetTemplateWithFallback(
+		context.Background(),
+		prompts.GetContentPromptTemplateDbKey,
+		prompts.GetContentPromptDefaultTemplate,
+	)
+
 	prompt := fmt.Sprintf(
-		prompts.GetContentPromptTemplate,
+		templateText,
 		topicLink,
 		topicLink,
 		string(dataMessages),
@@ -97,7 +99,7 @@ func (h *ContentHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 		for {
 			select {
 			case <-ticker.C:
-				sender.SendTypingAction(msg.Chat.Id)
+				h.messageSenderService.SendTypingAction(msg.Chat.Id)
 			case <-typingCtx.Done():
 				return
 			}
@@ -125,10 +127,10 @@ func (h *ContentHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 	}
 
 	if msg.Text != "" &&
-		strings.HasPrefix(msg.Text, contentCommand) &&
-		msg.Chat.Type == privateChat {
+		strings.HasPrefix(msg.Text, constants.ContentCommand) &&
+		msg.Chat.Type == constants.PrivateChat {
 
-		if !h.isUserClubMember(b, msg) {
+		if !utils.IsUserClubMember(b, msg, h.config) {
 			msg.Reply(b, "Команда доступна только для членов клуба.", nil)
 			log.Print("Trying to use /content command without club membership")
 			return false
@@ -140,35 +142,15 @@ func (h *ContentHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 }
 
 func (h *ContentHandler) Name() string {
-	return contentHandlerName
+	return constants.ContentHandlerName
 }
 
 func (h *ContentHandler) extractCommandText(msg *gotgbot.Message) string {
 	var commandText string
-	if strings.HasPrefix(msg.Text, contentCommand) {
-		commandText = strings.TrimPrefix(msg.Text, contentCommand)
+	if strings.HasPrefix(msg.Text, constants.ContentCommand) {
+		commandText = strings.TrimPrefix(msg.Text, constants.ContentCommand)
 	}
 	return strings.TrimSpace(commandText)
-}
-
-func (h *ContentHandler) isUserClubMember(b *gotgbot.Bot, msg *gotgbot.Message) bool {
-	chatId, err := strconv.ParseInt("-100"+strconv.FormatInt(h.chatId, 10), 10, 64)
-	if err != nil {
-		log.Printf("Failed to parse chat ID: %v", err)
-		return false
-	}
-	// Check if user is member of target group
-	chatMember, err := b.GetChatMember(chatId, msg.From.Id, nil)
-	if err != nil {
-		log.Printf("Failed to get chat member: %v", err)
-		return false
-	}
-
-	status := chatMember.GetStatus()
-	if status == "left" || status == "kicked" {
-		return false
-	}
-	return true
 }
 
 func (h *ContentHandler) prepareTelegramMessages(messages []tg.Message) ([]byte, error) {

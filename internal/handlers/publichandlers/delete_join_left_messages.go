@@ -3,13 +3,12 @@ package publichandlers
 import (
 	"fmt"
 	"log"
-	"your_module_name/internal/handlers"
+	"github.com/it-beard/evo-bot-go/internal/constants"
+	"github.com/it-beard/evo-bot-go/internal/handlers"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
-
-const deleteJoinLeftMessagesHandlerName = "delete_join_left_messages_handler"
 
 type DeleteJoinLeftMessagesHandler struct{}
 
@@ -22,13 +21,13 @@ func (h *DeleteJoinLeftMessagesHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Co
 
 	_, err := msg.Delete(b, nil)
 	if err != nil {
-		return fmt.Errorf("%s: Error deleting message: %v", deleteJoinLeftMessagesHandlerName, err)
+		return fmt.Errorf("%s: Error deleting message: %v", constants.DeleteJoinLeftMessagesHandlerName, err)
 	}
 
 	if msg.NewChatMembers != nil {
-		log.Printf("%s: New user joined. Username: %v. User ID: %v", deleteJoinLeftMessagesHandlerName, msg.NewChatMembers[0].Username, msg.NewChatMembers[0].Id)
+		log.Printf("%s: New user joined. Username: %v. User ID: %v", constants.DeleteJoinLeftMessagesHandlerName, msg.NewChatMembers[0].Username, msg.NewChatMembers[0].Id)
 	} else if msg.LeftChatMember != nil {
-		log.Printf("%s: User left. Username: %v. User ID: %v", deleteJoinLeftMessagesHandlerName, msg.LeftChatMember.Username, msg.LeftChatMember.Id)
+		log.Printf("%s: User left. Username: %v. User ID: %v", constants.DeleteJoinLeftMessagesHandlerName, msg.LeftChatMember.Username, msg.LeftChatMember.Id)
 	}
 
 	return nil
@@ -44,5 +43,5 @@ func (h *DeleteJoinLeftMessagesHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Con
 }
 
 func (h *DeleteJoinLeftMessagesHandler) Name() string {
-	return deleteJoinLeftMessagesHandlerName
+	return constants.DeleteJoinLeftMessagesHandlerName
 }

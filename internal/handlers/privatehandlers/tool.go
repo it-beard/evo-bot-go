@@ -6,14 +6,16 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
-	"your_module_name/internal/clients"
-	"your_module_name/internal/handlers"
-	"your_module_name/internal/handlers/prompts"
-	"your_module_name/internal/services"
+	"github.com/it-beard/evo-bot-go/internal/clients"
+	"github.com/it-beard/evo-bot-go/internal/config"
+	"github.com/it-beard/evo-bot-go/internal/constants"
+	"github.com/it-beard/evo-bot-go/internal/constants/prompts"
+	"github.com/it-beard/evo-bot-go/internal/handlers"
+	"github.com/it-beard/evo-bot-go/internal/services"
+	"github.com/it-beard/evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -21,30 +23,23 @@ import (
 )
 
 type ToolHandler struct {
-	openaiClient *clients.OpenAiClient
-	chatId       int64 // Add field for chat ID
-	topicId      int   // Add field for topic ID
+	openaiClient             *clients.OpenAiClient
+	config                   *config.Config
+	promptingTemplateService *services.PromptingTemplateService
+	messageSenderService     services.MessageSenderService
 }
 
-func NewToolHandler(openaiClient *clients.OpenAiClient) handlers.Handler {
-	// Parse environment variables
-	chatIdStr := os.Getenv("TG_EVO_BOT_MAIN_CHAT_ID")
-	topicIdStr := os.Getenv("TG_EVO_BOT_TOOL_TOPIC_ID")
-
-	chatId, err := strconv.ParseInt(chatIdStr, 10, 64)
-	if err != nil {
-		log.Fatalf("Invalid TG_EVO_BOT_MAIN_CHAT_ID: %v", err)
-	}
-
-	topicId, err := strconv.Atoi(topicIdStr)
-	if err != nil {
-		log.Fatalf("Invalid TG_EVO_BOT_TOOL_TOPIC_ID: %v", err)
-	}
-
+func NewToolHandler(
+	openaiClient *clients.OpenAiClient,
+	messageSenderService services.MessageSenderService,
+	promptingTemplateService *services.PromptingTemplateService,
+	config *config.Config,
+) handlers.Handler {
 	return &ToolHandler{
-		openaiClient: openaiClient,
-		chatId:       chatId,
-		topicId:      topicId,
+		openaiClient:             openaiClient,
+		config:                   config,
+		promptingTemplateService: promptingTemplateService,
+		messageSenderService:     messageSenderService,
 	}
 }
 
@@ -54,16 +49,15 @@ func (h *ToolHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	// Extract text after command
 	commandText := h.extractCommandText(msg)
 	if commandText == "" {
-		_, err := msg.Reply(b, fmt.Sprintf("Пожалуйста, введи поисковый запрос после команды. Например: %s <текст>", toolCommand), nil)
+		_, err := msg.Reply(b, fmt.Sprintf("Пожалуйста, введи поисковый запрос после команды. Например: %s <текст>", constants.ToolCommand), nil)
 		return err
 	}
 
 	// Send typing action using MessageSender.
-	sender := services.NewMessageSender(b)
-	sender.SendTypingAction(msg.Chat.Id)
+	h.messageSenderService.SendTypingAction(msg.Chat.Id)
 
 	// Get messages from chat
-	messages, err := clients.GetChatMessages(h.chatId, h.topicId) // Get last 100 messages
+	messages, err := clients.GetChatMessages(h.config.SuperGroupChatID, h.config.ToolTopicID) // Get last 100 messages
 	if err != nil {
 		return fmt.Errorf("failed to get chat messages: %w", err)
 	}
@@ -73,9 +67,16 @@ func (h *ToolHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 		return err
 	}
 
-	topicLink := fmt.Sprintf("https://t.me/c/%d/%d", h.chatId, h.topicId)
+	topicLink := fmt.Sprintf("https://t.me/c/%d/%d", h.config.SuperGroupChatID, h.config.ToolTopicID)
+
+	templateText := h.promptingTemplateService.GetTemplateWithFallback(
+		context.Background(),
+		prompts.GetToolPromptTemplateDbKey,
+		prompts.GetToolPromptDefaultTemplate,
+	)
+
 	prompt := fmt.Sprintf(
-		prompts.GetToolPromptTemplate,
+		templateText,
 		topicLink,
 		topicLink,
 		string(dataMessages),
@@ -97,7 +98,7 @@ func (h *ToolHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 		for {
 			select {
 			case <-ticker.C:
-				sender.SendTypingAction(msg.Chat.Id)
+				h.messageSenderService.SendTypingAction(msg.Chat.Id)
 			case <-typingCtx.Done():
 				return
 			}
@@ -125,10 +126,10 @@ func (h *ToolHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 	}
 
 	if msg.Text != "" &&
-		(strings.HasPrefix(msg.Text, toolsCommand) || strings.HasPrefix(msg.Text, toolCommand)) &&
-		msg.Chat.Type == privateChat {
+		(strings.HasPrefix(msg.Text, constants.ToolsCommand) || strings.HasPrefix(msg.Text, constants.ToolCommand)) &&
+		msg.Chat.Type == constants.PrivateChat {
 
-		if !h.isUserClubMember(b, msg) {
+		if !utils.IsUserClubMember(b, msg, h.config) {
 			msg.Reply(b, "Команда доступна только для членов клуба.", nil)
 			log.Print("Trying to use /tool command without club membership")
 			return false
@@ -140,37 +141,17 @@ func (h *ToolHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 }
 
 func (h *ToolHandler) Name() string {
-	return toolHandlerName
+	return constants.ToolHandlerName
 }
 
 func (h *ToolHandler) extractCommandText(msg *gotgbot.Message) string {
 	var commandText string
-	if strings.HasPrefix(msg.Text, toolsCommand) {
-		commandText = strings.TrimPrefix(msg.Text, toolsCommand)
+	if strings.HasPrefix(msg.Text, constants.ToolsCommand) {
+		commandText = strings.TrimPrefix(msg.Text, constants.ToolsCommand)
 	} else {
-		commandText = strings.TrimPrefix(msg.Text, toolCommand)
+		commandText = strings.TrimPrefix(msg.Text, constants.ToolCommand)
 	}
 	return strings.TrimSpace(commandText)
-}
-
-func (h *ToolHandler) isUserClubMember(b *gotgbot.Bot, msg *gotgbot.Message) bool {
-	chatId, err := strconv.ParseInt("-100"+strconv.FormatInt(h.chatId, 10), 10, 64)
-	if err != nil {
-		log.Printf("Failed to parse chat ID: %v", err)
-		return false
-	}
-	// Check if user is member of target group
-	chatMember, err := b.GetChatMember(chatId, msg.From.Id, nil)
-	if err != nil {
-		log.Printf("Failed to get chat member: %v", err)
-		return false
-	}
-
-	status := chatMember.GetStatus()
-	if status == "left" || status == "kicked" {
-		return false
-	}
-	return true
 }
 
 func (h *ToolHandler) prepareTelegramMessages(messages []tg.Message) ([]byte, error) {

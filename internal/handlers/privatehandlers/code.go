@@ -2,33 +2,32 @@ package privatehandlers
 
 import (
 	"log"
-	"os"
-	"strconv"
 	"strings"
-	"your_module_name/internal/clients"
-	"your_module_name/internal/handlers"
+
+	"github.com/it-beard/evo-bot-go/internal/clients"
+	"github.com/it-beard/evo-bot-go/internal/config"
+	"github.com/it-beard/evo-bot-go/internal/constants"
+	"github.com/it-beard/evo-bot-go/internal/handlers"
+	"github.com/it-beard/evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
 type CodeHandler struct {
-	chatId int64
+	config *config.Config
 }
 
-func NewCodeHandler() handlers.Handler {
-	chatIdStr := os.Getenv("TG_EVO_BOT_MAIN_CHAT_ID")
-	chatId, err := strconv.ParseInt(chatIdStr, 10, 64)
-	if err != nil {
-		log.Fatalf("Invalid TG_EVO_BOT_MAIN_CHAT_ID: %v", err)
+func NewCodeHandler(config *config.Config) handlers.Handler {
+	return &CodeHandler{
+		config: config,
 	}
-	return &CodeHandler{chatId: chatId}
 }
 
 func (h *CodeHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	// Extract code from command
-	revertedCode := strings.TrimPrefix(msg.Text, codeCommand)
+	revertedCode := strings.TrimPrefix(msg.Text, constants.CodeCommand)
 	revertedCode = strings.TrimSpace(revertedCode)
 	code := reverseString(revertedCode)
 	if code == "" {
@@ -37,9 +36,9 @@ func (h *CodeHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	// Store the code in memory
-	clients.SetVerificationCode(code)
+	clients.TgSetVerificationCode(code)
 	log.Print("Code stored")
-	err := clients.KeepSessionAlive() // Refresh session
+	err := clients.TgKeepSessionAlive() // Refresh session
 	if err == nil {
 		msg.Reply(b, "Код принят", nil)
 	}
@@ -52,8 +51,8 @@ func (h *CodeHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 		return false
 	}
 
-	if msg.Text != "" && strings.HasPrefix(msg.Text, codeCommand) && msg.Chat.Type == privateChat {
-		if !h.isUserAdminOrCreator(b, msg) {
+	if msg.Text != "" && strings.HasPrefix(msg.Text, constants.CodeCommand) && msg.Chat.Type == constants.PrivateChat {
+		if !utils.IsUserAdminOrCreator(b, msg.From.Id, h.config.SuperGroupChatID) {
 			msg.Reply(b, "Команда доступна только для администраторов.", nil)
 			log.Print("Trying to use /code command without admin rights")
 			return false
@@ -65,7 +64,7 @@ func (h *CodeHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 }
 
 func (h *CodeHandler) Name() string {
-	return codeHandlerName
+	return constants.CodeHandlerName
 }
 
 func reverseString(s string) string {
@@ -74,24 +73,4 @@ func reverseString(s string) string {
 		runes[i], runes[j] = runes[j], runes[i]
 	}
 	return string(runes)
-}
-
-func (h *CodeHandler) isUserAdminOrCreator(b *gotgbot.Bot, msg *gotgbot.Message) bool {
-	chatId, err := strconv.ParseInt("-100"+strconv.FormatInt(h.chatId, 10), 10, 64)
-	if err != nil {
-		log.Printf("Failed to parse chat ID: %v", err)
-		return false
-	}
-	// Check if user is member of target group
-	chatMember, err := b.GetChatMember(chatId, msg.From.Id, nil)
-	if err != nil {
-		log.Printf("Failed to get chat member: %v", err)
-		return false
-	}
-
-	status := chatMember.GetStatus()
-	if status == "administrator" || status == "creator" {
-		return true
-	}
-	return false
 }

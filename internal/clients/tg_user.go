@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
-	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/it-beard/evo-bot-go/internal/config"
+	"github.com/it-beard/evo-bot-go/internal/constants"
+	"github.com/it-beard/evo-bot-go/internal/database"
+	"github.com/it-beard/evo-bot-go/internal/database/repositories"
 
 	"github.com/gotd/td/session"
 	"github.com/gotd/td/telegram"
@@ -15,34 +18,61 @@ import (
 	"github.com/gotd/td/tg"
 )
 
-// Environment variable names
-const (
-	envSessionType = "TG_EVO_BOT_TGUSERCLIENT_SESSION_TYPE"
-	envAppID       = "TG_EVO_BOT_TGUSERCLIENT_APPID"
-	envAppHash     = "TG_EVO_BOT_TGUSERCLIENT_APPHASH"
-	envPhoneNumber = "TG_EVO_BOT_TGUSERCLIENT_PHONENUMBER"
-	envPassword    = "TG_EVO_BOT_TGUSERCLIENT_2FAPASS"
-
-	defaultSessionFile = "session.json"
-	defaultLimit       = 100
-)
-
 var (
 	verificationCode string
 	codeMutex        sync.RWMutex
-	storage          session.Storage
+	sessionStorage   session.Storage
 )
 
 func init() {
-	// Initialize session storage based on environment configuration
-	sessionType := os.Getenv(envSessionType)
-	if strings.ToLower(sessionType) == "file" {
-		storage = &session.FileStorage{Path: defaultSessionFile}
-		log.Printf("Using file session storage (%s)", defaultSessionFile)
-	} else {
-		storage = new(session.StorageMemory)
+	// Initialize session storage based on configuration
+	// Load configuration
+	appConfig, err := config.LoadConfig()
+	if err != nil {
+		log.Printf("Failed to load configuration, using in-memory session storage: %v", err)
+		sessionStorage = new(session.StorageMemory)
+		return
+	}
+
+	sessionType := strings.ToLower(appConfig.TGUserClientSessionType)
+
+	switch sessionType {
+	case constants.TGUserClientSessionTypeFile:
+		sessionStorage = &session.FileStorage{Path: constants.TGUserClientDefaultSessionFile}
+		log.Printf("Using file session storage (%s)", constants.TGUserClientDefaultSessionFile)
+	case constants.TGUserClientSessionTypeDatabase:
+		// Initialize database storage
+		dbSessionStorage, err := initDatabaseStorage(appConfig.DBConnection)
+		if err != nil {
+			log.Printf("Failed to initialize database session storage: %v, falling back to in-memory storage", err)
+			sessionStorage = new(session.StorageMemory)
+		} else {
+			sessionStorage = dbSessionStorage
+			log.Print("Using database session storage")
+		}
+	default:
+		sessionStorage = new(session.StorageMemory)
 		log.Print("Using in-memory session storage")
 	}
+}
+
+// initDatabaseStorage initializes a database-backed session storage
+func initDatabaseStorage(connectionString string) (session.Storage, error) {
+	if connectionString == "" {
+		return nil, fmt.Errorf("database connection string is empty")
+	}
+
+	// Create database connection
+	db, err := database.NewDB(connectionString)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
+	}
+
+	// Create session repository
+	sessionRepository := repositories.NewTgSessionRepository(db)
+	// No error handling needed as the constructor doesn't return an error anymore
+
+	return sessionRepository, nil
 }
 
 // TelegramConfig holds the configuration for Telegram client
@@ -53,19 +83,20 @@ type TelegramConfig struct {
 	Password    string
 }
 
-// NewTelegramConfig creates a new TelegramConfig from environment variables
+// NewTelegramConfig creates a new TelegramConfig from config values
 func NewTelegramConfig() (*TelegramConfig, error) {
-	appIDStr := os.Getenv(envAppID)
-	appHash := os.Getenv(envAppHash)
-	phoneNumber := os.Getenv(envPhoneNumber)
-	password := os.Getenv(envPassword)
-
-	appID, err := strconv.Atoi(appIDStr)
+	// Load configuration
+	appConfig, err := config.LoadConfig()
 	if err != nil {
-		return nil, fmt.Errorf("invalid app ID: %w", err)
+		return nil, fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	if appHash == "" || phoneNumber == "" || password == "" {
+	appID := appConfig.TGUserClientAppID
+	appHash := appConfig.TGUserClientAppHash
+	phoneNumber := appConfig.TGUserClientPhoneNumber
+	password := appConfig.TGUserClient2FAPass
+
+	if appID == 0 || appHash == "" || phoneNumber == "" || password == "" {
 		return nil, fmt.Errorf("missing required telegram client configuration")
 	}
 
@@ -91,7 +122,7 @@ func NewTelegramClient() (*TelegramClient, error) {
 	}
 
 	client := telegram.NewClient(config.AppID, config.AppHash, telegram.Options{
-		SessionStorage: storage,
+		SessionStorage: sessionStorage,
 	})
 
 	return &TelegramClient{
@@ -100,16 +131,16 @@ func NewTelegramClient() (*TelegramClient, error) {
 	}, nil
 }
 
-// SetVerificationCode sets the verification code for authentication
-func SetVerificationCode(code string) {
+// TgSetVerificationCode sets the verification code for authentication
+func TgSetVerificationCode(code string) {
 	codeMutex.Lock()
 	defer codeMutex.Unlock()
 	verificationCode = code
 }
 
-// GetChatMessageById retrieves a specific message by its ID from a chat
+// TgGetChatMessageById retrieves a specific message by its ID from a chat
 // For forum topics, it returns a synthetic message with the topic name
-func GetChatMessageById(chatID int64, messageID int) (*tg.Message, error) {
+func TgGetChatMessageById(chatID int64, messageID int) (*tg.Message, error) {
 	tgClient, err := NewTelegramClient()
 	if err != nil {
 		return nil, err
@@ -137,7 +168,7 @@ func GetChatMessageById(chatID int64, messageID int) (*tg.Message, error) {
 			// Try to get forum topics
 			forumTopics, err := api.ChannelsGetForumTopics(ctx, &tg.ChannelsGetForumTopicsRequest{
 				Channel: inputChannel,
-				Limit:   defaultLimit,
+				Limit:   constants.TGUserClientDefaultLimit,
 			})
 			if err == nil {
 				for _, topic := range forumTopics.Topics {
@@ -201,7 +232,7 @@ func GetChatMessages(chatID int64, topicID int) ([]tg.Message, error) {
 // fetchMessages retrieves messages with pagination
 func (t *TelegramClient) fetchMessages(ctx context.Context, api *tg.Client, inputPeer tg.InputPeerClass, topicID int, allMessages *[]tg.Message) error {
 	offset := 0
-	limit := defaultLimit
+	limit := constants.TGUserClientDefaultLimit
 
 	for {
 		// Get messages from chat with pagination
@@ -259,8 +290,8 @@ func extractMessages(resp tg.MessagesMessagesClass) ([]tg.Message, error) {
 	return messages, nil
 }
 
-// KeepSessionAlive keeps the Telegram session alive
-func KeepSessionAlive() error {
+// TgKeepSessionAlive keeps the Telegram session alive
+func TgKeepSessionAlive() error {
 	tgClient, err := NewTelegramClient()
 	if err != nil {
 		return err
@@ -293,7 +324,7 @@ func (t *TelegramClient) getPeerInfoByChatID(ctx context.Context, chatID int64) 
 
 	// Fetch dialogs to find the chat and get its AccessHash if needed
 	dialogs, err := api.MessagesGetDialogs(ctx, &tg.MessagesGetDialogsRequest{
-		Limit:      defaultLimit,
+		Limit:      constants.TGUserClientDefaultLimit,
 		OffsetPeer: &tg.InputPeerChat{},
 	})
 	if err != nil {

@@ -3,51 +3,36 @@ package publichandlers
 import (
 	"fmt"
 	"log"
-	"os"
 	"strconv"
-	"strings"
 	"unicode/utf8"
-	"your_module_name/internal/clients"
-	"your_module_name/internal/handlers"
-	"your_module_name/internal/services"
+
+	"github.com/it-beard/evo-bot-go/internal/config"
+	"github.com/it-beard/evo-bot-go/internal/constants"
+	"github.com/it-beard/evo-bot-go/internal/handlers"
+	"github.com/it-beard/evo-bot-go/internal/services"
+	"github.com/it-beard/evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
-const repliesFromClosedThreadsHandlerName = "replies_from_closed_threads_handler"
-
 type RepliesFromClosedThreadsHandler struct {
-	closedThreads      map[int64]bool
-	forwardingThreadId int64
-	messageSender      services.MessageSender
+	closedTopics         map[int]bool
+	messageSenderService services.MessageSenderService
+	config               *config.Config
 }
 
-func NewRepliesFromClosedThreadsHandler(messageSender services.MessageSender) handlers.Handler {
-	closedThreads := make(map[int64]bool)
-	closedThreadsStr := os.Getenv("TG_EVO_BOT_CLOSED_THREADS_IDS")
-	for _, chatID := range strings.Split(closedThreadsStr, ",") {
-		if id, err := strconv.ParseInt(chatID, 10, 64); err == nil {
-			closedThreads[id] = true
-		} else {
-			log.Printf(
-				"%s: error >> failed to parse closed thread ID from env: %v",
-				repliesFromClosedThreadsHandlerName,
-				err)
-		}
+func NewRepliesFromClosedThreadsHandler(messageSenderService services.MessageSenderService, config *config.Config) handlers.Handler {
+	// Create map of closed topics
+	closedTopics := make(map[int]bool)
+	for _, id := range config.ClosedTopicsIDs {
+		closedTopics[id] = true
 	}
-	forwardingThreadStr := os.Getenv("TG_EVO_BOT_FORWARDING_THREAD_ID")
-	forwardingThreadId, err := strconv.ParseInt(forwardingThreadStr, 10, 64)
-	if err != nil {
-		log.Printf(
-			"%s: error >> failed to parse forwarding thread ID from env: %v",
-			repliesFromClosedThreadsHandlerName,
-			err)
-	}
+
 	return &RepliesFromClosedThreadsHandler{
-		closedThreads:      closedThreads,
-		messageSender:      messageSender,
-		forwardingThreadId: forwardingThreadId,
+		closedTopics:         closedTopics,
+		messageSenderService: messageSenderService,
+		config:               config,
 	}
 }
 
@@ -55,53 +40,24 @@ func (h *RepliesFromClosedThreadsHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.
 	msg := ctx.EffectiveMessage
 
 	if msg.ReplyToMessage != nil &&
-		h.closedThreads[msg.MessageThreadId] &&
+		h.closedTopics[int(msg.MessageThreadId)] &&
 		msg.ReplyToMessage.MessageId != msg.MessageThreadId {
 		if err := h.forwardReplyMessage(ctx); err != nil {
 			log.Printf(
 				"%s: error >> failed to forward reply message: %v",
-				repliesFromClosedThreadsHandlerName,
+				constants.RepliesFromClosedThreadsHandlerName,
 				err)
 		}
 		_, err := msg.Delete(b, nil)
 		if err != nil {
 			log.Printf(
 				"%s: error >> failed to delete original message after forwarding: %v",
-				repliesFromClosedThreadsHandlerName,
+				constants.RepliesFromClosedThreadsHandlerName,
 				err)
 		}
 	}
 
 	return nil
-}
-
-// getTopicName retrieves the topic name from the thread ID using the Telegram API
-func (h *RepliesFromClosedThreadsHandler) getTopicName(threadId int64, chatId int64) (string, error) {
-	// Convert threadId to int since GetChatMessageById expects an int
-	messageId := int(threadId)
-
-	// Remove "-100" prefix from chatId if present
-	chatIdStr := strconv.FormatInt(chatId, 10)
-	if strings.HasPrefix(chatIdStr, "-100") {
-		chatIdStr = chatIdStr[4:] // Remove the first 4 characters ("-100")
-		chatId, _ = strconv.ParseInt(chatIdStr, 10, 64)
-	}
-
-	// Get the topic message by ID
-	message, err := clients.GetChatMessageById(chatId, messageId)
-	if err != nil {
-		return "Topic", fmt.Errorf("failed to get thread message: %w", err)
-	}
-
-	// Extract and truncate the topic name if needed
-	topicName := message.Message
-	if topicName == "" {
-		topicName = "Topic"
-	} else if len(topicName) > 30 {
-		topicName = topicName[:27] + "..."
-	}
-
-	return topicName, nil
 }
 
 func (h *RepliesFromClosedThreadsHandler) forwardReplyMessage(ctx *ext.Context) error {
@@ -112,11 +68,11 @@ func (h *RepliesFromClosedThreadsHandler) forwardReplyMessage(ctx *ext.Context) 
 		msg.ReplyToMessage.MessageId)
 
 	// Get the topic name
-	topicName, topicErr := h.getTopicName(msg.MessageThreadId, msg.Chat.Id)
+	topicName, topicErr := utils.GetTopicName(int(msg.MessageThreadId))
 	if topicErr != nil {
 		log.Printf(
 			"%s: warning >> failed to get topic name: %v",
-			repliesFromClosedThreadsHandlerName,
+			constants.RepliesFromClosedThreadsHandlerName,
 			topicErr)
 		// Continue with a default topic name
 		topicName = "Topic"
@@ -187,9 +143,9 @@ func (h *RepliesFromClosedThreadsHandler) forwardReplyMessage(ctx *ext.Context) 
 	}
 
 	// Forward the message
-	_, err := h.messageSender.SendCopy(msg.Chat.Id, &h.forwardingThreadId, finalMessage, updatedEntities, msg)
+	_, err := h.messageSenderService.SendCopy(msg.Chat.Id, &h.config.ForwardingTopicID, finalMessage, updatedEntities, msg)
 	if err != nil {
-		return fmt.Errorf("%s: error >> failed to forward reply message: %w", repliesFromClosedThreadsHandlerName, err)
+		return fmt.Errorf("%s: error >> failed to forward reply message: %w", constants.RepliesFromClosedThreadsHandlerName, err)
 	}
 
 	return nil
@@ -206,10 +162,10 @@ func (h *RepliesFromClosedThreadsHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.C
 		return false
 	}
 
-	// Trigger if message is in closed threads and not reply to itself
-	return h.closedThreads[msg.MessageThreadId] && msg.ReplyToMessage.MessageId != msg.MessageThreadId
+	// Trigger if message is in closed topics and not reply to itself
+	return h.closedTopics[int(msg.MessageThreadId)] && msg.ReplyToMessage.MessageId != msg.MessageThreadId
 }
 
 func (h *RepliesFromClosedThreadsHandler) Name() string {
-	return repliesFromClosedThreadsHandlerName
+	return constants.RepliesFromClosedThreadsHandlerName
 }

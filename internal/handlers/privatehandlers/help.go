@@ -1,7 +1,8 @@
 package privatehandlers
 
 import (
-	"your_module_name/internal/handlers"
+	"github.com/it-beard/evo-bot-go/internal/constants"
+	"github.com/it-beard/evo-bot-go/internal/handlers"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -18,7 +19,7 @@ func (h *HelpHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 		"/start - Приветственное сообщение\n" +
 		"/help - Инструкция по моему использованию\n" +
 		"/tool или /tools - Поиск ИИ-инструментов для разработки. Используйте команду с описанием того, что вы ищете, например: `/tool лучшая IDE`.\n" +
-		"/content - Поиск видео-контента клуба. Используй команду с описанием того, что ты ищешь, например: `/content обзор про MCP`. \n\n" +
+		"/content - Поиск видео-контента клуба. Используй команду с описанием того, что ты ищешь, например: `/content обзор про MCP`. \n" +
 		"Инструкция со всеми моими возможностями: https://t.me/c/2069889012/127/9470"
 	_, err := ctx.EffectiveMessage.Reply(b, helpText, &gotgbot.SendMessageOpts{
 		ParseMode: "Markdown",
@@ -34,5 +35,5 @@ func (h *HelpHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 }
 
 func (h *HelpHandler) Name() string {
-	return helpHandlerName
+	return constants.HelpHandlerName
 }

@@ -1,4 +1,4 @@
-module your_module_name
+module github.com/it-beard/evo-bot-go
 
 go 1.23.3
 
@@ -7,6 +7,7 @@ toolchain go1.23.5
 require (
 	github.com/PaulSonOfLars/gotgbot/v2 v2.0.0-rc.29
 	github.com/gotd/td v0.118.0
+	github.com/lib/pq v1.10.9
 	github.com/openai/openai-go v0.1.0-alpha.51
 	github.com/stretchr/testify v1.10.0
 )
