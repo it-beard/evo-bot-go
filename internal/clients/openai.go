@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/it-beard/evo-bot-go/internal/config"
+	"evo-bot-go/internal/config"
 
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"

@@ -4,7 +4,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/it-beard/evo-bot-go/internal/clients"
+	"evo-bot-go/internal/clients"
 )
 
 // SessionKeepAliveTask handles scheduling of session keep-alive tasks for tg_user client session.

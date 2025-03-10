@@ -152,7 +152,7 @@ This command will recursively run all tests in all packages of your project.
 To run tests in a specific package:
 
 ```shell
-go test github.com/it-beard/evo-bot-go/internal/handlers/privatehandlers
+go test evo-bot-go/internal/handlers/privatehandlers
 ```
 
 Or navigate to the package directory and run:
@@ -167,7 +167,7 @@ go test
 To run a specific test function:
 
 ```shell
-go test -run TestHelpHandler_Name github.com/it-beard/evo-bot-go/internal/handlers/privatehandlers
+go test -run TestHelpHandler_Name evo-bot-go/internal/handlers/privatehandlers
 ```
 
 The `-run` flag accepts a regular expression that matches test function names.

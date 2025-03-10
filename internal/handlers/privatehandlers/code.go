@@ -4,11 +4,11 @@ import (
 	"log"
 	"strings"
 
-	"github.com/it-beard/evo-bot-go/internal/clients"
-	"github.com/it-beard/evo-bot-go/internal/config"
-	"github.com/it-beard/evo-bot-go/internal/constants"
-	"github.com/it-beard/evo-bot-go/internal/handlers"
-	"github.com/it-beard/evo-bot-go/internal/utils"
+	"evo-bot-go/internal/clients"
+	"evo-bot-go/internal/config"
+	"evo-bot-go/internal/constants"
+	"evo-bot-go/internal/handlers"
+	"evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"

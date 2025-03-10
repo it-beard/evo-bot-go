@@ -1,4 +1,4 @@
-module github.com/it-beard/evo-bot-go
+module evo-bot-go
 
 go 1.23.3
 

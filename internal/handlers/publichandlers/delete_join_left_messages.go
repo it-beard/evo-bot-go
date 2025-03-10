@@ -3,8 +3,8 @@ package publichandlers
 import (
 	"fmt"
 	"log"
-	"github.com/it-beard/evo-bot-go/internal/constants"
-	"github.com/it-beard/evo-bot-go/internal/handlers"
+	"evo-bot-go/internal/constants"
+	"evo-bot-go/internal/handlers"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"

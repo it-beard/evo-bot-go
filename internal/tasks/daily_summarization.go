@@ -5,8 +5,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/it-beard/evo-bot-go/internal/config"
-	"github.com/it-beard/evo-bot-go/internal/services"
+	"evo-bot-go/internal/config"
+	"evo-bot-go/internal/services"
 )
 
 // DailySummarizationTask handles scheduling of daily summarization tasks

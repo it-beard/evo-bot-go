@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/gotd/td/session"
-	"github.com/it-beard/evo-bot-go/internal/database"
+	"evo-bot-go/internal/database"
 )
 
 // SessionRepository implements the session.Storage interface for
