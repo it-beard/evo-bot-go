@@ -4,7 +4,7 @@ import (
 	"log"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/it-beard/evo-bot-go/internal/config"
+	"evo-bot-go/internal/config"
 )
 
 func IsUserClubMember(b *gotgbot.Bot, msg *gotgbot.Message, config *config.Config) bool {

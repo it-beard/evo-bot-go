@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/it-beard/evo-bot-go/internal/database"
+	"evo-bot-go/internal/database"
 )
 
 // PromptingTemplate represents a stored prompt template in the database

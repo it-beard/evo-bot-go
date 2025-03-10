@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/it-beard/evo-bot-go/internal/database"
+	"evo-bot-go/internal/database"
 )
 
 // Message represents a stored message in the database

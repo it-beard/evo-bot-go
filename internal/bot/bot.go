@@ -7,14 +7,14 @@ import (
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
-	"github.com/it-beard/evo-bot-go/internal/clients"
-	"github.com/it-beard/evo-bot-go/internal/config"
-	"github.com/it-beard/evo-bot-go/internal/database"
-	"github.com/it-beard/evo-bot-go/internal/database/repositories"
-	"github.com/it-beard/evo-bot-go/internal/handlers/privatehandlers"
-	"github.com/it-beard/evo-bot-go/internal/handlers/publichandlers"
-	"github.com/it-beard/evo-bot-go/internal/services"
-	"github.com/it-beard/evo-bot-go/internal/tasks"
+	"evo-bot-go/internal/clients"
+	"evo-bot-go/internal/config"
+	"evo-bot-go/internal/database"
+	"evo-bot-go/internal/database/repositories"
+	"evo-bot-go/internal/handlers/privatehandlers"
+	"evo-bot-go/internal/handlers/publichandlers"
+	"evo-bot-go/internal/services"
+	"evo-bot-go/internal/tasks"
 )
 
 // TgBotClient represents a Telegram bot client with all required dependencies

@@ -4,8 +4,8 @@ import (
 	"context"
 	"log"
 
-	"github.com/it-beard/evo-bot-go/internal/constants/prompts"
-	"github.com/it-beard/evo-bot-go/internal/database/repositories"
+	"evo-bot-go/internal/constants/prompts"
+	"evo-bot-go/internal/database/repositories"
 )
 
 type PromptingTemplateService struct {

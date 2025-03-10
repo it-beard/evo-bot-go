@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/it-beard/evo-bot-go/internal/clients"
-	"github.com/it-beard/evo-bot-go/internal/config"
+	"evo-bot-go/internal/clients"
+	"evo-bot-go/internal/config"
 )
 
 // GetTopicName retrieves the topic name from the topic ID using the Telegram API

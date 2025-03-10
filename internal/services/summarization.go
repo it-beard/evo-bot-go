@@ -6,11 +6,11 @@ import (
 	"log"
 	"time"
 
-	"github.com/it-beard/evo-bot-go/internal/clients"
-	"github.com/it-beard/evo-bot-go/internal/config"
-	"github.com/it-beard/evo-bot-go/internal/constants/prompts"
-	"github.com/it-beard/evo-bot-go/internal/database/repositories"
-	"github.com/it-beard/evo-bot-go/internal/utils"
+	"evo-bot-go/internal/clients"
+	"evo-bot-go/internal/config"
+	"evo-bot-go/internal/constants/prompts"
+	"evo-bot-go/internal/database/repositories"
+	"evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 )

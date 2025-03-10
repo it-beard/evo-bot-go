@@ -6,9 +6,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/it-beard/evo-bot-go/internal/bot"
-	"github.com/it-beard/evo-bot-go/internal/clients"
-	"github.com/it-beard/evo-bot-go/internal/config"
+	"evo-bot-go/internal/bot"
+	"evo-bot-go/internal/clients"
+	"evo-bot-go/internal/config"
 )
 
 func main() {
