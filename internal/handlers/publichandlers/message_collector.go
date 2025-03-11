@@ -57,7 +57,7 @@ func (h *MessageCollectorHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) 
 
 	formattedSuperGroupChatId := utils.ChatIdToFullChatId(h.config.SuperGroupChatID)
 	// Check if the chat is in the monitored list and from the supergroup
-	return msg.SenderChat != nil && msg.SenderChat.Id == formattedSuperGroupChatId &&
+	return msg.Chat.Id == formattedSuperGroupChatId &&
 		(h.config.IsMonitoredTopic(int(msg.MessageThreadId)) ||
 			(h.config.IsMonitoredTopic(0) && !msg.IsTopicMessage)) // small hack for root topic 0 (1 in links)
 }
