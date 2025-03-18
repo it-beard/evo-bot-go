@@ -9,7 +9,6 @@ import (
 	"evo-bot-go/internal/clients"
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants/prompts"
-	"evo-bot-go/internal/database/repositories"
 	"evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -19,7 +18,6 @@ import (
 // SummarizationService handles the daily summarization of messages
 type SummarizationService struct {
 	config                   *config.Config
-	messages                 *repositories.MessageRepository
 	openaiClient             *clients.OpenAiClient
 	messageSenderService     MessageSenderService
 	promptingTemplateService *PromptingTemplateService
@@ -28,14 +26,12 @@ type SummarizationService struct {
 // NewSummarizationService creates a new summarization service
 func NewSummarizationService(
 	config *config.Config,
-	messages *repositories.MessageRepository,
 	openaiClient *clients.OpenAiClient,
 	messageSenderService MessageSenderService,
 	promptingTemplateService *PromptingTemplateService,
 ) *SummarizationService {
 	return &SummarizationService{
 		config:                   config,
-		messages:                 messages,
 		openaiClient:             openaiClient,
 		messageSenderService:     messageSenderService,
 		promptingTemplateService: promptingTemplateService,
@@ -91,7 +87,7 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 	for _, msg := range tgMessages {
 		// Convert Unix timestamp to time.Time
 		msgTime := time.Unix(int64(msg.Date), 0)
-		
+
 		// Extract username/first name from the message
 		username := "Unknown"
 		if msg.FromID != nil {
@@ -100,7 +96,7 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 				username = fmt.Sprintf("User %d", userID.UserID)
 			}
 		}
-		
+
 		context += fmt.Sprintf("[%s] %s: %s\n",
 			msgTime.Format("2006-01-02 15:04:05"),
 			username,

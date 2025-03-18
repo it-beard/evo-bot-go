@@ -189,13 +189,3 @@ func LoadConfig() (*Config, error) {
 
 	return config, nil
 }
-
-// IsMonitoredTopic checks if a topic ID is in the monitored list
-func (c *Config) IsMonitoredTopic(topicID int) bool {
-	for _, id := range c.MonitoredTopicsIDs {
-		if id == topicID {
-			return true
-		}
-	}
-	return false
-}

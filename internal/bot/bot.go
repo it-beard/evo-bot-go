@@ -5,8 +5,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"evo-bot-go/internal/clients"
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/database"
@@ -15,6 +13,9 @@ import (
 	"evo-bot-go/internal/handlers/publichandlers"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/tasks"
+
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
 // TgBotClient represents a Telegram bot client with all required dependencies
@@ -55,13 +56,12 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	}
 
 	// Initialize repositories
-	messageRepo := repositories.NewMessageRepository(db)
 	promptingTemplateService := services.NewPromptingTemplateService(repositories.NewPromptingTemplateRepository(db))
 
 	// Initialize services
 	messageSenderService := services.NewMessageSenderService(bot)
 	summarizationService := services.NewSummarizationService(
-		appConfig, messageRepo, openaiClient, messageSenderService, promptingTemplateService,
+		appConfig, openaiClient, messageSenderService, promptingTemplateService,
 	)
 
 	// Initialize scheduled tasks
@@ -79,7 +79,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	}
 
 	// Register all handlers
-	client.registerHandlers(openaiClient, appConfig, messageRepo, promptingTemplateService, summarizationService, messageSenderService)
+	client.registerHandlers(openaiClient, appConfig, promptingTemplateService, summarizationService, messageSenderService)
 
 	return client, nil
 }
@@ -110,7 +110,6 @@ func setupDatabase(connectionString string) (*database.DB, error) {
 func (b *TgBotClient) registerHandlers(
 	openaiClient *clients.OpenAiClient,
 	appConfig *config.Config,
-	messageRepository *repositories.MessageRepository,
 	promptingTemplateService *services.PromptingTemplateService,
 	summarizationService *services.SummarizationService,
 	messageSenderService services.MessageSenderService,
@@ -134,7 +133,6 @@ func (b *TgBotClient) registerHandlers(
 		publichandlers.NewSaveHandler(messageSenderService, appConfig),
 		publichandlers.NewRepliesFromClosedThreadsHandler(messageSenderService, appConfig),
 		publichandlers.NewCleanClosedThreadsHandler(messageSenderService, appConfig),
-		publichandlers.NewMessageCollectorHandler(messageRepository, appConfig),
 	}
 	for _, handler := range publicHandlers {
 		b.dispatcher.AddHandler(handler)
