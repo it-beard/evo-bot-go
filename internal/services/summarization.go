@@ -13,6 +13,7 @@ import (
 	"evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/gotd/td/tg"
 )
 
 // SummarizationService handles the daily summarization of messages
@@ -69,26 +70,41 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 		return fmt.Errorf("failed to get topic name: %w", err)
 	}
 
-	// Get recent messages
-	messages, err := s.messages.GetRecent(ctx, topicID, since)
+	// Calculate hours since the given time
+	hoursSince := int(time.Since(since).Hours()) + 1 // Add 1 to ensure we get all messages since 'since' time
+
+	// Get messages directly from Telegram instead of database
+	tgMessages, err := clients.GetLastTopicMessagesByTime(s.config.SuperGroupChatID, topicID, hoursSince)
 	if err != nil {
-		return fmt.Errorf("failed to get recent messages: %w", err)
+		return fmt.Errorf("failed to get messages from Telegram: %w", err)
 	}
 
-	if len(messages) == 0 {
+	if len(tgMessages) == 0 {
 		log.Printf("No messages found for topic %d since %v", topicID, since)
 		return nil
 	}
 
-	log.Printf("Found %d messages for topic %d", len(messages), topicID)
+	log.Printf("Found %d messages for topic %d", len(tgMessages), topicID)
 
 	// Build context directly from all messages without using RAG
 	context := ""
-	for _, msg := range messages {
+	for _, msg := range tgMessages {
+		// Convert Unix timestamp to time.Time
+		msgTime := time.Unix(int64(msg.Date), 0)
+		
+		// Extract username/first name from the message
+		username := "Unknown"
+		if msg.FromID != nil {
+			if userID, ok := msg.FromID.(*tg.PeerUser); ok && userID != nil {
+				// Just use the user ID as a placeholder since we don't have easy access to username
+				username = fmt.Sprintf("User %d", userID.UserID)
+			}
+		}
+		
 		context += fmt.Sprintf("[%s] %s: %s\n",
-			msg.CreatedAt.Format("2006-01-02 15:04:05"),
-			msg.Username,
-			msg.Text)
+			msgTime.Format("2006-01-02 15:04:05"),
+			username,
+			msg.Message)
 	}
 
 	// Get the prompt template from the database with fallback to default

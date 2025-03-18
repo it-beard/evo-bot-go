@@ -6,6 +6,7 @@ import (
 	"log"
 	"strings"
 	"sync"
+	"time"
 
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
@@ -229,6 +230,42 @@ func GetChatMessages(chatID int64, topicID int) ([]tg.Message, error) {
 	return allMessages, nil
 }
 
+// GetLastTopicMessagesByTime retrieves messages from a chat topic within the last specified hours
+// Filtering is applied directly when fetching messages
+func GetLastTopicMessagesByTime(chatID int64, topicID int, hours int) ([]tg.Message, error) {
+	tgClient, err := NewTelegramClient()
+	if err != nil {
+		return nil, err
+	}
+
+	// Calculate the cutoff time
+	cutoffTime := time.Now().Add(-time.Duration(hours) * time.Hour)
+	// Convert to Unix timestamp
+	cutoffDate := int(cutoffTime.Unix())
+
+	var allMessages []tg.Message
+	err = tgClient.client.Run(context.Background(), func(ctx context.Context) error {
+		if err := tgClient.ensureAuthorized(ctx); err != nil {
+			return err
+		}
+
+		api := tgClient.client.API()
+		inputPeer, err := tgClient.getPeerInfoByChatID(ctx, chatID)
+		if err != nil {
+			return fmt.Errorf("failed to get peer info: %w", err)
+		}
+
+		// Use a direct approach to get messages with reply filtering
+		return fetchMessagesWithDateFilter(ctx, api, inputPeer, topicID, cutoffDate, &allMessages)
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get messages: %w", err)
+	}
+
+	return allMessages, nil
+}
+
 // fetchMessages retrieves messages with pagination
 func (t *TelegramClient) fetchMessages(ctx context.Context, api *tg.Client, inputPeer tg.InputPeerClass, topicID int, allMessages *[]tg.Message) error {
 	offset := 0
@@ -259,6 +296,53 @@ func (t *TelegramClient) fetchMessages(ctx context.Context, api *tg.Client, inpu
 
 		// Append batch messages to all messages
 		*allMessages = append(*allMessages, batchMessages...)
+
+		// If we got less messages than the limit, we've reached the end
+		if len(batchMessages) < limit {
+			break
+		}
+
+		// Increment offset for next batch
+		offset += limit
+	}
+
+	return nil
+}
+
+// fetchMessagesWithDateFilter retrieves messages with date filtering and pagination
+func fetchMessagesWithDateFilter(ctx context.Context, api *tg.Client, inputPeer tg.InputPeerClass, topicID int, cutoffDate int, allMessages *[]tg.Message) error {
+	offset := 0
+	limit := constants.TGUserClientDefaultLimit
+
+	for {
+		// Get replies to the topic
+		resp, err := api.MessagesGetReplies(ctx, &tg.MessagesGetRepliesRequest{
+			Peer:      inputPeer,
+			MsgID:     topicID,
+			AddOffset: offset,
+			Limit:     limit,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to get messages: %w", err)
+		}
+
+		// Extract messages from response
+		batchMessages, err := extractMessages(resp)
+		if err != nil {
+			return err
+		}
+
+		// If no messages returned, we've reached the end
+		if len(batchMessages) == 0 {
+			break
+		}
+
+		// Filter by date and append to results
+		for _, msg := range batchMessages {
+			if msg.Date >= cutoffDate {
+				*allMessages = append(*allMessages, msg)
+			}
+		}
 
 		// If we got less messages than the limit, we've reached the end
 		if len(batchMessages) < limit {
