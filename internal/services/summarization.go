@@ -94,8 +94,8 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 	// Get the prompt template from the database with fallback to default
 	templateText := s.promptingTemplateService.GetTemplateWithFallback(
 		ctx,
-		prompts.FairyTaleSummarizationPromptTemplateDbKey,
-		prompts.FairyTaleSummarizationPromptDefaultTemplate,
+		prompts.DailySummarizationPromptTemplateDbKey,
+		prompts.DailySummarizationPromptDefaultTemplate,
 	)
 
 	// Generate summary using OpenAI with the prompt from the database
