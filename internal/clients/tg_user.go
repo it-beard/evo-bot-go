@@ -238,6 +238,10 @@ func GetLastTopicMessagesByTime(chatID int64, topicID int, hours int) ([]tg.Mess
 		return nil, err
 	}
 
+	if topicID == 0 {
+		topicID = 1 // Root topic fix
+	}
+
 	// Calculate the cutoff time
 	cutoffTime := time.Now().Add(-time.Duration(hours) * time.Hour)
 	// Convert to Unix timestamp
