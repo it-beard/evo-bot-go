@@ -31,4 +31,35 @@ func (r *ContentRepository) CreateContent(name, contentType string) (int, error)
 		return 0, fmt.Errorf("failed to insert content: %w", err)
 	}
 	return id, nil
-} 
+}
+
+// GetLastClubCalls retrieves the last 10 content records of type 'club-call'
+func (r *ContentRepository) GetLastClubCalls(limit int) ([]Content, error) {
+	query := `
+		SELECT id, name, type 
+		FROM contents 
+		WHERE type = $1 
+		ORDER BY id DESC 
+		LIMIT $2`
+
+	rows, err := r.db.Query(query, "club-call", limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query last club calls: %w", err)
+	}
+	defer rows.Close()
+
+	var contents []Content
+	for rows.Next() {
+		var c Content
+		if err := rows.Scan(&c.ID, &c.Name, &c.Type); err != nil {
+			return nil, fmt.Errorf("failed to scan club call row: %w", err)
+		}
+		contents = append(contents, c)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error during rows iteration for club calls: %w", err)
+	}
+
+	return contents, nil
+}

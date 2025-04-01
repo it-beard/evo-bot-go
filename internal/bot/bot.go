@@ -125,6 +125,7 @@ func (b *TgBotClient) registerHandlers(
 		privatehandlers.NewCodeHandler(appConfig),
 		privatehandlers.NewSummarizeHandler(summarizationService, messageSenderService, appConfig),
 		privatehandlers.NewSetupClubCallHandler(contentRepository, appConfig),
+		privatehandlers.NewGetLastClubCallsHandler(contentRepository, appConfig),
 	}
 	for _, handler := range privateHandlers {
 		b.dispatcher.AddHandler(handler)

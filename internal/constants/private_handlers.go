@@ -12,7 +12,8 @@ const ToolsCommand = "/tools"
 const ContentCommand = "/content"
 const CodeCommand = "/code"
 const SummarizeCommand = "/summarize"
-const SetupClubCallCommand = "/setupclubcall"
+const SetupClubCallCommand = "/setupClubCall"
+const GetLastClubCallsCommand = "/getlastclubcalls"
 
 const SummarizeDmFlag = "-dm"
 
