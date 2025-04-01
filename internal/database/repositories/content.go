@@ -3,6 +3,7 @@ package repositories
 import (
 	"database/sql"
 	"fmt"
+	"log"
 )
 
 // Content represents a row in the contents table
@@ -62,4 +63,23 @@ func (r *ContentRepository) GetLastClubCalls(limit int) ([]Content, error) {
 	}
 
 	return contents, nil
+}
+
+// UpdateContentName updates the name of a content record by its ID
+func (r *ContentRepository) UpdateContentName(id int, newName string) error {
+	query := `UPDATE contents SET name = $1 WHERE id = $2`
+	result, err := r.db.Exec(query, newName, id)
+	if err != nil {
+		return fmt.Errorf("failed to update content name for ID %d: %w", id, err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		// Log the error but don't fail the operation if rowsAffected can't be retrieved
+		log.Printf("Could not get rows affected after update: %v", err)
+	} else if rowsAffected == 0 {
+		return fmt.Errorf("no content found with ID %d to update", id)
+	}
+
+	return nil
 }
