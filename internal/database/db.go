@@ -24,6 +24,14 @@ const (
 			template_text TEXT NOT NULL
 		)
 	`
+
+	createContentsTableSQL = `
+		CREATE TABLE IF NOT EXISTS contents (
+			id SERIAL PRIMARY KEY,
+			name TEXT NOT NULL,
+			type TEXT NOT NULL CHECK (type IN ('club-call', 'meetup', 'workshop'))
+		)
+	`
 )
 
 // DB represents a database connection
@@ -56,6 +64,10 @@ func (db *DB) InitSchema() error {
 		return err
 	}
 
+	if err := db.initContentsSchema(); err != nil {
+		return err
+	}
+
 	log.Println("All database schemas initialized successfully")
 	return nil
 }
@@ -77,6 +89,16 @@ func (db *DB) initPromptingTemplatesSchema() error {
 	}
 
 	log.Println("Prompting templates schema initialized successfully")
+	return nil
+}
+
+// initContentsSchema initializes the contents schema
+func (db *DB) initContentsSchema() error {
+	if _, err := db.Exec(createContentsTableSQL); err != nil {
+		return fmt.Errorf("failed to create contents table: %w", err)
+	}
+
+	log.Println("Contents schema initialized successfully")
 	return nil
 }
 

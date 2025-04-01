@@ -57,6 +57,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 
 	// Initialize repositories
 	promptingTemplateService := services.NewPromptingTemplateService(repositories.NewPromptingTemplateRepository(db))
+	contentRepository := repositories.NewContentRepository(db.DB)
 
 	// Initialize services
 	messageSenderService := services.NewMessageSenderService(bot)
@@ -79,7 +80,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	}
 
 	// Register all handlers
-	client.registerHandlers(openaiClient, appConfig, promptingTemplateService, summarizationService, messageSenderService)
+	client.registerHandlers(openaiClient, appConfig, promptingTemplateService, summarizationService, messageSenderService, contentRepository)
 
 	return client, nil
 }
@@ -113,6 +114,7 @@ func (b *TgBotClient) registerHandlers(
 	promptingTemplateService *services.PromptingTemplateService,
 	summarizationService *services.SummarizationService,
 	messageSenderService services.MessageSenderService,
+	contentRepository *repositories.ContentRepository,
 ) {
 	// Register private chat handlers
 	privateHandlers := []ext.Handler{
@@ -122,6 +124,7 @@ func (b *TgBotClient) registerHandlers(
 		privatehandlers.NewContentHandler(openaiClient, messageSenderService, promptingTemplateService, appConfig),
 		privatehandlers.NewCodeHandler(appConfig),
 		privatehandlers.NewSummarizeHandler(summarizationService, messageSenderService, appConfig),
+		privatehandlers.NewSetupClubCallHandler(contentRepository, appConfig),
 	}
 	for _, handler := range privateHandlers {
 		b.dispatcher.AddHandler(handler)
