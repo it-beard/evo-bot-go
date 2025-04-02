@@ -2,9 +2,7 @@ package contenthandlers
 
 import (
 	"fmt"
-	"log"
 	"strings"
-	"sync"
 
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
@@ -30,26 +28,17 @@ const (
 type contentSetupHandler struct {
 	contentRepository *repositories.ContentRepository
 	config            *config.Config
-	userStore         *setupUserDataStore
-}
-
-type setupUserDataStore struct {
-	rwMux    sync.RWMutex
-	userData map[int64]map[string]any
+	userStore         *utils.UserDataStore
 }
 
 func NewContentSetupHandler(
 	contentRepository *repositories.ContentRepository,
 	config *config.Config,
 ) ext.Handler {
-	store := &setupUserDataStore{
-		userData: make(map[int64]map[string]any),
-	}
-
 	h := &contentSetupHandler{
 		contentRepository: contentRepository,
 		config:            config,
-		userStore:         store,
+		userStore:         utils.NewUserDataStore(),
 	}
 
 	return handlers.NewConversation(
@@ -74,26 +63,12 @@ func NewContentSetupHandler(
 func (h *contentSetupHandler) startSetup(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
-	// Check admin permissions
-	if !utils.IsUserAdminOrCreator(b, msg.From.Id, h.config.SuperGroupChatID) {
-		if _, err := msg.Reply(b, "Эта команда доступна только администраторам.", nil); err != nil {
-			log.Printf("Failed to send admin-only message: %v", err)
-		}
-		log.Printf("User %d tried to use %s without admin rights", msg.From.Id, constants.ContentSetupCommand)
+	// Check admin permissions and private chat
+	if !utils.CheckAdminAndPrivateChat(b, ctx, h.config.SuperGroupChatID, constants.ContentSetupCommand) {
 		return handlers.EndConversation()
 	}
 
-	// Check if the command is used in a private chat
-	if msg.Chat.Type != constants.PrivateChatType {
-		if _, err := msg.Reply(b, "Эта команда доступна только в личном чате.", nil); err != nil {
-			log.Printf("Failed to send private-only message: %v", err)
-		}
-		return handlers.EndConversation()
-	}
-
-	if _, err := msg.Reply(b, fmt.Sprintf("Пожалуйста, введи название для нового контента или /%s для отмены:", setupCancelCommand), nil); err != nil {
-		log.Printf("Failed to send name prompt: %v", err)
-	}
+	utils.SendLoggedReply(b, msg, fmt.Sprintf("Пожалуйста, введи название для нового контента или /%s для отмены:", setupCancelCommand), nil)
 
 	return handlers.NextConversationState(stateAskContentName)
 }
@@ -104,14 +79,12 @@ func (h *contentSetupHandler) handleContentName(b *gotgbot.Bot, ctx *ext.Context
 	contentName := strings.TrimSpace(msg.Text)
 
 	if contentName == "" {
-		if _, err := msg.Reply(b, fmt.Sprintf("Название не может быть пустым. Пожалуйста, введи название для контента или /%s для отмены:", setupCancelCommand), nil); err != nil {
-			log.Printf("Failed to send empty name error: %v", err)
-		}
+		utils.SendLoggedReply(b, msg, fmt.Sprintf("Название не может быть пустым. Пожалуйста, введи название для контента или /%s для отмены:", setupCancelCommand), nil)
 		return nil // Stay in the same state
 	}
 
 	// Store the content name
-	h.userStore.set(ctx.EffectiveUser.Id, ctxDataKeyContentName, contentName)
+	h.userStore.Set(ctx.EffectiveUser.Id, ctxDataKeyContentName, contentName)
 
 	// Ask for content type
 	typeOptions := fmt.Sprintf("Выбери тип контента (введи число):\n1. %s\n2. %s\nИли /%s для отмены",
@@ -120,9 +93,7 @@ func (h *contentSetupHandler) handleContentName(b *gotgbot.Bot, ctx *ext.Context
 		constants.CancelCommand,
 	)
 
-	if _, err := msg.Reply(b, typeOptions, nil); err != nil {
-		log.Printf("Failed to send type options: %v", err)
-	}
+	utils.SendLoggedReply(b, msg, typeOptions, nil)
 
 	return handlers.NextConversationState(stateAskContentType)
 }
@@ -139,47 +110,38 @@ func (h *contentSetupHandler) handleContentType(b *gotgbot.Bot, ctx *ext.Context
 	case "2":
 		contentType = constants.ContentTypeMeetup
 	default:
-		if _, err := msg.Reply(b, fmt.Sprintf("Неверный выбор. Пожалуйста, введи 1 или 2, или /%s для отмены:", setupCancelCommand), nil); err != nil {
-			log.Printf("Failed to send invalid type error: %v", err)
-		}
+		utils.SendLoggedReply(b, msg, fmt.Sprintf("Неверный выбор. Пожалуйста, введи 1 или 2, или /%s для отмены:", setupCancelCommand), nil)
 		return nil // Stay in the same state
 	}
 
 	// Get the content name from user data store
-	contentNameVal, ok := h.userStore.get(ctx.EffectiveUser.Id, ctxDataKeyContentName)
+	contentNameVal, ok := h.userStore.Get(ctx.EffectiveUser.Id, ctxDataKeyContentName)
 	if !ok {
-		log.Printf("Error: content name not found in user data for user %d", ctx.EffectiveUser.Id)
-		if _, err := msg.Reply(b, fmt.Sprintf("Произошла внутренняя ошибка. Не удалось найти название контента. Попробуй начать заново с /%s.", constants.ContentSetupCommand), nil); err != nil {
-			log.Printf("Failed to send error message: %v", err)
-		}
+		utils.SendLoggedReply(
+			b,
+			msg,
+			fmt.Sprintf("Произошла внутренняя ошибка. Не удалось найти название контента. Попробуй начать заново с /%s.", constants.ContentSetupCommand),
+			nil)
 		return handlers.EndConversation()
 	}
 
 	contentName, ok := contentNameVal.(string)
 	if !ok {
-		log.Printf("Error: content name in user data is not a string: %T. Value: %v", contentNameVal, contentNameVal)
-		if _, err := msg.Reply(b, fmt.Sprintf("Произошла внутренняя ошибка (неверный тип названия). Попробуй начать заново с /%s.", constants.ContentSetupCommand), nil); err != nil {
-			log.Printf("Failed to send type error message: %v", err)
-		}
+		utils.SendLoggedReply(b, msg, fmt.Sprintf("Произошла внутренняя ошибка (неверный тип названия). Попробуй начать заново с /%s.", constants.ContentSetupCommand), nil)
 		return handlers.EndConversation()
 	}
 
 	// Create content in the database
 	id, err := h.contentRepository.CreateContent(contentName, contentType)
 	if err != nil {
-		log.Printf("Failed to create content: %v", err)
-		if _, replyErr := msg.Reply(b, "Произошла ошибка при создании записи о контенте.", nil); replyErr != nil {
-			log.Printf("Failed to send error message: %v", replyErr)
-		}
+		utils.SendLoggedReply(b, msg, "Произошла ошибка при создании записи о контенте.", err)
 		return handlers.EndConversation()
 	}
 
-	if _, err := msg.Reply(b, fmt.Sprintf("Запись о контенте '%s' с типом '%s' успешно создана с ID: %d", contentName, contentType, id), nil); err != nil {
-		log.Printf("Error sending success message: %v", err)
-	}
+	utils.SendLoggedReply(b, msg, fmt.Sprintf("Запись о контенте '%s' с типом '%s' успешно создана с ID: %d", contentName, contentType, id), nil)
 
 	// Clean up user data
-	h.userStore.clear(ctx.EffectiveUser.Id)
+	h.userStore.Clear(ctx.EffectiveUser.Id)
 
 	return handlers.EndConversation()
 }
@@ -187,45 +149,10 @@ func (h *contentSetupHandler) handleContentType(b *gotgbot.Bot, ctx *ext.Context
 // 4. handleCancel handles the /cancel command
 func (h *contentSetupHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
-	if _, err := msg.Reply(b, "Операция создания контента отменена.", nil); err != nil {
-		log.Printf("Failed to send cancel message: %v", err)
-	}
+	utils.SendLoggedReply(b, msg, "Операция создания контента отменена.", nil)
 
 	// Clean up user data
-	h.userStore.clear(ctx.EffectiveUser.Id)
+	h.userStore.Clear(ctx.EffectiveUser.Id)
 
 	return handlers.EndConversation()
-}
-
-func (s *setupUserDataStore) get(userID int64, key string) (any, bool) {
-	s.rwMux.RLock()
-	defer s.rwMux.RUnlock()
-
-	userData, ok := s.userData[userID]
-	if !ok {
-		return nil, false
-	}
-
-	v, ok := userData[key]
-	return v, ok
-}
-
-func (s *setupUserDataStore) set(userID int64, key string, val any) {
-	s.rwMux.Lock()
-	defer s.rwMux.Unlock()
-
-	userData, ok := s.userData[userID]
-	if !ok {
-		userData = make(map[string]any)
-		s.userData[userID] = userData
-	}
-
-	userData[key] = val
-}
-
-func (s *setupUserDataStore) clear(userID int64) {
-	s.rwMux.Lock()
-	defer s.rwMux.Unlock()
-
-	delete(s.userData, userID)
 }

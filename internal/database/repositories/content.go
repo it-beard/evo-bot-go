@@ -34,7 +34,7 @@ func (r *ContentRepository) CreateContent(name, contentType string) (int, error)
 	return id, nil
 }
 
-// GetLastContents retrieves the last 10 content records of type 'club-call'
+// GetLastContents retrieves the last N content records
 func (r *ContentRepository) GetLastContents(limit int) ([]Content, error) {
 	query := `
 		SELECT id, name, type 
