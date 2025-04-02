@@ -9,11 +9,11 @@ import (
 
 // Topic represents a row in the topics table
 type Topic struct {
-	ID        int
-	Topic     string
-	UserID    int
-	ContentID int
-	CreatedAt time.Time
+	ID           int
+	Topic        string
+	UserNickname *string
+	ContentID    int
+	CreatedAt    time.Time
 }
 
 // TopicRepository handles database operations for topics
@@ -27,10 +27,10 @@ func NewTopicRepository(db *sql.DB) *TopicRepository {
 }
 
 // CreateTopic inserts a new topic record into the database
-func (r *TopicRepository) CreateTopic(topic string, userID int, contentID int) (int, error) {
+func (r *TopicRepository) CreateTopic(topic string, userNickname string, contentID int) (int, error) {
 	var id int
-	query := `INSERT INTO topics (topic, user_id, content_id) VALUES ($1, $2, $3) RETURNING id`
-	err := r.db.QueryRow(query, topic, userID, contentID).Scan(&id)
+	query := `INSERT INTO topics (topic, user_nickname, content_id) VALUES ($1, $2, $3) RETURNING id`
+	err := r.db.QueryRow(query, topic, userNickname, contentID).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert topic: %w", err)
 	}
@@ -40,7 +40,7 @@ func (r *TopicRepository) CreateTopic(topic string, userID int, contentID int) (
 // GetTopicsByContentID retrieves all topics for a specific content
 func (r *TopicRepository) GetTopicsByContentID(contentID int) ([]Topic, error) {
 	query := `
-		SELECT id, topic, user_id, content_id, created_at
+		SELECT id, topic, user_nickname, content_id, created_at
 		FROM topics
 		WHERE content_id = $1
 		ORDER BY created_at DESC`
@@ -54,7 +54,7 @@ func (r *TopicRepository) GetTopicsByContentID(contentID int) ([]Topic, error) {
 	var topics []Topic
 	for rows.Next() {
 		var t Topic
-		if err := rows.Scan(&t.ID, &t.Topic, &t.UserID, &t.ContentID, &t.CreatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.Topic, &t.UserNickname, &t.ContentID, &t.CreatedAt); err != nil {
 			return nil, fmt.Errorf("failed to scan topic row: %w", err)
 		}
 		topics = append(topics, t)
@@ -70,7 +70,7 @@ func (r *TopicRepository) GetTopicsByContentID(contentID int) ([]Topic, error) {
 // GetTopicByID retrieves a single topic record by its ID
 func (r *TopicRepository) GetTopicByID(id int) (*Topic, error) {
 	query := `
-		SELECT id, topic, user_id, content_id, created_at
+		SELECT id, topic, user_nickname, content_id, created_at
 		FROM topics
 		WHERE id = $1`
 
@@ -78,7 +78,7 @@ func (r *TopicRepository) GetTopicByID(id int) (*Topic, error) {
 	err := r.db.QueryRow(query, id).Scan(
 		&topic.ID,
 		&topic.Topic,
-		&topic.UserID,
+		&topic.UserNickname,
 		&topic.ContentID,
 		&topic.CreatedAt,
 	)

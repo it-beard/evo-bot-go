@@ -23,7 +23,6 @@ const (
 	topicsShowStateSelectContent = "topics_show_select_content"
 
 	// UserStore keys
-	topicsShowUserStoreKeyProcessing = "topics_show_is_processing"
 	topicsShowUserStoreKeyCancelFunc = "topics_show_cancel_func"
 )
 
@@ -86,16 +85,14 @@ func (h *topicsShowHandler) startTopicsShow(b *gotgbot.Bot, ctx *ext.Context) er
 	}
 
 	if len(contents) == 0 {
-		utils.SendLoggedReply(b, msg, "Нет доступного контента для просмотра тем.", nil)
+		utils.SendLoggedReply(b, msg, "Нет доступного контента для просмотра тем и вопросов.", nil)
 		return handlers.EndConversation()
 	}
 
 	// Format and display content list for selection
 	formattedContents := utils.FormatContentListForUsers(
 		contents,
-		"Выберите контент для просмотра тем",
-		constants.CancelCommand,
-		"для которого вы хотите увидеть темы",
+		fmt.Sprintf("Выбери ID мероприятия, для которого ты хочешь увидеть темы и вопросы, либо жми /%s для отмены диалога", constants.CancelCommand),
 	)
 
 	utils.SendLoggedMarkdownReply(b, msg, formattedContents, nil)
@@ -114,7 +111,7 @@ func (h *topicsShowHandler) handleContentSelection(b *gotgbot.Bot, ctx *ext.Cont
 		utils.SendLoggedReply(
 			b,
 			msg,
-			fmt.Sprintf("Пожалуйста, отправьте корректный ID контента или /%s для отмены.", constants.CancelCommand),
+			fmt.Sprintf("Пожалуйста, отправь корректный ID контента или /%s для отмены.", constants.CancelCommand),
 			nil,
 		)
 		return nil // Stay in the same state
@@ -126,7 +123,7 @@ func (h *topicsShowHandler) handleContentSelection(b *gotgbot.Bot, ctx *ext.Cont
 		utils.SendLoggedReply(
 			b,
 			msg,
-			fmt.Sprintf("Не удалось найти контент с ID %d. Пожалуйста, проверьте ID.", contentID),
+			fmt.Sprintf("Не удалось найти контент с ID %d. Пожалуйста, проверь ID.", contentID),
 			err,
 		)
 		return nil // Stay in the same state
@@ -140,17 +137,8 @@ func (h *topicsShowHandler) handleContentSelection(b *gotgbot.Bot, ctx *ext.Cont
 	}
 
 	// Format and display topics
-	formattedTopics := utils.FormatTopicListForUsers(topics, content.Name, constants.CancelCommand)
+	formattedTopics := utils.FormatTopicListForUsers(topics, content.Name, content.Type)
 	utils.SendLoggedMarkdownReply(b, msg, formattedTopics, nil)
-
-	// Show message suggesting to use the topicAdd command
-	utils.SendLoggedReply(
-		b,
-		msg,
-		fmt.Sprintf("Вы можете добавить новую тему, используя команду /%s или использовать",
-			constants.TopicAddCommand),
-		nil,
-	)
 
 	return handlers.EndConversation()
 }

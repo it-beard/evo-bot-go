@@ -123,7 +123,7 @@ func (b *TgBotClient) registerHandlers(
 	topicRepository *repositories.TopicRepository,
 ) {
 	// Register start handler, that avaliable for all users
-	b.dispatcher.AddHandler(handlers.NewStartHandler())
+	b.dispatcher.AddHandler(handlers.NewStartHandler(appConfig))
 
 	// Register admin chat handlers
 	adminHandlers := []ext.Handler{

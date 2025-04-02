@@ -24,8 +24,9 @@ const (
 	topicAddStateEnterTopic    = "topic_add_enter_topic"
 
 	// UserStore keys
-	topicAddUserStoreKeyProcessing = "topic_add_is_processing"
-	topicAddUserStoreKeyCancelFunc = "topic_add_cancel_func"
+	topicAddUserStoreKeySelectedContentID   = "topic_add_selected_content_id"
+	topicAddUserStoreKeySelectedContentName = "topic_add_selected_content_name"
+	topicAddUserStoreKeyCancelFunc          = "topic_add_cancel_func"
 )
 
 type topicAddHandler struct {
@@ -97,9 +98,7 @@ func (h *topicAddHandler) startTopicAdd(b *gotgbot.Bot, ctx *ext.Context) error 
 	// Format and display content list for selection
 	formattedContents := utils.FormatContentListForUsers(
 		contents,
-		"Выберите контент для добавления темы",
-		constants.CancelCommand,
-		"для которого вы хотите добавить тему",
+		fmt.Sprintf("Выбери ID мероприятия, на которое ты хочешь закинуть тему или вопросы, либо жми /%s для отмены диалога", constants.CancelCommand),
 	)
 
 	utils.SendLoggedMarkdownReply(b, msg, formattedContents, nil)
@@ -118,7 +117,7 @@ func (h *topicAddHandler) handleContentSelection(b *gotgbot.Bot, ctx *ext.Contex
 		utils.SendLoggedReply(
 			b,
 			msg,
-			fmt.Sprintf("Пожалуйста, отправьте корректный ID контента или /%s для отмены.", constants.CancelCommand),
+			fmt.Sprintf("Пожалуйста, отправь корректный ID контента или /%s для отмены.", constants.CancelCommand),
 			nil,
 		)
 		return nil // Stay in the same state
@@ -130,21 +129,21 @@ func (h *topicAddHandler) handleContentSelection(b *gotgbot.Bot, ctx *ext.Contex
 		utils.SendLoggedReply(
 			b,
 			msg,
-			fmt.Sprintf("Не удалось найти контент с ID %d. Пожалуйста, проверьте ID.", contentID),
+			fmt.Sprintf("Не удалось найти контент с ID %d. Пожалуйста, проверь ID.", contentID),
 			err,
 		)
 		return nil // Stay in the same state
 	}
 
 	// Store the selected content ID for later use when creating a new topic
-	h.userStore.Set(ctx.EffectiveUser.Id, "selected_content_id", contentID)
-	h.userStore.Set(ctx.EffectiveUser.Id, "selected_content_name", content.Name)
+	h.userStore.Set(ctx.EffectiveUser.Id, topicAddUserStoreKeySelectedContentID, contentID)
+	h.userStore.Set(ctx.EffectiveUser.Id, topicAddUserStoreKeySelectedContentName, content.Name)
 
 	// Prompt user to enter a topic
 	utils.SendLoggedMarkdownReply(
 		b,
 		msg,
-		fmt.Sprintf("Введите тему для контента *%s* или используйте /%s для отмены.", content.Name, constants.CancelCommand),
+		fmt.Sprintf("Отправь мне темы или вопросы к мероприятию *%s*, либо используй /%s для отмены диалога.", content.Name, constants.CancelCommand),
 		nil,
 	)
 
@@ -160,57 +159,41 @@ func (h *topicAddHandler) handleTopicEntry(b *gotgbot.Bot, ctx *ext.Context) err
 		utils.SendLoggedReply(
 			b,
 			msg,
-			"Тема не может быть пустой. Пожалуйста, введите текст темы или /cancel для отмены.",
+			"Тема не может быть пустой. Пожалуйста, введи текст темы или /cancel для отмены.",
 			nil,
 		)
 		return nil // Stay in the same state
 	}
 
 	// Get the selected content ID from user store
-	contentIDInterface, ok := h.userStore.Get(ctx.EffectiveUser.Id, "selected_content_id")
+	contentIDInterface, ok := h.userStore.Get(ctx.EffectiveUser.Id, topicAddUserStoreKeySelectedContentID)
 	if !ok {
 		utils.SendLoggedReply(
 			b,
 			msg,
-			"Произошла ошибка: не найден выбранный контент. Пожалуйста, начните заново.",
-			nil,
-		)
-		return handlers.EndConversation()
-	}
-
-	contentNameInterface, ok := h.userStore.Get(ctx.EffectiveUser.Id, "selected_content_name")
-	if !ok {
-		utils.SendLoggedReply(
-			b,
-			msg,
-			"Произошла ошибка: не найдено имя выбранного контента. Пожалуйста, начните заново.",
+			"Произошла ошибка: не найден выбранный контент. Пожалуйста, начни заново.",
 			nil,
 		)
 		return handlers.EndConversation()
 	}
 
 	contentID := contentIDInterface.(int)
-	contentName := contentNameInterface.(string)
-	userID := int(ctx.EffectiveUser.Id)
+	userNickname := "не указано"
+	if ctx.EffectiveUser.Username != "" {
+		userNickname = ctx.EffectiveUser.Username
+	}
 
 	// Create the new topic
-	_, err := h.topicRepository.CreateTopic(topicText, userID, contentID)
+	_, err := h.topicRepository.CreateTopic(topicText, userNickname, contentID)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Ошибка при создании новой темы.", err)
+		utils.SendLoggedReply(b, msg, "Ой! Ошибка записи в базу данных...", err)
 		return handlers.EndConversation()
 	}
 
-	// Get updated topics list
-	topics, err := h.topicRepository.GetTopicsByContentID(contentID)
-	if err != nil {
-		utils.SendLoggedReply(b, msg, "Ошибка при получении обновленного списка тем.", err)
-		return handlers.EndConversation()
-	}
-
-	// Format and display updated topics
-	formattedTopics := utils.FormatTopicListForUsers(topics, contentName, constants.CancelCommand)
-	utils.SendLoggedReply(b, msg, "Тема успешно добавлена!", nil)
-	utils.SendLoggedMarkdownReply(b, msg, formattedTopics, nil)
+	utils.SendLoggedReply(b, msg,
+		fmt.Sprintf("Добавлено! \nИспользуй команду /%s для просмотра всех тем и вопросов к мероприятию.", constants.TopicsShowCommand),
+		nil,
+	)
 
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)

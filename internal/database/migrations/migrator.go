@@ -11,6 +11,8 @@ import (
 func Registry() []implementations.Migration {
 	return []implementations.Migration{
 		implementations.NewAddStartedAtToContents(),
+		implementations.NewChangeUserIdToNullableString(),
+		implementations.NewRenameUserIdToUserNickname(),
 		// Add new migrations here
 	}
 }
