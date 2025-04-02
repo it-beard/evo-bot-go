@@ -14,7 +14,6 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/conversation"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/message"
 )
 
@@ -66,9 +65,7 @@ func NewContentEditHandler(
 			},
 		},
 		&handlers.ConversationOpts{
-			Exits:        []ext.Handler{handlers.NewCommand(cancelCommand, h.handleCancel)},
-			StateStorage: conversation.NewInMemoryStorage(conversation.KeyStrategySenderAndChat),
-			AllowReEntry: true,
+			Exits: []ext.Handler{handlers.NewCommand(cancelCommand, h.handleCancel)},
 		},
 	)
 }
