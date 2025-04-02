@@ -2,37 +2,37 @@ package privatehandlers
 
 import (
 	"evo-bot-go/internal/constants"
-	"evo-bot-go/internal/handlers"
+	"evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 )
 
-type StartHandler struct{}
+type startHandler struct{}
 
-func NewStartHandler() handlers.Handler {
-	return &StartHandler{}
+func NewStartHandler() ext.Handler {
+	h := &startHandler{}
+
+	return handlers.NewConversation(
+		[]ext.Handler{
+			handlers.NewCommand(constants.StartCommand, h.handleStart),
+		},
+		map[string][]ext.Handler{},
+		nil,
+	)
 }
 
-func (h *StartHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *startHandler) handleStart(b *gotgbot.Bot, ctx *ext.Context) error {
+	// Only proceed if this is a private chat
+	if !utils.CheckPrivateChatType(b, ctx) {
+		return handlers.EndConversation()
+	}
+
 	message := "Привет! Я *Дженкинс Вебстер*, дворецкий бот клуба _\"Эволюция Кода\"_.\n" +
 		"Используй /help для просмотра возможностей."
-	opts := &gotgbot.SendMessageOpts{ParseMode: "markdown"}
-	_, err := b.SendMessage(ctx.EffectiveMessage.From.Id, message, opts)
-	return err
-}
 
-func (h *StartHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
-	msg := ctx.EffectiveMessage
+	utils.SendLoggedMarkdownReply(b, ctx.EffectiveMessage, message, nil)
 
-	if msg == nil {
-		return false
-	}
-	return msg.Text != "" &&
-		msg.Text == constants.StartCommand &&
-		msg.Chat.Type == constants.PrivateChatType
-}
-
-func (h *StartHandler) Name() string {
-	return constants.StartHandlerName
+	return handlers.EndConversation()
 }
