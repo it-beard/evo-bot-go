@@ -95,7 +95,7 @@ func setupDatabase(connectionString string) (*database.DB, error) {
 		return nil, err
 	}
 
-	if err := db.InitSchema(); err != nil {
+	if err := db.InitWithMigrations(); err != nil {
 		return nil, err
 	}
 

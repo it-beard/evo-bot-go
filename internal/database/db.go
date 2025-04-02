@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"evo-bot-go/internal/database/migrations"
 	"fmt"
 	"log"
 
@@ -31,8 +32,18 @@ const (
 			name TEXT NOT NULL,
 			type TEXT NOT NULL CHECK (type IN ('club-call', 'meetup')),
 			status TEXT NOT NULL DEFAULT 'actual' CHECK (status IN ('finished', 'actual')),
+			started_at TIMESTAMP WITH TIME ZONE,
 			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)
+	`
+
+	createMigrationsTableSQL = `
+		CREATE TABLE IF NOT EXISTS migrations (
+			id SERIAL PRIMARY KEY,
+			name TEXT NOT NULL UNIQUE,
+			timestamp TEXT NOT NULL,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 		)
 	`
 )
@@ -71,7 +82,27 @@ func (db *DB) InitSchema() error {
 		return err
 	}
 
+	if err := db.initMigrationsSchema(); err != nil {
+		return err
+	}
+
 	log.Println("All database schemas initialized successfully")
+	return nil
+}
+
+// InitWithMigrations initializes the database and runs any pending migrations
+func (db *DB) InitWithMigrations() error {
+	// First initialize the base schema
+	if err := db.InitSchema(); err != nil {
+		return err
+	}
+
+	// Run pending migrations
+	if err := migrations.RunMigrations(db.DB); err != nil {
+		return fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	log.Println("All migrations applied successfully")
 	return nil
 }
 
@@ -102,6 +133,16 @@ func (db *DB) initContentsSchema() error {
 	}
 
 	log.Println("Contents schema initialized successfully")
+	return nil
+}
+
+// initMigrationsSchema initializes the migrations table schema
+func (db *DB) initMigrationsSchema() error {
+	if _, err := db.Exec(createMigrationsTableSQL); err != nil {
+		return fmt.Errorf("failed to create migrations table: %w", err)
+	}
+
+	log.Println("Migrations schema initialized successfully")
 	return nil
 }
 
