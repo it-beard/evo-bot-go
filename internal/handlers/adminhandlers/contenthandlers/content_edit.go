@@ -84,10 +84,10 @@ func (h *contentEditHandler) startEdit(b *gotgbot.Bot, ctx *ext.Context) error {
 	var response strings.Builder
 	response.WriteString(fmt.Sprintf("Последние %d контента:\n", len(contents)))
 	for _, content := range contents {
-		response.WriteString(fmt.Sprintf("- ID: %d, Название: %s *(%s)*\n", content.ID, content.Name, content.Type))
+		response.WriteString(fmt.Sprintf("- ID: %d, Название: %s _(%s)_\n", content.ID, content.Name, content.Type))
 	}
 	response.WriteString(fmt.Sprintf("\nПожалуйста, отправь ID контента, который ты хочешь отредактировать, или /%s для отмены.", constants.CancelCommand))
-	utils.SendLoggedReply(b, msg, response.String(), nil)
+	utils.SendLoggedMarkdownReply(b, msg, response.String(), nil)
 
 	return handlers.NextConversationState(stateAskContentID)
 }

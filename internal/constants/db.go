@@ -13,3 +13,17 @@ var AllContentTypes = []ContentType{
 	ContentTypeClubCall,
 	ContentTypeMeetup,
 }
+
+// ContentStatus represents the status of content
+type ContentStatus string
+
+const (
+	ContentStatusFinished ContentStatus = "finished"
+	ContentStatusActual   ContentStatus = "actual"
+)
+
+// AllContentStatuses is a slice containing all possible ContentStatus values
+var AllContentStatuses = []ContentStatus{
+	ContentStatusFinished,
+	ContentStatusActual,
+}

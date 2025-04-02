@@ -124,6 +124,7 @@ func (b *TgBotClient) registerHandlers(
 		adminhandlers.NewSummarizeHandler(summarizationService, messageSenderService, appConfig),
 		contenthandlers.NewContentEditHandler(contentRepository, appConfig),
 		contenthandlers.NewContentSetupHandler(contentRepository, appConfig),
+		contenthandlers.NewContentDeleteHandler(contentRepository, appConfig),
 	}
 	for _, handler := range adminHandlers {
 		b.dispatcher.AddHandler(handler)
@@ -132,7 +133,7 @@ func (b *TgBotClient) registerHandlers(
 	// Register private chat handlers
 	privateHandlers := []ext.Handler{
 		privatehandlers.NewStartHandler(),
-		privatehandlers.NewHelpHandler(),
+		privatehandlers.NewHelpHandler(appConfig),
 		privatehandlers.NewToolHandler(openaiClient, messageSenderService, promptingTemplateService, appConfig),
 		privatehandlers.NewContentHandler(openaiClient, messageSenderService, promptingTemplateService, appConfig),
 	}

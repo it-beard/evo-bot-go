@@ -7,8 +7,7 @@ const ToolsCommand = "/tools"
 const ContentHandlerName = "content_handler"
 const ContentCommand = "/content"
 
-const HelpHandlerName = "help_handler"
-const HelpCommand = "/help"
+const HelpCommand = "help"
 
 const StartHandlerName = "start_handler"
 const StartCommand = "/start"

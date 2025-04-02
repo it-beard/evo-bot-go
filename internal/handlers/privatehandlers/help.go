@@ -1,41 +1,57 @@
 package privatehandlers
 
 import (
+	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
-	"evo-bot-go/internal/handlers"
+	"evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 )
 
-type HelpHandler struct{}
-
-func NewHelpHandler() handlers.Handler {
-	return &HelpHandler{}
+type helpHandler struct {
+	config *config.Config
 }
 
-func (h *HelpHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
-	helpText := "Доступные команды:\n\n" +
+func NewHelpHandler(config *config.Config) ext.Handler {
+	h := &helpHandler{
+		config: config,
+	}
+
+	return handlers.NewConversation(
+		[]ext.Handler{
+			handlers.NewCommand(constants.HelpCommand, h.handleHelp),
+		},
+		map[string][]ext.Handler{},
+		nil,
+	)
+}
+
+func (h *helpHandler) handleHelp(b *gotgbot.Bot, ctx *ext.Context) error {
+
+	// Only proceed if this is a private chat
+	if !utils.CheckPrivateChatType(b, ctx) {
+		return handlers.EndConversation()
+	}
+
+	helpText := "<blockquote> Доступные команды</blockquote>\n" +
 		"/start - Приветственное сообщение\n" +
 		"/help - Инструкция по моему использованию\n" +
 		"/tool или /tools - Поиск ИИ-инструментов для разработки. Используйте команду с описанием того, что вы ищете, например: `/tool лучшая IDE`.\n" +
-		"/content - Поиск видео-контента клуба. Используй команду с описанием того, что ты ищешь, например: `/content обзор про MCP`. \n" +
-		"Инструкция со всеми моими возможностями: https://t.me/c/2069889012/127/9470"
-	_, err := ctx.EffectiveMessage.Reply(b, helpText, &gotgbot.SendMessageOpts{
-		ParseMode: "Markdown",
-	})
-	return err
-}
+		"/content - Поиск видео-контента клуба. Используй команду с описанием того, что ты ищешь, например: <code>/content обзор про MCP</code>. \n\n" +
+		"Инструкция со всеми моими возможностями: https://t.me/c/2069889012/127/9470\n"
 
-func (h *HelpHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
-	if ctx.EffectiveMessage == nil {
-		return false
+	adminHelpText := "<blockquote> Доступные команды для администраторов</blockquote>\n" +
+		"/contentEdit - Редактирование контента клуба.\n" +
+		"/contentSetup - Создание нового контента клуба.\n" +
+		"/contentDelete - Удаление контента клуба.\n"
+
+	if utils.CheckAdminAndPrivateChat(b, ctx, h.config.SuperGroupChatID, constants.HelpCommand) {
+		helpText += "\n" + adminHelpText
 	}
-	return ctx.EffectiveMessage.Text != "" &&
-		ctx.EffectiveMessage.Text == constants.HelpCommand &&
-		ctx.EffectiveMessage.Chat.Type == constants.PrivateChatType
-}
 
-func (h *HelpHandler) Name() string {
-	return constants.HelpHandlerName
+	utils.SendLoggedHtmlReply(b, ctx.EffectiveMessage, helpText, nil)
+
+	return handlers.EndConversation()
 }

@@ -50,6 +50,30 @@ func SendLoggedReply(b *gotgbot.Bot, msg *gotgbot.Message, text string, err erro
 	}
 }
 
+// SendLoggedReply sends a reply to the user with proper logging
+func SendLoggedMarkdownReply(b *gotgbot.Bot, msg *gotgbot.Message, text string, err error) {
+	if _, replyErr := msg.Reply(b, text, &gotgbot.SendMessageOpts{
+		ParseMode: "Markdown",
+	}); replyErr != nil {
+		log.Printf("Failed to send error message: %v", replyErr)
+	}
+	if err != nil {
+		log.Printf("Error: %v", err)
+	}
+}
+
+// SendLoggedReply sends a reply to the user with proper logging
+func SendLoggedHtmlReply(b *gotgbot.Bot, msg *gotgbot.Message, text string, err error) {
+	if _, replyErr := msg.Reply(b, text, &gotgbot.SendMessageOpts{
+		ParseMode: "HTML",
+	}); replyErr != nil {
+		log.Printf("Failed to send error message: %v", replyErr)
+	}
+	if err != nil {
+		log.Printf("Error: %v", err)
+	}
+}
+
 // CheckAdminAndPrivateChat combines permission and chat type checking for admin-only private commands
 // Returns true if all checks pass, false otherwise
 func CheckAdminAndPrivateChat(b *gotgbot.Bot, ctx *ext.Context, superGroupChatID int64, commandName string) bool {

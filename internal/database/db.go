@@ -29,7 +29,10 @@ const (
 		CREATE TABLE IF NOT EXISTS contents (
 			id SERIAL PRIMARY KEY,
 			name TEXT NOT NULL,
-			type TEXT NOT NULL CHECK (type IN ('club-call', 'meetup', 'workshop'))
+			type TEXT NOT NULL CHECK (type IN ('club-call', 'meetup')),
+			status TEXT NOT NULL DEFAULT 'actual' CHECK (status IN ('finished', 'actual')),
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 		)
 	`
 )

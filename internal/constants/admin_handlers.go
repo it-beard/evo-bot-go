@@ -12,3 +12,4 @@ const ContentEditCommand = "contentEdit"
 const ContentEditGetLastLimit = 10
 
 const ContentSetupCommand = "contentSetup"
+const ContentDeleteCommand = "contentDelete"
