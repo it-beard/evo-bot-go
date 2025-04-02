@@ -22,6 +22,8 @@ import (
 	"github.com/gotd/td/tg"
 )
 
+// todo: refactor to use ext.Handler
+
 type ContentHandler struct {
 	openaiClient             *clients.OpenAiClient
 	promptingTemplateService *services.PromptingTemplateService

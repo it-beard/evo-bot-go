@@ -15,6 +15,8 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
+// todo: refactor to use ext.Handler
+
 type CleanClosedThreadsHandler struct {
 	closedTopics         map[int]bool
 	messageSenderService services.MessageSenderService

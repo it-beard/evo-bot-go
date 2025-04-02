@@ -10,6 +10,8 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
+// todo: refactor to use ext.Handler
+
 type DeleteJoinLeftMessagesHandler struct{}
 
 func NewDeleteJoinLeftMessagesHandler() handlers.Handler {

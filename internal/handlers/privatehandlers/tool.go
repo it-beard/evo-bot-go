@@ -22,6 +22,8 @@ import (
 	"github.com/gotd/td/tg"
 )
 
+// todo: refactor to use ext.Handler
+
 type ToolHandler struct {
 	openaiClient             *clients.OpenAiClient
 	config                   *config.Config

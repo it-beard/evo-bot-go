@@ -17,9 +17,8 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
-// Constants moved to internal/constants/private_handlers.go
+// todo: refactor to use ext.Handler
 
-// SummarizeHandler handles the summarize command
 type SummarizeHandler struct {
 	summarizationService *services.SummarizationService
 	messageSenderService services.MessageSenderService

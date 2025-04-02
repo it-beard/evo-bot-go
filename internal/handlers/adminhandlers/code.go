@@ -14,6 +14,8 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
+// todo: refactor to use ext.Handler
+
 type CodeHandler struct {
 	config *config.Config
 }
