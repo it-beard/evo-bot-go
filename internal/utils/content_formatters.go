@@ -37,6 +37,34 @@ func FormatContentListForUsers(contents []repositories.Content, title string) st
 	return response.String()
 }
 
+// FormatContentListForUsersWithoutIds formats a slice of contents for display to users
+// It returns a markdown-formatted string with content information
+func FormatContentListForUsersWithoutIds(contents []repositories.Content, title string) string {
+	var response strings.Builder
+	response.WriteString(fmt.Sprintf("%s:\n", title))
+
+	for _, content := range contents {
+		// Handle optional started_at field
+		startedAtStr := "не указано"
+		if content.StartedAt != nil && !content.StartedAt.IsZero() {
+			startedAtStr = content.StartedAt.Format("02.01.2006 в 15:04")
+		}
+
+		// Emoji based on content status
+		typeEmoji := "🔄"
+		if content.Type == "club-call" {
+			typeEmoji = "💬"
+		} else if content.Type == "meetup" {
+			typeEmoji = "🎙"
+		}
+
+		response.WriteString(fmt.Sprintf("\n%s _%s_: *%s*\n", typeEmoji, content.Type, content.Name))
+		response.WriteString(fmt.Sprintf("└ _дата проведения_: %s\n", startedAtStr))
+	}
+
+	return response.String()
+}
+
 // FormatContentListForAdmin formats a slice of contents for display to admins
 // It returns a markdown-formatted string with content information
 func FormatContentListForAdmin(contents []repositories.Content, title string, cancelCommand string, actionDescription string) string {

@@ -143,6 +143,7 @@ func (b *TgBotClient) registerHandlers(
 		privatehandlers.NewHelpHandler(appConfig),
 		privatehandlers.NewToolsHandler(openaiClient, messageSenderService, promptingTemplateService, appConfig),
 		privatehandlers.NewContentHandler(openaiClient, messageSenderService, promptingTemplateService, appConfig),
+		privatehandlers.NewShowContentHandler(contentRepository, appConfig),
 		topicshandlers.NewTopicsShowHandler(topicRepository, contentRepository, messageSenderService, appConfig),
 		topicshandlers.NewTopicAddHandler(topicRepository, contentRepository, messageSenderService, appConfig),
 	}
