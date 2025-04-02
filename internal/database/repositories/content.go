@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"database/sql"
+	"evo-bot-go/internal/constants"
 	"fmt"
 	"log"
 )
@@ -24,7 +25,7 @@ func NewContentRepository(db *sql.DB) *ContentRepository {
 }
 
 // CreateContent inserts a new content record into the database
-func (r *ContentRepository) CreateContent(name, contentType string) (int, error) {
+func (r *ContentRepository) CreateContent(name string, contentType constants.ContentType) (int, error) {
 	var id int
 	query := `INSERT INTO contents (name, type) VALUES ($1, $2) RETURNING id`
 	err := r.db.QueryRow(query, name, contentType).Scan(&id)

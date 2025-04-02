@@ -23,7 +23,6 @@ const (
 
 	// Context data keys
 	ctxDataKeyContentID = "content_id"
-	cancelCommand       = "cancel"
 )
 
 type contentEditHandler struct {
@@ -55,7 +54,7 @@ func NewContentEditHandler(
 			},
 		},
 		&handlers.ConversationOpts{
-			Exits: []ext.Handler{handlers.NewCommand(cancelCommand, h.handleCancel)},
+			Exits: []ext.Handler{handlers.NewCommand(constants.CancelCommand, h.handleCancel)},
 		},
 	)
 }
@@ -87,7 +86,7 @@ func (h *contentEditHandler) startEdit(b *gotgbot.Bot, ctx *ext.Context) error {
 	for _, content := range contents {
 		response.WriteString(fmt.Sprintf("- ID: %d, Название: %s *(%s)*\n", content.ID, content.Name, content.Type))
 	}
-	response.WriteString(fmt.Sprintf("\nПожалуйста, отправь ID контента, который ты хочешь отредактировать, или /%s для отмены.", cancelCommand))
+	response.WriteString(fmt.Sprintf("\nПожалуйста, отправь ID контента, который ты хочешь отредактировать, или /%s для отмены.", constants.CancelCommand))
 	utils.SendLoggedReply(b, msg, response.String(), nil)
 
 	return handlers.NextConversationState(stateAskContentID)
@@ -100,13 +99,13 @@ func (h *contentEditHandler) handleContentID(b *gotgbot.Bot, ctx *ext.Context) e
 
 	contentID, err := strconv.Atoi(contentIDStr)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, fmt.Sprintf("Неверный ID. Пожалуйста, введи числовой ID или /%s для отмены.", cancelCommand), nil)
+		utils.SendLoggedReply(b, msg, fmt.Sprintf("Неверный ID. Пожалуйста, введи числовой ID или /%s для отмены.", constants.CancelCommand), nil)
 		return nil // Stay in the same state
 	}
 
 	h.userStore.Set(ctx.EffectiveUser.Id, ctxDataKeyContentID, contentID)
 
-	if _, err := msg.Reply(b, fmt.Sprintf("Хорошо. Теперь введи новое название для этого контента, или /%s для отмены.", cancelCommand), nil); err != nil {
+	if _, err := msg.Reply(b, fmt.Sprintf("Хорошо. Теперь введи новое название для этого контента, или /%s для отмены.", constants.CancelCommand), nil); err != nil {
 		log.Printf("Error asking for new name: %v", err)
 	}
 
@@ -119,7 +118,7 @@ func (h *contentEditHandler) handleNewName(b *gotgbot.Bot, ctx *ext.Context) err
 	newName := strings.TrimSpace(msg.Text)
 
 	if newName == "" {
-		utils.SendLoggedReply(b, msg, fmt.Sprintf("Название не может быть пустым. Попробуй еще раз или /%s для отмены.", cancelCommand), nil)
+		utils.SendLoggedReply(b, msg, fmt.Sprintf("Название не может быть пустым. Попробуй еще раз или /%s для отмены.", constants.CancelCommand), nil)
 		return nil // Stay in the same state
 	}
 
