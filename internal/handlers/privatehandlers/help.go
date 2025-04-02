@@ -54,7 +54,8 @@ func (h *helpHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 			"• /contentEdit - Редактировать контент\n" +
 			"• /contentSetup - Создать новый контент\n" +
 			"• /contentDelete - Удалить контент\n" +
-			"• /contentFinish - Отметить контент как завершенный"
+			"• /contentFinish - Отметить контент как завершенный\n" +
+			"• /showTopics - Просмотреть темы и вопросы к предстоящим мероприятиям с возможностью удаления\n"
 
 		helpText += adminHelpText
 	}

@@ -21,12 +21,16 @@ type Content struct {
 
 // ContentRepository handles database operations for contents
 type ContentRepository struct {
-	db *sql.DB
+	db              *sql.DB
+	topicRepository *TopicRepository
 }
 
 // NewContentRepository creates a new ContentRepository
 func NewContentRepository(db *sql.DB) *ContentRepository {
-	return &ContentRepository{db: db}
+	return &ContentRepository{
+		db:              db,
+		topicRepository: NewTopicRepository(db),
+	}
 }
 
 // CreateContent inserts a new content record into the database
@@ -169,6 +173,20 @@ func (r *ContentRepository) UpdateContentStartedAt(id int, startedAt time.Time) 
 
 // DeleteContent removes a content record from the database by its ID
 func (r *ContentRepository) DeleteContent(id int) error {
+	// First, get all topics related to this content
+	topics, err := r.topicRepository.GetTopicsByContentID(id)
+	if err != nil {
+		return fmt.Errorf("failed to get topics for content ID %d: %w", id, err)
+	}
+
+	// Delete all related topics
+	for _, topic := range topics {
+		if err := r.topicRepository.DeleteTopic(topic.ID); err != nil {
+			return fmt.Errorf("failed to delete related topic with ID %d: %w", topic.ID, err)
+		}
+	}
+
+	// Now delete the content itself
 	query := `DELETE FROM contents WHERE id = $1`
 	result, err := r.db.Exec(query, id)
 	if err != nil {
