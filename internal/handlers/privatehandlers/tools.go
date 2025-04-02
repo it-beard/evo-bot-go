@@ -25,42 +25,42 @@ import (
 
 const (
 	// Conversation states
-	stateProcessQuery = "process_query"
+	stateProcessToolQuery = "process_tool_query"
 
 	// UserStore keys
-	contentUserStoreKeyProcessing = "content_is_processing"
-	contentUserStoreKeyCancelFunc = "content_cancel_func"
+	userStoreKeyProcessing = "is_processing"
+	userStoreKeyCancelFunc = "cancel_func"
 )
 
-type contentHandler struct {
+type toolsHandler struct {
 	openaiClient             *clients.OpenAiClient
+	config                   *config.Config
 	promptingTemplateService *services.PromptingTemplateService
 	messageSenderService     services.MessageSenderService
-	config                   *config.Config
 	userStore                *utils.UserDataStore
 }
 
-func NewContentHandler(
+func NewToolsHandler(
 	openaiClient *clients.OpenAiClient,
 	messageSenderService services.MessageSenderService,
 	promptingTemplateService *services.PromptingTemplateService,
 	config *config.Config,
 ) ext.Handler {
-	h := &contentHandler{
+	h := &toolsHandler{
 		openaiClient:             openaiClient,
+		config:                   config,
 		promptingTemplateService: promptingTemplateService,
 		messageSenderService:     messageSenderService,
-		config:                   config,
 		userStore:                utils.NewUserDataStore(),
 	}
 
 	return handlers.NewConversation(
 		[]ext.Handler{
-			handlers.NewCommand(constants.ContentCommand, h.startContentSearch),
+			handlers.NewCommand(constants.ToolsCommand, h.startToolSearch),
 		},
 		map[string][]ext.Handler{
-			stateProcessQuery: {
-				handlers.NewMessage(message.All, h.processContentSearch),
+			stateProcessToolQuery: {
+				handlers.NewMessage(message.All, h.processToolSearch),
 			},
 		},
 		&handlers.ConversationOpts{
@@ -69,8 +69,8 @@ func NewContentHandler(
 	)
 }
 
-// 1. startContentSearch is the entry point handler for the content search conversation
-func (h *contentHandler) startContentSearch(b *gotgbot.Bot, ctx *ext.Context) error {
+// 1. startToolSearch is the entry point handler for the tool search conversation
+func (h *toolsHandler) startToolSearch(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
 	// Only proceed if this is a private chat
@@ -79,22 +79,22 @@ func (h *contentHandler) startContentSearch(b *gotgbot.Bot, ctx *ext.Context) er
 	}
 
 	// Check if user is a club member
-	if !utils.CheckClubMemberPermissions(b, msg, h.config, constants.ContentCommand) {
+	if !utils.CheckClubMemberPermissions(b, msg, h.config, constants.ToolsCommand) {
 		return handlers.EndConversation()
 	}
 
 	// Ask user to enter search query
-	utils.SendLoggedReply(b, msg, fmt.Sprintf("Введите поисковый запрос по контенту или используйте /%s для отмены:", constants.CancelCommand), nil)
+	utils.SendLoggedReply(b, msg, fmt.Sprintf("Введите поисковый запрос по инструментам или используйте /%s для отмены:", constants.CancelCommand), nil)
 
-	return handlers.NextConversationState(stateProcessQuery)
+	return handlers.NextConversationState(stateProcessToolQuery)
 }
 
-// 2. processContentSearch handles the actual content search
-func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) error {
+// 2. processToolSearch handles the actual tool search
+func (h *toolsHandler) processToolSearch(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
 	// Check if we're already processing a request for this user
-	if isProcessing, ok := h.userStore.Get(ctx.EffectiveUser.Id, contentUserStoreKeyProcessing); ok && isProcessing.(bool) {
+	if isProcessing, ok := h.userStore.Get(ctx.EffectiveUser.Id, userStoreKeyProcessing); ok && isProcessing.(bool) {
 		utils.SendLoggedReply(
 			b,
 			msg,
@@ -117,18 +117,18 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 	}
 
 	// Mark as processing
-	h.userStore.Set(ctx.EffectiveUser.Id, contentUserStoreKeyProcessing, true)
+	h.userStore.Set(ctx.EffectiveUser.Id, userStoreKeyProcessing, true)
 
 	// Create a cancellable context for this operation
 	typingCtx, cancelTyping := context.WithCancel(context.Background())
 
 	// Store cancel function in user store so it can be called from handleCancel
-	h.userStore.Set(ctx.EffectiveUser.Id, contentUserStoreKeyCancelFunc, cancelTyping)
+	h.userStore.Set(ctx.EffectiveUser.Id, userStoreKeyCancelFunc, cancelTyping)
 
 	// Make sure we clean up the processing flag in all exit paths
 	defer func() {
-		h.userStore.Set(ctx.EffectiveUser.Id, contentUserStoreKeyProcessing, false)
-		h.userStore.Set(ctx.EffectiveUser.Id, contentUserStoreKeyCancelFunc, nil)
+		h.userStore.Set(ctx.EffectiveUser.Id, userStoreKeyProcessing, false)
+		h.userStore.Set(ctx.EffectiveUser.Id, userStoreKeyCancelFunc, nil)
 	}()
 
 	// Inform user that search has started
@@ -138,7 +138,7 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 	h.messageSenderService.SendTypingAction(msg.Chat.Id)
 
 	// Get messages from chat
-	messages, err := clients.GetChatMessages(h.config.SuperGroupChatID, h.config.ContentTopicID)
+	messages, err := clients.GetChatMessages(h.config.SuperGroupChatID, h.config.ToolTopicID)
 	if err != nil {
 		utils.SendLoggedReply(b, msg, "Произошла ошибка при получении сообщений из чата.", err)
 		return handlers.EndConversation()
@@ -150,13 +150,12 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 		return handlers.EndConversation()
 	}
 
-	topicLink := fmt.Sprintf("https://t.me/c/%d/%d", h.config.SuperGroupChatID, h.config.ContentTopicID)
+	topicLink := fmt.Sprintf("https://t.me/c/%d/%d", h.config.SuperGroupChatID, h.config.ToolTopicID)
 
-	// Get the prompt template from the database
 	templateText := h.promptingTemplateService.GetTemplateWithFallback(
 		context.Background(),
-		prompts.GetContentPromptTemplateDbKey,
-		prompts.GetContentPromptDefaultTemplate,
+		prompts.GetToolPromptTemplateDbKey,
+		prompts.GetToolPromptDefaultTemplate,
 	)
 
 	prompt := fmt.Sprintf(
@@ -211,18 +210,18 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 }
 
 // 3. handleCancel handles the /cancel command
-func (h *contentHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *toolsHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
 	// Check if there's an ongoing operation to cancel
-	if cancelFunc, ok := h.userStore.Get(ctx.EffectiveUser.Id, contentUserStoreKeyCancelFunc); ok {
+	if cancelFunc, ok := h.userStore.Get(ctx.EffectiveUser.Id, userStoreKeyCancelFunc); ok {
 		// Call the cancel function to stop any ongoing API calls
 		if cf, ok := cancelFunc.(context.CancelFunc); ok {
 			cf()
-			utils.SendLoggedReply(b, msg, "Операция поиска контента отменена.", nil)
+			utils.SendLoggedReply(b, msg, "Операция поиска инструментов отменена.", nil)
 		}
 	} else {
-		utils.SendLoggedReply(b, msg, "Операция поиска контента отменена.", nil)
+		utils.SendLoggedReply(b, msg, "Операция поиска инструментов отменена.", nil)
 	}
 
 	// Clean up user data
@@ -231,31 +230,17 @@ func (h *contentHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	return handlers.EndConversation()
 }
 
-func (h *contentHandler) prepareTelegramMessages(messages []tg.Message) ([]byte, error) {
-	// Modified MessageObject to have Date as string
+func (h *toolsHandler) prepareTelegramMessages(messages []tg.Message) ([]byte, error) {
 	type MessageObject struct {
 		ID      int    `json:"id"`
 		Message string `json:"message"`
-		Date    string `json:"date"` // now formatted as "10 february 2024"
-	}
-
-	// Load CET location
-	loc, err := time.LoadLocation("CET")
-	if err != nil {
-		return nil, fmt.Errorf("failed to load CET location: %w", err)
 	}
 
 	messageObjects := make([]MessageObject, 0, len(messages))
 	for _, message := range messages {
-		// Convert Unix timestamp to CET time
-		t := time.Unix(int64(message.Date), 0).In(loc)
-		// Format date as "day month year" and convert to lowercase
-		dateFormatted := strings.ToLower(t.Format("2 January 2006"))
-
 		messageObjects = append(messageObjects, MessageObject{
 			ID:      message.ID,
 			Message: message.Message,
-			Date:    dateFormatted,
 		})
 	}
 

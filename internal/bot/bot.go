@@ -139,7 +139,7 @@ func (b *TgBotClient) registerHandlers(
 	// Register private chat handlers
 	privateHandlers := []ext.Handler{
 		privatehandlers.NewHelpHandler(appConfig),
-		privatehandlers.NewToolHandler(openaiClient, messageSenderService, promptingTemplateService, appConfig),
+		privatehandlers.NewToolsHandler(openaiClient, messageSenderService, promptingTemplateService, appConfig),
 		privatehandlers.NewContentHandler(openaiClient, messageSenderService, promptingTemplateService, appConfig),
 	}
 	for _, handler := range privateHandlers {

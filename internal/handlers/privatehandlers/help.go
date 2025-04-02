@@ -38,8 +38,8 @@ func (h *helpHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 	helpText := "<blockquote> Доступные команды</blockquote>\n" +
 		"/start - Приветственное сообщение\n" +
 		"/help - Инструкция по моему использованию\n" +
-		"/tool или /tools - Поиск ИИ-инструментов для разработки. Используйте команду с описанием того, что вы ищете, например: `/tool лучшая IDE`.\n" +
-		"/content - Поиск видео-контента клуба. Используй команду с описанием того, что ты ищешь, например: <code>/content обзор про MCP</code>. \n\n" +
+		"/tools - Поиск ИИ-инструментов для разработки" +
+		"/content - Поиск видео-контента клуба. \n\n" +
 		"Инструкция со всеми моими возможностями: https://t.me/c/2069889012/127/9470\n"
 
 	if utils.IsUserAdminOrCreator(b, msg.From.Id, h.config.SuperGroupChatID) {

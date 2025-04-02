@@ -39,8 +39,8 @@ func (h *codeHandler) handleCode(b *gotgbot.Bot, ctx *ext.Context) error {
 	revertedCode = strings.TrimSpace(revertedCode)
 	code := reverseString(revertedCode)
 	if code == "" {
-		_, err := msg.Reply(b, "Пожалуйста, введи код из сообщения", nil)
-		return err
+		utils.SendLoggedReply(b, msg, "Пожалуйста, введи код из сообщения", nil)
+		return nil
 	}
 
 	// Store the code in memory
@@ -48,9 +48,12 @@ func (h *codeHandler) handleCode(b *gotgbot.Bot, ctx *ext.Context) error {
 	log.Print("Code stored")
 	err := clients.TgKeepSessionAlive() // Refresh session
 	if err == nil {
-		msg.Reply(b, "Код принят", nil)
+		utils.SendLoggedReply(b, msg, "Код принят", nil)
+	} else {
+		utils.SendLoggedReply(b, msg, "Произошла ошибка при сохранении кода", err)
 	}
-	return err
+
+	return nil
 }
 
 func reverseString(s string) string {
