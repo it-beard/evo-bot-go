@@ -14,7 +14,7 @@ const CodeCommand = "/code"
 const SummarizeCommand = "/summarize"
 const SetupClubCallCommand = "/setupClubCall"
 const GetLastClubCallsCommand = "/getlastclubcalls"
-const EditClubCallCommand = "/editClubCall"
+const EditClubCallCommand = "editClubCall"
 
 const SummarizeDmFlag = "-dm"
 
