@@ -134,9 +134,15 @@ func FormatTopicListForUsers(topics []repositories.Topic, contentName string, co
 
 // FormatTopicListForAdmin formats a slice of topics for display to admins
 // It returns a markdown-formatted string with topic information
-func FormatTopicListForAdmin(topics []repositories.Topic, contentName string, cancelCommand string) string {
+func FormatTopicListForAdmin(topics []repositories.Topic, contentName string, contentType string) string {
 	var response strings.Builder
-	response.WriteString(fmt.Sprintf("Темы и вопросы для мероприятия: *%s*\n", contentName))
+	typeEmoji := "🔄"
+	if contentType == "club-call" {
+		typeEmoji = "💬"
+	} else if contentType == "meetup" {
+		typeEmoji = "🎙"
+	}
+	response.WriteString(fmt.Sprintf("\n %s _Мероприятие:_ *%s*\n", typeEmoji, contentName))
 
 	if len(topics) == 0 {
 		response.WriteString("\nДля этого мероприятия пока нет тем и вопросов.")
@@ -144,17 +150,14 @@ func FormatTopicListForAdmin(topics []repositories.Topic, contentName string, ca
 		for _, topic := range topics {
 			userNickname := "не указано"
 			if topic.UserNickname != nil {
-				userNickname = *topic.UserNickname
+				userNickname = "@" + *topic.UserNickname
 			}
-			dateFormatted := topic.CreatedAt.Format("02.01.2006 в 15:04")
-			response.WriteString(fmt.Sprintf("\nID `%d`: *%s*\n", topic.ID, topic.Topic))
-			response.WriteString(fmt.Sprintf("└ Создано: _%s_, Пользователь ID: `%s`\n",
-				dateFormatted, userNickname))
+			dateFormatted := topic.CreatedAt.Format("02.01.2006")
+			response.WriteString(fmt.Sprintf("\n_%s_ / *%s*\n", dateFormatted, topic.Topic))
+			response.WriteString(fmt.Sprintf("└ _ID_ `%d`, _пользователь_: %s\n",
+				topic.ID, userNickname))
 		}
 	}
-
-	response.WriteString(fmt.Sprintf("\nИспользуй /%s для возврата.",
-		cancelCommand))
 
 	return response.String()
 }

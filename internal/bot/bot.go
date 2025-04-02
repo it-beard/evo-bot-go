@@ -129,6 +129,7 @@ func (b *TgBotClient) registerHandlers(
 	adminHandlers := []ext.Handler{
 		adminhandlers.NewCodeHandler(appConfig),
 		adminhandlers.NewSummarizeHandler(summarizationService, messageSenderService, appConfig),
+		adminhandlers.NewShowTopicsHandler(topicRepository, contentRepository, messageSenderService, appConfig),
 		contenthandlers.NewContentEditHandler(contentRepository, appConfig),
 		contenthandlers.NewContentSetupHandler(contentRepository, appConfig),
 		contenthandlers.NewContentDeleteHandler(contentRepository, appConfig),

@@ -10,3 +10,6 @@ const ContentEditGetLastLimit = 10
 const ContentSetupCommand = "contentSetup"
 const ContentDeleteCommand = "contentDelete"
 const ContentFinishCommand = "contentFinish"
+
+// Topics Handlers
+const ShowTopicsCommand = "showTopics"
