@@ -38,7 +38,7 @@ func (h *helpHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 	helpText := "<blockquote> Доступные команды</blockquote>\n" +
 		"/start - Приветственное сообщение\n" +
 		"/help - Инструкция по моему использованию\n" +
-		"/tools - Поиск ИИ-инструментов для разработки" +
+		"/tools - Поиск ИИ-инструментов для разработки\n" +
 		"/content - Поиск видео-контента клуба. \n\n" +
 		"Инструкция со всеми моими возможностями: https://t.me/c/2069889012/127/9470\n"
 

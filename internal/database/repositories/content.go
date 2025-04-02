@@ -14,6 +14,7 @@ type Content struct {
 	Name      string
 	Type      string
 	Status    string
+	StartedAt *time.Time
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
@@ -39,12 +40,23 @@ func (r *ContentRepository) CreateContent(name string, contentType constants.Con
 	return id, nil
 }
 
+// CreateContentWithStartedAt inserts a new content record with a started_at value into the database
+func (r *ContentRepository) CreateContentWithStartedAt(name string, contentType constants.ContentType, startedAt time.Time) (int, error) {
+	var id int
+	query := `INSERT INTO contents (name, type, status, started_at) VALUES ($1, $2, $3, $4) RETURNING id`
+	err := r.db.QueryRow(query, name, contentType, constants.ContentStatusActual, startedAt).Scan(&id)
+	if err != nil {
+		return 0, fmt.Errorf("failed to insert content with started_at: %w", err)
+	}
+	return id, nil
+}
+
 // GetLastContents retrieves the last N content records
 func (r *ContentRepository) GetLastContents(limit int) ([]Content, error) {
 	query := `
-		SELECT id, name, type, status, created_at, updated_at
+		SELECT id, name, type, status, started_at, created_at, updated_at
 		FROM contents
-		ORDER BY id DESC 
+		ORDER BY started_at ASC NULLS LAST
 		LIMIT $1`
 
 	rows, err := r.db.Query(query, limit)
@@ -56,7 +68,7 @@ func (r *ContentRepository) GetLastContents(limit int) ([]Content, error) {
 	var contents []Content
 	for rows.Next() {
 		var c Content
-		if err := rows.Scan(&c.ID, &c.Name, &c.Type, &c.Status, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.Type, &c.Status, &c.StartedAt, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("failed to scan content row: %w", err)
 		}
 		contents = append(contents, c)
@@ -106,6 +118,24 @@ func (r *ContentRepository) UpdateContentStatus(id int, status constants.Content
 	return nil
 }
 
+// UpdateContentStartedAt updates the started_at field of a content record by its ID
+func (r *ContentRepository) UpdateContentStartedAt(id int, startedAt time.Time) error {
+	query := `UPDATE contents SET started_at = $1, updated_at = NOW() WHERE id = $2`
+	result, err := r.db.Exec(query, startedAt, id)
+	if err != nil {
+		return fmt.Errorf("failed to update content started_at for ID %d: %w", id, err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		log.Printf("Could not get rows affected after update: %v", err)
+	} else if rowsAffected == 0 {
+		return fmt.Errorf("no content found with ID %d to update started_at", id)
+	}
+
+	return nil
+}
+
 // DeleteContent removes a content record from the database by its ID
 func (r *ContentRepository) DeleteContent(id int) error {
 	query := `DELETE FROM contents WHERE id = $1`
@@ -122,4 +152,33 @@ func (r *ContentRepository) DeleteContent(id int) error {
 	}
 
 	return nil
+}
+
+// GetContentByID retrieves a single content record by its ID
+func (r *ContentRepository) GetContentByID(id int) (*Content, error) {
+	query := `
+		SELECT id, name, type, status, started_at, created_at, updated_at
+		FROM contents
+		WHERE id = $1`
+
+	var content Content
+	err := r.db.QueryRow(query, id).Scan(
+		&content.ID,
+		&content.Name,
+		&content.Type,
+		&content.Status,
+		&content.StartedAt,
+		&content.CreatedAt,
+		&content.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("no content found with ID %d", id)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get content with ID %d: %w", id, err)
+	}
+
+	return &content, nil
 }

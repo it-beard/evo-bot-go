@@ -76,14 +76,11 @@ func (h *contentFinishHandler) startFinish(b *gotgbot.Bot, ctx *ext.Context) err
 		return handlers.EndConversation()
 	}
 
-	// Build response with available contents
-	var response strings.Builder
-	response.WriteString(fmt.Sprintf("Последние %d контента:\n", len(contents)))
-	for _, content := range contents {
-		response.WriteString(fmt.Sprintf("- ID `%d`: *%s* _(%s, %s)_\n", content.ID, content.Name, content.Type, content.Status))
-	}
-	response.WriteString(fmt.Sprintf("\nПожалуйста, отправь ID контента, статус которого ты хочешь изменить на 'finished', или /%s для отмены.", constants.CancelCommand))
-	utils.SendLoggedMarkdownReply(b, msg, response.String(), nil)
+	title := fmt.Sprintf("Последние %d контента:", len(contents))
+	actionDescription := "статус которого ты хочешь изменить на 'finished'"
+	formattedResponse := utils.FormatContentList(contents, title, constants.CancelCommand, actionDescription)
+
+	utils.SendLoggedMarkdownReply(b, msg, formattedResponse, nil)
 
 	return handlers.NextConversationState(stateAskFinishContentID)
 }

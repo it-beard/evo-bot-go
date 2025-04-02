@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
@@ -18,11 +19,13 @@ import (
 
 const (
 	// Conversation states
-	stateAskContentName = "ask_content_name"
-	stateAskContentType = "ask_content_type"
+	contentSetupStateAskContentName      = "content_setup_ask_content_name"
+	contentSetupStateAskContentType      = "content_setup_ask_content_type"
+	contentSetupStateAskContentStartedAt = "content_setup_ask_content_started_at"
 
 	// Context data keys
-	ctxDataKeyContentName = "content_name"
+	contentSetupCtxDataKeyContentName = "content_setup_content_name"
+	contentSetupCtxDataKeyContentID   = "content_setup_content_id"
 )
 
 type contentSetupHandler struct {
@@ -46,11 +49,14 @@ func NewContentSetupHandler(
 			handlers.NewCommand(constants.ContentSetupCommand, h.startSetup),
 		},
 		map[string][]ext.Handler{
-			stateAskContentName: {
+			contentSetupStateAskContentName: {
 				handlers.NewMessage(message.Text, h.handleContentName),
 			},
-			stateAskContentType: {
+			contentSetupStateAskContentType: {
 				handlers.NewMessage(message.Text, h.handleContentType),
+			},
+			contentSetupStateAskContentStartedAt: {
+				handlers.NewMessage(message.Text, h.handleContentStartedAt),
 			},
 		},
 		&handlers.ConversationOpts{
@@ -70,7 +76,7 @@ func (h *contentSetupHandler) startSetup(b *gotgbot.Bot, ctx *ext.Context) error
 
 	utils.SendLoggedReply(b, msg, fmt.Sprintf("Пожалуйста, введи название для нового контента или /%s для отмены:", constants.CancelCommand), nil)
 
-	return handlers.NextConversationState(stateAskContentName)
+	return handlers.NextConversationState(contentSetupStateAskContentName)
 }
 
 // 2. handleContentName processes the content name input
@@ -84,7 +90,7 @@ func (h *contentSetupHandler) handleContentName(b *gotgbot.Bot, ctx *ext.Context
 	}
 
 	// Store the content name
-	h.userStore.Set(ctx.EffectiveUser.Id, ctxDataKeyContentName, contentName)
+	h.userStore.Set(ctx.EffectiveUser.Id, contentSetupCtxDataKeyContentName, contentName)
 
 	// Ask for content type
 	contentTypeOptions := []string{}
@@ -98,7 +104,7 @@ func (h *contentSetupHandler) handleContentName(b *gotgbot.Bot, ctx *ext.Context
 
 	utils.SendLoggedReply(b, msg, typeOptions, nil)
 
-	return handlers.NextConversationState(stateAskContentType)
+	return handlers.NextConversationState(contentSetupStateAskContentType)
 }
 
 // 3. handleContentType processes the content type selection and creates the content
@@ -119,7 +125,7 @@ func (h *contentSetupHandler) handleContentType(b *gotgbot.Bot, ctx *ext.Context
 	contentType = constants.AllContentTypes[index-1]
 
 	// Get the content name from user data store
-	contentNameVal, ok := h.userStore.Get(ctx.EffectiveUser.Id, ctxDataKeyContentName)
+	contentNameVal, ok := h.userStore.Get(ctx.EffectiveUser.Id, contentSetupCtxDataKeyContentName)
 	if !ok {
 		utils.SendLoggedReply(
 			b,
@@ -142,7 +148,64 @@ func (h *contentSetupHandler) handleContentType(b *gotgbot.Bot, ctx *ext.Context
 		return handlers.EndConversation()
 	}
 
-	utils.SendLoggedReply(b, msg, fmt.Sprintf("Запись о контенте '%s' с типом '%s' успешно создана с ID: %d", contentName, contentType, id), nil)
+	// Store the content ID
+	h.userStore.Set(ctx.EffectiveUser.Id, contentSetupCtxDataKeyContentID, id)
+
+	// Ask for start date
+	utils.SendLoggedReply(b, msg, fmt.Sprintf("Когда стартует контент? Введи дату и время в формате DD.MM.YYYY HH:MM или /%s для отмены.", constants.CancelCommand), nil)
+
+	return handlers.NextConversationState(contentSetupStateAskContentStartedAt)
+}
+
+// 4. handleContentStartedAt processes the start date input and updates the content
+func (h *contentSetupHandler) handleContentStartedAt(b *gotgbot.Bot, ctx *ext.Context) error {
+	msg := ctx.EffectiveMessage
+	dateTimeStr := strings.TrimSpace(msg.Text)
+
+	// Parse the start date
+	startedAt, err := time.Parse("02.01.2006 15:04", dateTimeStr)
+	if err != nil {
+		utils.SendLoggedReply(b, msg, fmt.Sprintf("Неверный формат даты. Пожалуйста, введи дату и время в формате DD.MM.YYYY HH:MM или /%s для отмены.", constants.CancelCommand), nil)
+		return nil // Stay in the same state
+	}
+
+	// Get content ID from user data store
+	contentIDVal, ok := h.userStore.Get(ctx.EffectiveUser.Id, contentSetupCtxDataKeyContentID)
+	if !ok {
+		utils.SendLoggedReply(b, msg, fmt.Sprintf("Произошла внутренняя ошибка. Не удалось найти ID контента. Попробуй начать заново с /%s.", constants.ContentSetupCommand), nil)
+		return handlers.EndConversation()
+	}
+
+	contentID, ok := contentIDVal.(int)
+	if !ok {
+		utils.SendLoggedReply(b, msg, fmt.Sprintf("Произошла внутренняя ошибка (неверный тип ID). Попробуй начать заново с /%s.", constants.ContentSetupCommand), nil)
+		return handlers.EndConversation()
+	}
+
+	// Update the started_at field
+	err = h.contentRepository.UpdateContentStartedAt(contentID, startedAt)
+	if err != nil {
+		utils.SendLoggedReply(b, msg, "Произошла ошибка при обновлении даты начала контента.", err)
+		return handlers.EndConversation()
+	}
+
+	// Get content name for the success message
+	contentNameVal, ok := h.userStore.Get(ctx.EffectiveUser.Id, contentSetupCtxDataKeyContentName)
+	if !ok {
+		utils.SendLoggedReply(b, msg, "Контент успешно создан с датой старта.", nil)
+		h.userStore.Clear(ctx.EffectiveUser.Id)
+		return handlers.EndConversation()
+	}
+
+	contentName, ok := contentNameVal.(string)
+	if !ok {
+		utils.SendLoggedReply(b, msg, "Контент успешно создан с датой старта.", nil)
+		h.userStore.Clear(ctx.EffectiveUser.Id)
+		return handlers.EndConversation()
+	}
+
+	// Success message
+	utils.SendLoggedReply(b, msg, fmt.Sprintf("Запись о контенте '%s' успешно создана с ID: %d и датой старта: %s", contentName, contentID, startedAt.Format("02.01.2006 15:04")), nil)
 
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)
@@ -150,7 +213,7 @@ func (h *contentSetupHandler) handleContentType(b *gotgbot.Bot, ctx *ext.Context
 	return handlers.EndConversation()
 }
 
-// 4. handleCancel handles the /cancel command
+// 5. handleCancel handles the /cancel command
 func (h *contentSetupHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	utils.SendLoggedReply(b, msg, "Операция создания контента отменена.", nil)
