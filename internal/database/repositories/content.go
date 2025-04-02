@@ -34,18 +34,17 @@ func (r *ContentRepository) CreateContent(name, contentType string) (int, error)
 	return id, nil
 }
 
-// GetLastClubCalls retrieves the last 10 content records of type 'club-call'
-func (r *ContentRepository) GetLastClubCalls(limit int) ([]Content, error) {
+// GetLastContents retrieves the last 10 content records of type 'club-call'
+func (r *ContentRepository) GetLastContents(limit int) ([]Content, error) {
 	query := `
 		SELECT id, name, type 
-		FROM contents 
-		WHERE type = $1 
+		FROM contents
 		ORDER BY id DESC 
-		LIMIT $2`
+		LIMIT $1`
 
-	rows, err := r.db.Query(query, "club-call", limit)
+	rows, err := r.db.Query(query, limit)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query last club calls: %w", err)
+		return nil, fmt.Errorf("failed to query last contents: %w", err)
 	}
 	defer rows.Close()
 
@@ -53,13 +52,13 @@ func (r *ContentRepository) GetLastClubCalls(limit int) ([]Content, error) {
 	for rows.Next() {
 		var c Content
 		if err := rows.Scan(&c.ID, &c.Name, &c.Type); err != nil {
-			return nil, fmt.Errorf("failed to scan club call row: %w", err)
+			return nil, fmt.Errorf("failed to scan content row: %w", err)
 		}
 		contents = append(contents, c)
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error during rows iteration for club calls: %w", err)
+		return nil, fmt.Errorf("error during rows iteration for contents: %w", err)
 	}
 
 	return contents, nil

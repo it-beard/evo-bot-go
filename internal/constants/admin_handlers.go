@@ -7,13 +7,14 @@ const SummarizeHandlerName = "summarize_handler"
 const SummarizeCommand = "/summarize"
 const SummarizeDmFlag = "-dm"
 
-const ClubCallEditHandlerName = "club_call_edit_handler"
-const ClubCallEditCommand = "editClubCall"
-const ClubCallEditGetLastLimit = 5
+// Content Handlers
+const ContentEditHandlerName = "content_edit_handler"
+const ContentEditCommand = "contentEdit"
+const ContentEditGetLastLimit = 5
 
-const ClubCallsGetLastHandlerName = "club_calls_get_last_handler"
-const ClubCallsGetLastCommand = "/getlastclubcalls"
-const ClubCallsGetLastLimit = 10
+const ContentsGetLastHandlerName = "contents_get_last_handler"
+const ContentsGetLastCommand = "/contentsGetLast"
+const ContentsGetLastLimit = 10
 
-const ClubCallSetupHandlerName = "club_call_setup_handler"
-const ClubCallSetupCommand = "/setupClubCall"
+const ContentSetupHandlerName = "content_setup_handler"
+const ContentSetupCommand = "/contentSetup"

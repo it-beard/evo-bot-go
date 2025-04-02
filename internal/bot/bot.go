@@ -10,6 +10,7 @@ import (
 	"evo-bot-go/internal/database"
 	"evo-bot-go/internal/database/repositories"
 	"evo-bot-go/internal/handlers/adminhandlers"
+	"evo-bot-go/internal/handlers/adminhandlers/contenthandlers"
 	"evo-bot-go/internal/handlers/grouphandlers"
 	"evo-bot-go/internal/handlers/privatehandlers"
 	"evo-bot-go/internal/services"
@@ -120,10 +121,10 @@ func (b *TgBotClient) registerHandlers(
 	// Register admin chat handlers
 	adminHandlers := []ext.Handler{
 		adminhandlers.NewCodeHandler(appConfig),
-		adminhandlers.NewClubCallEditHandler(contentRepository, appConfig),
-		adminhandlers.NewClubCallsGetLastHandler(contentRepository, appConfig),
-		adminhandlers.NewClubCallSetupHandler(contentRepository, appConfig),
 		adminhandlers.NewSummarizeHandler(summarizationService, messageSenderService, appConfig),
+		contenthandlers.NewContentEditHandler(contentRepository, appConfig),
+		contenthandlers.NewContentsGetLastHandler(contentRepository, appConfig),
+		contenthandlers.NewContentSetupHandler(contentRepository, appConfig),
 	}
 	for _, handler := range adminHandlers {
 		b.dispatcher.AddHandler(handler)
