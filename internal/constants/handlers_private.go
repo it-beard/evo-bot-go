@@ -8,6 +8,4 @@ const ContentHandlerName = "content_handler"
 const ContentCommand = "/content"
 
 const HelpCommand = "help"
-
-const StartHandlerName = "start_handler"
-const StartCommand = "/start"
+const StartCommand = "start"
