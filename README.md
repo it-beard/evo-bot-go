@@ -19,7 +19,6 @@ A Telegram bot for Evocoders Club management implemented in Go. Helps moderate d
   - Manual trigger with `/summarize` (admin-only)
 
 ### Utility
-- 💾 **Save Messages** (`/save`): Forwards messages to direct chat
 - ℹ️ **Help** (`/help`): Provides usage information
 - 🧩 **Dynamic Templates**: Customizable AI prompts stored in database
 

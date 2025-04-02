@@ -1,39 +1,67 @@
 package privatehandlers
 
 import (
+	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
-	"evo-bot-go/internal/handlers"
+	"evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 )
 
-type HelpHandler struct{}
-
-func NewHelpHandler() handlers.Handler {
-	return &HelpHandler{}
+type helpHandler struct {
+	config *config.Config
 }
 
-func (h *HelpHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
-	helpText := "Доступные команды:\n\n" +
-		"/start - Приветственное сообщение\n" +
-		"/help - Инструкция по моему использованию\n" +
-		"/tool или /tools - Поиск ИИ-инструментов для разработки. Используйте команду с описанием того, что вы ищете, например: `/tool лучшая IDE`.\n" +
-		"/content - Поиск видео-контента клуба. Используй команду с описанием того, что ты ищешь, например: `/content обзор про MCP`. \n" +
-		"Инструкция со всеми моими возможностями: https://t.me/c/2069889012/127/9470"
-	_, err := ctx.EffectiveMessage.Reply(b, helpText, &gotgbot.SendMessageOpts{
-		ParseMode: "Markdown",
-	})
-	return err
-}
-
-func (h *HelpHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
-	if ctx.EffectiveMessage == nil {
-		return false
+func NewHelpHandler(config *config.Config) ext.Handler {
+	h := &helpHandler{
+		config: config,
 	}
-	return ctx.EffectiveMessage.Text != "" && ctx.EffectiveMessage.Text == "/help" && ctx.EffectiveMessage.Chat.Type == "private"
+
+	return handlers.NewCommand(constants.HelpCommand, h.handleCommand)
 }
 
-func (h *HelpHandler) Name() string {
-	return constants.HelpHandlerName
+func (h *helpHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
+	msg := ctx.EffectiveMessage
+
+	// Only proceed if this is a private chat
+	if !utils.CheckPrivateChatType(b, ctx) {
+		return nil
+	}
+
+	// Check if user is a club member
+	if !utils.CheckClubMemberPermissions(b, msg, h.config, constants.HelpCommand) {
+		return nil
+	}
+
+	helpText := "<b>📋 Доступные команды</b>\n\n" +
+		"<b>🏠 Основные</b>\n" +
+		"• /start - Приветственное сообщение\n" +
+		"• /help - Показать список моих команд\n\n" +
+		"<b>🔍 Поиск</b>\n" +
+		"• /tools - Найти инструменты из канала «Инструменты»\n" +
+		"• /content - Найти видео из канала «Видео-контент»\n\n" +
+		"<b>📅 Мероприятия</b>\n" +
+		"• /showContent - Показать список предстоящих мероприятий\n" +
+		"• /topicsShow - Просмотреть темы и вопросы к предстоящим мероприятиям\n" +
+		"• /topicAdd - Предложить тему или вопрос к предстоящему мероприятию\n\n" +
+		"<i>💡 Подробная инструкция:</i>\n" +
+		"<a href=\"https://t.me/c/2069889012/127/9470\">Открыть полное руководство</a>"
+
+	if utils.IsUserAdminOrCreator(b, msg.From.Id, h.config.SuperGroupChatID) {
+		adminHelpText := "\n\n<b>🔐 Команды администратора</b>\n" +
+			"• /contentEdit - Редактировать контент\n" +
+			"• /contentSetup - Создать новый контент\n" +
+			"• /contentDelete - Удалить контент\n" +
+			"• /contentFinish - Отметить контент как завершенный\n" +
+			"• /showTopics - Просмотреть темы и вопросы к предстоящим мероприятиям с возможностью удаления\n" +
+			"• /code - Ввести код для авторизации TG-клиента (задом наперед)\n"
+
+		helpText += adminHelpText
+	}
+
+	utils.SendLoggedHtmlReply(b, ctx.EffectiveMessage, helpText, nil)
+
+	return nil
 }

@@ -5,16 +5,21 @@ import (
 	"log"
 	"time"
 
-	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"evo-bot-go/internal/clients"
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/database"
 	"evo-bot-go/internal/database/repositories"
+	"evo-bot-go/internal/handlers"
+	"evo-bot-go/internal/handlers/adminhandlers"
+	"evo-bot-go/internal/handlers/adminhandlers/contenthandlers"
+	"evo-bot-go/internal/handlers/grouphandlers"
 	"evo-bot-go/internal/handlers/privatehandlers"
-	"evo-bot-go/internal/handlers/publichandlers"
+	"evo-bot-go/internal/handlers/privatehandlers/topicshandlers"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/tasks"
+
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
 // TgBotClient represents a Telegram bot client with all required dependencies
@@ -55,13 +60,14 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	}
 
 	// Initialize repositories
-	messageRepo := repositories.NewMessageRepository(db)
 	promptingTemplateService := services.NewPromptingTemplateService(repositories.NewPromptingTemplateRepository(db))
+	contentRepository := repositories.NewContentRepository(db.DB)
+	topicRepository := repositories.NewTopicRepository(db.DB)
 
 	// Initialize services
 	messageSenderService := services.NewMessageSenderService(bot)
 	summarizationService := services.NewSummarizationService(
-		appConfig, messageRepo, openaiClient, messageSenderService, promptingTemplateService,
+		appConfig, openaiClient, messageSenderService, promptingTemplateService,
 	)
 
 	// Initialize scheduled tasks
@@ -79,7 +85,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	}
 
 	// Register all handlers
-	client.registerHandlers(openaiClient, appConfig, messageRepo, promptingTemplateService, summarizationService, messageSenderService)
+	client.registerHandlers(openaiClient, appConfig, promptingTemplateService, summarizationService, messageSenderService, contentRepository, topicRepository)
 
 	return client, nil
 }
@@ -91,7 +97,7 @@ func setupDatabase(connectionString string) (*database.DB, error) {
 		return nil, err
 	}
 
-	if err := db.InitSchema(); err != nil {
+	if err := db.InitWithMigrations(); err != nil {
 		return nil, err
 	}
 
@@ -110,33 +116,49 @@ func setupDatabase(connectionString string) (*database.DB, error) {
 func (b *TgBotClient) registerHandlers(
 	openaiClient *clients.OpenAiClient,
 	appConfig *config.Config,
-	messageRepository *repositories.MessageRepository,
 	promptingTemplateService *services.PromptingTemplateService,
 	summarizationService *services.SummarizationService,
 	messageSenderService services.MessageSenderService,
+	contentRepository *repositories.ContentRepository,
+	topicRepository *repositories.TopicRepository,
 ) {
+	// Register start handler, that avaliable for all users
+	b.dispatcher.AddHandler(handlers.NewStartHandler(appConfig))
+
+	// Register admin chat handlers
+	adminHandlers := []ext.Handler{
+		adminhandlers.NewCodeHandler(appConfig),
+		adminhandlers.NewSummarizeHandler(summarizationService, messageSenderService, appConfig),
+		adminhandlers.NewShowTopicsHandler(topicRepository, contentRepository, messageSenderService, appConfig),
+		contenthandlers.NewContentEditHandler(contentRepository, appConfig),
+		contenthandlers.NewContentSetupHandler(contentRepository, appConfig),
+		contenthandlers.NewContentDeleteHandler(contentRepository, appConfig),
+		contenthandlers.NewContentFinishHandler(contentRepository, appConfig),
+	}
+	for _, handler := range adminHandlers {
+		b.dispatcher.AddHandler(handler)
+	}
+
 	// Register private chat handlers
 	privateHandlers := []ext.Handler{
-		privatehandlers.NewStartHandler(),
-		privatehandlers.NewHelpHandler(),
-		privatehandlers.NewToolHandler(openaiClient, messageSenderService, promptingTemplateService, appConfig),
+		privatehandlers.NewHelpHandler(appConfig),
+		privatehandlers.NewToolsHandler(openaiClient, messageSenderService, promptingTemplateService, appConfig),
 		privatehandlers.NewContentHandler(openaiClient, messageSenderService, promptingTemplateService, appConfig),
-		privatehandlers.NewCodeHandler(appConfig),
-		privatehandlers.NewSummarizeHandler(summarizationService, messageSenderService, appConfig),
+		privatehandlers.NewShowContentHandler(contentRepository, appConfig),
+		topicshandlers.NewTopicsShowHandler(topicRepository, contentRepository, messageSenderService, appConfig),
+		topicshandlers.NewTopicAddHandler(topicRepository, contentRepository, messageSenderService, appConfig),
 	}
 	for _, handler := range privateHandlers {
 		b.dispatcher.AddHandler(handler)
 	}
 
-	// Register public chat handlers
-	publicHandlers := []ext.Handler{
-		publichandlers.NewDeleteJoinLeftMessagesHandler(),
-		publichandlers.NewSaveHandler(messageSenderService, appConfig),
-		publichandlers.NewRepliesFromClosedThreadsHandler(messageSenderService, appConfig),
-		publichandlers.NewCleanClosedThreadsHandler(messageSenderService, appConfig),
-		publichandlers.NewMessageCollectorHandler(messageRepository, appConfig),
+	// Register group chat handlers
+	groupHandlers := []ext.Handler{
+		grouphandlers.NewDeleteJoinLeftMessagesHandler(),
+		grouphandlers.NewRepliesFromClosedThreadsHandler(messageSenderService, appConfig),
+		grouphandlers.NewCleanClosedThreadsHandler(messageSenderService, appConfig),
 	}
-	for _, handler := range publicHandlers {
+	for _, handler := range groupHandlers {
 		b.dispatcher.AddHandler(handler)
 	}
 }

@@ -20,7 +20,7 @@ func (s *PromptingTemplateService) InitializeDefaultTemplates(ctx context.Contex
 	log.Println("Initializing default prompting templates...")
 
 	// Initialize summarization prompts
-	if err := s.repo.EnsureTemplateExists(ctx, prompts.FairyTaleSummarizationPromptTemplateDbKey, prompts.FairyTaleSummarizationPromptDefaultTemplate); err != nil {
+	if err := s.repo.EnsureTemplateExists(ctx, prompts.DailySummarizationPromptTemplateDbKey, prompts.DailySummarizationPromptDefaultTemplate); err != nil {
 		return err
 	}
 

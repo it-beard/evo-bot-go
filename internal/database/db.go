@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"evo-bot-go/internal/database/migrations"
 	"fmt"
 	"log"
 
@@ -10,28 +11,6 @@ import (
 
 // SQL statements for table creation
 const (
-	createMessagesTableSQL = `
-		CREATE TABLE IF NOT EXISTS messages (
-			id SERIAL PRIMARY KEY,
-			topic_id INT NOT NULL,
-			message_id INT NOT NULL,
-			reply_to_message_id INT,
-			user_id BIGINT,
-			username TEXT,
-			message_text TEXT,
-			created_at TIMESTAMP WITH TIME ZONE,
-			UNIQUE(topic_id, message_id)
-		)
-	`
-
-	createMessagesChatIdxSQL = `
-		CREATE INDEX IF NOT EXISTS idx_messages_topic_id ON messages(topic_id)
-	`
-
-	createMessagesTimeIdxSQL = `
-		CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at)
-	`
-
 	createSessionsTableSQL = `
 		CREATE TABLE IF NOT EXISTS tg_sessions (
 			id TEXT PRIMARY KEY,
@@ -44,6 +23,37 @@ const (
 		CREATE TABLE IF NOT EXISTS prompting_templates (
 			template_key TEXT PRIMARY KEY,
 			template_text TEXT NOT NULL
+		)
+	`
+
+	createContentsTableSQL = `
+		CREATE TABLE IF NOT EXISTS contents (
+			id SERIAL PRIMARY KEY,
+			name TEXT NOT NULL,
+			type TEXT NOT NULL CHECK (type IN ('club-call', 'meetup')),
+			status TEXT NOT NULL DEFAULT 'actual' CHECK (status IN ('finished', 'actual')),
+			started_at TIMESTAMP WITH TIME ZONE,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)
+	`
+
+	createTopicsTableSQL = `
+		CREATE TABLE IF NOT EXISTS topics (
+			id SERIAL PRIMARY KEY,
+			topic TEXT NOT NULL,
+			user_id INTEGER NOT NULL,
+			content_id INTEGER REFERENCES contents(id),
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)
+	`
+
+	createMigrationsTableSQL = `
+		CREATE TABLE IF NOT EXISTS migrations (
+			id SERIAL PRIMARY KEY,
+			name TEXT NOT NULL UNIQUE,
+			timestamp TEXT NOT NULL,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 		)
 	`
 )
@@ -70,10 +80,6 @@ func NewDB(connectionString string) (*DB, error) {
 
 // InitSchema initializes all database schemas
 func (db *DB) InitSchema() error {
-	if err := db.initMessagesSchema(); err != nil {
-		return err
-	}
-
 	if err := db.initSessionSchema(); err != nil {
 		return err
 	}
@@ -82,27 +88,35 @@ func (db *DB) InitSchema() error {
 		return err
 	}
 
+	if err := db.initContentsSchema(); err != nil {
+		return err
+	}
+
+	if err := db.initTopicsSchema(); err != nil {
+		return err
+	}
+
+	if err := db.initMigrationsSchema(); err != nil {
+		return err
+	}
+
 	log.Println("All database schemas initialized successfully")
 	return nil
 }
 
-// initMessagesSchema initializes the messages table schema
-func (db *DB) initMessagesSchema() error {
-	// Create messages table
-	if _, err := db.Exec(createMessagesTableSQL); err != nil {
-		return fmt.Errorf("failed to create messages table: %w", err)
+// InitWithMigrations initializes the database and runs any pending migrations
+func (db *DB) InitWithMigrations() error {
+	// First initialize the base schema
+	if err := db.InitSchema(); err != nil {
+		return err
 	}
 
-	// Create indexes
-	if _, err := db.Exec(createMessagesChatIdxSQL); err != nil {
-		return fmt.Errorf("failed to create chat_id index: %w", err)
+	// Run pending migrations
+	if err := migrations.RunMigrations(db.DB); err != nil {
+		return fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	if _, err := db.Exec(createMessagesTimeIdxSQL); err != nil {
-		return fmt.Errorf("failed to create created_at index: %w", err)
-	}
-
-	log.Println("Messages schema initialized successfully")
+	log.Println("All migrations applied successfully")
 	return nil
 }
 
@@ -126,7 +140,35 @@ func (db *DB) initPromptingTemplatesSchema() error {
 	return nil
 }
 
+// initContentsSchema initializes the contents schema
+func (db *DB) initContentsSchema() error {
+	if _, err := db.Exec(createContentsTableSQL); err != nil {
+		return fmt.Errorf("failed to create contents table: %w", err)
+	}
 
+	log.Println("Contents schema initialized successfully")
+	return nil
+}
+
+// initTopicsSchema initializes the topics schema
+func (db *DB) initTopicsSchema() error {
+	if _, err := db.Exec(createTopicsTableSQL); err != nil {
+		return fmt.Errorf("failed to create topics table: %w", err)
+	}
+
+	log.Println("Topics schema initialized successfully")
+	return nil
+}
+
+// initMigrationsSchema initializes the migrations table schema
+func (db *DB) initMigrationsSchema() error {
+	if _, err := db.Exec(createMigrationsTableSQL); err != nil {
+		return fmt.Errorf("failed to create migrations table: %w", err)
+	}
+
+	log.Println("Migrations schema initialized successfully")
+	return nil
+}
 
 // Close closes the database connection
 func (db *DB) Close() error {

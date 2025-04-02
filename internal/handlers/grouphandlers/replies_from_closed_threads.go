@@ -1,4 +1,4 @@
-package publichandlers
+package grouphandlers
 
 import (
 	"fmt"
@@ -8,12 +8,12 @@ import (
 
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
-	"evo-bot-go/internal/handlers"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 )
 
 type RepliesFromClosedThreadsHandler struct {
@@ -22,21 +22,37 @@ type RepliesFromClosedThreadsHandler struct {
 	config               *config.Config
 }
 
-func NewRepliesFromClosedThreadsHandler(messageSenderService services.MessageSenderService, config *config.Config) handlers.Handler {
+func NewRepliesFromClosedThreadsHandler(messageSenderService services.MessageSenderService, config *config.Config) ext.Handler {
 	// Create map of closed topics
 	closedTopics := make(map[int]bool)
 	for _, id := range config.ClosedTopicsIDs {
 		closedTopics[id] = true
 	}
 
-	return &RepliesFromClosedThreadsHandler{
+	h := &RepliesFromClosedThreadsHandler{
 		closedTopics:         closedTopics,
 		messageSenderService: messageSenderService,
 		config:               config,
 	}
+
+	return handlers.NewMessage(h.check, h.handle)
 }
 
-func (h *RepliesFromClosedThreadsHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *RepliesFromClosedThreadsHandler) check(msg *gotgbot.Message) bool {
+	if msg == nil || msg.ReplyToMessage == nil {
+		return false
+	}
+
+	// Don't forward frow GroupAnonymousBot
+	if msg.From.IsBot && msg.From.Username == "GroupAnonymousBot" {
+		return false
+	}
+
+	// Trigger if message is in closed topics and not reply to itself
+	return h.closedTopics[int(msg.MessageThreadId)] && msg.ReplyToMessage.MessageId != msg.MessageThreadId
+}
+
+func (h *RepliesFromClosedThreadsHandler) handle(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
 	if msg.ReplyToMessage != nil &&
@@ -149,23 +165,4 @@ func (h *RepliesFromClosedThreadsHandler) forwardReplyMessage(ctx *ext.Context) 
 	}
 
 	return nil
-}
-
-func (h *RepliesFromClosedThreadsHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
-	msg := ctx.EffectiveMessage
-	if msg == nil || msg.ReplyToMessage == nil {
-		return false
-	}
-
-	// Don't forward frow GroupAnonymousBot
-	if msg.From.IsBot && msg.From.Username == "GroupAnonymousBot" {
-		return false
-	}
-
-	// Trigger if message is in closed topics and not reply to itself
-	return h.closedTopics[int(msg.MessageThreadId)] && msg.ReplyToMessage.MessageId != msg.MessageThreadId
-}
-
-func (h *RepliesFromClosedThreadsHandler) Name() string {
-	return constants.RepliesFromClosedThreadsHandlerName
 }
