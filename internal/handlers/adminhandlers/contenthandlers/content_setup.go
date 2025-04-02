@@ -116,7 +116,9 @@ func (h *contentSetupHandler) handleContentName(b *gotgbot.Bot, ctx *ext.Context
 	// Ask for content type
 	typeOptions := fmt.Sprintf("Выбери тип контента (введи число):\n1. %s\n2. %s\nИли /%s для отмены",
 		constants.ContentTypeClubCall,
-		constants.ContentTypeMeetup)
+		constants.ContentTypeMeetup,
+		constants.CancelCommand,
+	)
 
 	if _, err := msg.Reply(b, typeOptions, nil); err != nil {
 		log.Printf("Failed to send type options: %v", err)

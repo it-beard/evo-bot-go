@@ -123,7 +123,6 @@ func (b *TgBotClient) registerHandlers(
 		adminhandlers.NewCodeHandler(appConfig),
 		adminhandlers.NewSummarizeHandler(summarizationService, messageSenderService, appConfig),
 		contenthandlers.NewContentEditHandler(contentRepository, appConfig),
-		contenthandlers.NewContentsGetLastHandler(contentRepository, appConfig),
 		contenthandlers.NewContentSetupHandler(contentRepository, appConfig),
 	}
 	for _, handler := range adminHandlers {
