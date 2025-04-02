@@ -19,7 +19,16 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/message"
 	"github.com/gotd/td/tg"
+)
+
+const (
+	// Conversation states
+	stateProcessQuery = "process_query"
+
+	// Context data keys
+	ctxDataKeyQuery = "query"
 )
 
 type contentHandler struct {
@@ -27,6 +36,7 @@ type contentHandler struct {
 	promptingTemplateService *services.PromptingTemplateService
 	messageSenderService     services.MessageSenderService
 	config                   *config.Config
+	userStore                *utils.UserDataStore
 }
 
 func NewContentHandler(
@@ -40,20 +50,27 @@ func NewContentHandler(
 		promptingTemplateService: promptingTemplateService,
 		messageSenderService:     messageSenderService,
 		config:                   config,
+		userStore:                utils.NewUserDataStore(),
 	}
 
-	return handlers.NewCommand(constants.ContentCommand, h.handleCommand)
+	return handlers.NewConversation(
+		[]ext.Handler{
+			handlers.NewCommand(constants.ContentCommand, h.startContentSearch),
+		},
+		map[string][]ext.Handler{
+			stateProcessQuery: {
+				handlers.NewMessage(message.All, h.processContentSearch),
+			},
+		},
+		&handlers.ConversationOpts{
+			Exits: []ext.Handler{handlers.NewCommand(constants.CancelCommand, h.handleCancel)},
+		},
+	)
 }
 
-func (h *contentHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
+// 1. startContentSearch is the entry point handler for the content search conversation
+func (h *contentHandler) startContentSearch(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
-
-	// Extract text after command
-	commandText := h.extractCommandText(msg)
-	if commandText == "" {
-		utils.SendLoggedReply(b, msg, "Пожалуйста, введи поисковый запрос после команды. Например: /content <текст>", nil)
-		return handlers.EndConversation()
-	}
 
 	// Only proceed if this is a private chat
 	if !utils.CheckPrivateChatType(b, ctx) {
@@ -61,9 +78,25 @@ func (h *contentHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	// Check if user is a club member
-	if !utils.IsUserClubMember(b, msg, h.config) {
-		utils.SendLoggedReply(b, msg, fmt.Sprintf("Команда /%s доступна только для членов клуба.", constants.ContentCommand), nil)
+	if !utils.CheckClubMemberPermissions(b, msg, h.config, constants.ContentCommand) {
 		return handlers.EndConversation()
+	}
+
+	// Ask user to enter search query
+	utils.SendLoggedReply(b, msg, fmt.Sprintf("Введите поисковый запрос по контенту или используйте /%s для отмены:", constants.CancelCommand), nil)
+
+	return handlers.NextConversationState(stateProcessQuery)
+}
+
+// 2. processContentSearch handles the actual content search
+func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) error {
+	msg := ctx.EffectiveMessage
+
+	// Get query from user message
+	query := strings.TrimSpace(msg.Text)
+	if query == "" {
+		utils.SendLoggedReply(b, msg, fmt.Sprintf("Поисковый запрос не может быть пустым. Пожалуйста, введите запрос или используйте /%s для отмены:", constants.CancelCommand), nil)
+		return nil // Stay in the same state
 	}
 
 	// Send typing action using MessageSender.
@@ -96,7 +129,7 @@ func (h *contentHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 		topicLink,
 		topicLink,
 		string(dataMessages),
-		commandText)
+		query)
 
 	// Save the prompt into a temporary file for logging purposes.
 	err = os.WriteFile("last-prompt-log.txt", []byte(prompt), 0644)
@@ -131,15 +164,22 @@ func (h *contentHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	utils.SendLoggedMarkdownReply(b, msg, responseOpenAi, nil)
+
+	// Clean up user data
+	h.userStore.Clear(ctx.EffectiveUser.Id)
+
 	return handlers.EndConversation()
 }
 
-func (h *contentHandler) extractCommandText(msg *gotgbot.Message) string {
-	var commandText string
-	if strings.HasPrefix(msg.Text, constants.ContentCommand) {
-		commandText = strings.TrimPrefix(msg.Text, constants.ContentCommand)
-	}
-	return strings.TrimSpace(commandText)
+// 3. handleCancel handles the /cancel command
+func (h *contentHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
+	msg := ctx.EffectiveMessage
+	utils.SendLoggedReply(b, msg, "Операция поиска контента отменена.", nil)
+
+	// Clean up user data
+	h.userStore.Clear(ctx.EffectiveUser.Id)
+
+	return handlers.EndConversation()
 }
 
 func (h *contentHandler) prepareTelegramMessages(messages []tg.Message) ([]byte, error) {

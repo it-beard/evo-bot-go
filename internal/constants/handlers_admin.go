@@ -1,7 +1,7 @@
 package constants
 
-const CodeCommand = "/code"
-const SummarizeCommand = "/summarize"
+const CodeCommand = "code"
+const SummarizeCommand = "summarize"
 const SummarizeDmFlag = "-dm"
 
 // Content Handlers
