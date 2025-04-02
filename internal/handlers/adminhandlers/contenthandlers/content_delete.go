@@ -83,7 +83,7 @@ func (h *contentDeleteHandler) startDelete(b *gotgbot.Bot, ctx *ext.Context) err
 
 	title := fmt.Sprintf("Последние %d контента:", len(contents))
 	actionDescription := "который ты хочешь удалить"
-	formattedResponse := utils.FormatContentList(contents, title, constants.CancelCommand, actionDescription)
+	formattedResponse := utils.FormatContentListForAdmin(contents, title, constants.CancelCommand, actionDescription)
 
 	utils.SendLoggedMarkdownReply(b, msg, formattedResponse, nil)
 

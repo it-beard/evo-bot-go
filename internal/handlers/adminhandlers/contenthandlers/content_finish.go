@@ -78,7 +78,7 @@ func (h *contentFinishHandler) startFinish(b *gotgbot.Bot, ctx *ext.Context) err
 
 	title := fmt.Sprintf("Последние %d контента:", len(contents))
 	actionDescription := "статус которого ты хочешь изменить на 'finished'"
-	formattedResponse := utils.FormatContentList(contents, title, constants.CancelCommand, actionDescription)
+	formattedResponse := utils.FormatContentListForAdmin(contents, title, constants.CancelCommand, actionDescription)
 
 	utils.SendLoggedMarkdownReply(b, msg, formattedResponse, nil)
 

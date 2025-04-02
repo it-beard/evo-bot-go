@@ -39,7 +39,9 @@ func (h *helpHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 		"/start - Приветственное сообщение\n" +
 		"/help - Инструкция по моему использованию\n" +
 		"/tools - Поиск ИИ-инструментов для разработки\n" +
-		"/content - Поиск видео-контента клуба. \n\n" +
+		"/content - Поиск видео-контента клуба\n" +
+		"/topicsShow - Просмотр тем для контента\n" +
+		"/topicAdd - Добавление новой темы\n\n" +
 		"Инструкция со всеми моими возможностями: https://t.me/c/2069889012/127/9470\n"
 
 	if utils.IsUserAdminOrCreator(b, msg.From.Id, h.config.SuperGroupChatID) {

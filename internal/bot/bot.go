@@ -14,6 +14,7 @@ import (
 	"evo-bot-go/internal/handlers/adminhandlers/contenthandlers"
 	"evo-bot-go/internal/handlers/grouphandlers"
 	"evo-bot-go/internal/handlers/privatehandlers"
+	"evo-bot-go/internal/handlers/privatehandlers/topicshandlers"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/tasks"
 
@@ -61,6 +62,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	// Initialize repositories
 	promptingTemplateService := services.NewPromptingTemplateService(repositories.NewPromptingTemplateRepository(db))
 	contentRepository := repositories.NewContentRepository(db.DB)
+	topicRepository := repositories.NewTopicRepository(db.DB)
 
 	// Initialize services
 	messageSenderService := services.NewMessageSenderService(bot)
@@ -83,7 +85,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	}
 
 	// Register all handlers
-	client.registerHandlers(openaiClient, appConfig, promptingTemplateService, summarizationService, messageSenderService, contentRepository)
+	client.registerHandlers(openaiClient, appConfig, promptingTemplateService, summarizationService, messageSenderService, contentRepository, topicRepository)
 
 	return client, nil
 }
@@ -118,8 +120,8 @@ func (b *TgBotClient) registerHandlers(
 	summarizationService *services.SummarizationService,
 	messageSenderService services.MessageSenderService,
 	contentRepository *repositories.ContentRepository,
+	topicRepository *repositories.TopicRepository,
 ) {
-
 	// Register start handler, that avaliable for all users
 	b.dispatcher.AddHandler(handlers.NewStartHandler())
 
@@ -141,6 +143,8 @@ func (b *TgBotClient) registerHandlers(
 		privatehandlers.NewHelpHandler(appConfig),
 		privatehandlers.NewToolsHandler(openaiClient, messageSenderService, promptingTemplateService, appConfig),
 		privatehandlers.NewContentHandler(openaiClient, messageSenderService, promptingTemplateService, appConfig),
+		topicshandlers.NewTopicsShowHandler(topicRepository, contentRepository, messageSenderService, appConfig),
+		topicshandlers.NewTopicAddHandler(topicRepository, contentRepository, messageSenderService, appConfig),
 	}
 	for _, handler := range privateHandlers {
 		b.dispatcher.AddHandler(handler)

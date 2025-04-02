@@ -38,6 +38,16 @@ const (
 		)
 	`
 
+	createTopicsTableSQL = `
+		CREATE TABLE IF NOT EXISTS topics (
+			id SERIAL PRIMARY KEY,
+			topic TEXT NOT NULL,
+			user_id INTEGER NOT NULL,
+			content_id INTEGER REFERENCES contents(id),
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)
+	`
+
 	createMigrationsTableSQL = `
 		CREATE TABLE IF NOT EXISTS migrations (
 			id SERIAL PRIMARY KEY,
@@ -79,6 +89,10 @@ func (db *DB) InitSchema() error {
 	}
 
 	if err := db.initContentsSchema(); err != nil {
+		return err
+	}
+
+	if err := db.initTopicsSchema(); err != nil {
 		return err
 	}
 
@@ -133,6 +147,16 @@ func (db *DB) initContentsSchema() error {
 	}
 
 	log.Println("Contents schema initialized successfully")
+	return nil
+}
+
+// initTopicsSchema initializes the topics schema
+func (db *DB) initTopicsSchema() error {
+	if _, err := db.Exec(createTopicsTableSQL); err != nil {
+		return fmt.Errorf("failed to create topics table: %w", err)
+	}
+
+	log.Println("Topics schema initialized successfully")
 	return nil
 }
 

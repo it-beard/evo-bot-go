@@ -98,7 +98,7 @@ func (h *contentEditHandler) startEdit(b *gotgbot.Bot, ctx *ext.Context) error {
 
 	title := fmt.Sprintf("Последние %d контента:", len(contents))
 	actionDescription := "который ты хочешь отредактировать"
-	formattedResponse := utils.FormatContentList(contents, title, constants.CancelCommand, actionDescription)
+	formattedResponse := utils.FormatContentListForAdmin(contents, title, constants.CancelCommand, actionDescription)
 
 	utils.SendLoggedMarkdownReply(b, msg, formattedResponse, nil)
 

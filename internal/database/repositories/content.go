@@ -51,6 +51,37 @@ func (r *ContentRepository) CreateContentWithStartedAt(name string, contentType 
 	return id, nil
 }
 
+// GetLastActualContents retrieves the last N actual content records
+func (r *ContentRepository) GetLastActualContents(limit int) ([]Content, error) {
+	query := `
+		SELECT id, name, type, status, started_at, created_at, updated_at
+		FROM contents
+		WHERE status = $1
+		ORDER BY started_at ASC NULLS LAST
+		LIMIT $2`
+
+	rows, err := r.db.Query(query, constants.ContentStatusActual, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query last contents: %w", err)
+	}
+	defer rows.Close()
+
+	var contents []Content
+	for rows.Next() {
+		var c Content
+		if err := rows.Scan(&c.ID, &c.Name, &c.Type, &c.Status, &c.StartedAt, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan content row: %w", err)
+		}
+		contents = append(contents, c)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error during rows iteration for contents: %w", err)
+	}
+
+	return contents, nil
+}
+
 // GetLastContents retrieves the last N content records
 func (r *ContentRepository) GetLastContents(limit int) ([]Content, error) {
 	query := `
