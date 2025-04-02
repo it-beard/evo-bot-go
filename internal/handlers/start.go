@@ -20,13 +20,14 @@ func NewStartHandler() ext.Handler {
 func (h *startHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 	// Only proceed if this is a private chat
 	if !utils.CheckPrivateChatType(b, ctx) {
-		return handlers.EndConversation()
+		return nil
 	}
 
 	message := "Привет! Я *Дженкинс Вебстер*, дворецкий бот клуба _\"Эволюция Кода\"_.\n" +
-		"Используй /help для просмотра возможностей."
+		"Вступай к нам, чтобы использовать все мои возможности! \n" +
+		"Больше информации: https://web.tribute.tg/l/get-started"
 
 	utils.SendLoggedMarkdownReply(b, ctx.EffectiveMessage, message, nil)
 
-	return handlers.EndConversation()
+	return nil
 }

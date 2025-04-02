@@ -3,6 +3,7 @@ package utils
 import (
 	"log"
 
+	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -34,6 +35,18 @@ func CheckPrivateChatType(b *gotgbot.Bot, ctx *ext.Context) bool {
 		if _, err := msg.Reply(b, "Эта команда доступна только в личном чате.", nil); err != nil {
 			log.Printf("Failed to send private-only message: %v", err)
 		}
+		return false
+	}
+
+	return true
+}
+
+func CheckClubMemberPermissions(b *gotgbot.Bot, msg *gotgbot.Message, config *config.Config, commandName string) bool {
+	if !IsUserClubMember(b, msg, config) {
+		if _, err := msg.Reply(b, "Эта команда доступна только участникам клуба.", nil); err != nil {
+			log.Printf("Failed to send club-only message: %v", err)
+		}
+		log.Printf("User %d tried to use %s without club member rights", msg.From.Id, commandName)
 		return false
 	}
 
