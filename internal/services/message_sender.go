@@ -16,6 +16,11 @@ type MessageSenderService interface {
 		originalMessage *gotgbot.Message,
 	) (*gotgbot.Message, error)
 	SendTypingAction(chatId int64) error
+	SendMessageToUser(
+		userId int64,
+		text string,
+		opts *gotgbot.SendMessageOpts,
+	) (*gotgbot.Message, error)
 }
 
 type TelegramMessageSender struct {
@@ -188,4 +193,25 @@ func (s *TelegramMessageSender) SendTypingAction(chatId int64) error {
 		log.Printf("failed to send typing action: %v", err)
 	}
 	return err
+}
+
+// SendMessageToUser sends a text message to a specific user by their user ID
+func (s *TelegramMessageSender) SendMessageToUser(
+	userId int64,
+	text string,
+	opts *gotgbot.SendMessageOpts,
+) (*gotgbot.Message, error) {
+	if opts == nil {
+		opts = &gotgbot.SendMessageOpts{
+			ParseMode: "Markdown",
+		}
+	}
+
+	sentMessage, err := s.bot.SendMessage(userId, text, opts)
+	if err != nil {
+		log.Printf("failed to send message to user %d: %v", userId, err)
+		return nil, err
+	}
+
+	return sentMessage, nil
 }

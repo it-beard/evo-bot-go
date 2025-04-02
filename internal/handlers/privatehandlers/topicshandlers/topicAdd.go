@@ -190,6 +190,26 @@ func (h *topicAddHandler) handleTopicEntry(b *gotgbot.Bot, ctx *ext.Context) err
 		return handlers.EndConversation()
 	}
 
+	// Send notification to admin about new topic
+	contentName, _ := h.userStore.Get(ctx.EffectiveUser.Id, topicAddUserStoreKeySelectedContentName)
+	adminChatID := h.config.AdminUserID
+
+	adminMsg := fmt.Sprintf(
+		"🔔 *Новая тема добавлена*\n\n"+
+			"_Мероприятие:_ %s\n"+
+			"_Автор:_ @%s\n"+
+			"_Топик:_ %s",
+		contentName,
+		userNickname,
+		topicText,
+	)
+
+	_, err = h.messageSenderService.SendMessageToUser(adminChatID, adminMsg, nil)
+	if err != nil {
+		// Just log the error, don't interrupt the user flow
+		fmt.Printf("Error sending admin notification about new topic: %v\n", err)
+	}
+
 	utils.SendLoggedReply(b, msg,
 		fmt.Sprintf("Добавлено! \nИспользуй команду /%s для просмотра всех тем и вопросов к мероприятию.", constants.TopicsShowCommand),
 		nil,

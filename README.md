@@ -65,7 +65,7 @@ The bot uses environment variables for configuration, make sure to set them all:
 ### Basic Bot Configuration
 - `TG_EVO_BOT_TOKEN`: Your Telegram bot token
 - `TG_EVO_BOT_SUPERGROUP_CHAT_ID`: Chat ID of your Supergroup
-- `TG_EVO_BOT_ANONYMOUS_USER_ID`: User ID for the account used on the anonymous group (if applicable)
+- `TG_EVO_BOT_ADMIN_USER_ID`: User ID for the administrator account (will get notifications about new topics)
 - `TG_EVO_BOT_OPENAI_API_KEY`: OpenAI API key
 
 ### Topics Management
@@ -98,7 +98,7 @@ On Windows, you can set the environment variables using the following commands i
 set TG_EVO_BOT_TOKEN=your_bot_token_here
 set TG_EVO_BOT_OPENAI_API_KEY=your_openai_api_key_here
 set TG_EVO_BOT_SUPERGROUP_CHAT_ID=chat_id
-set TG_EVO_BOT_ANONYMOUS_USER_ID=anonymous_user_id
+set TG_EVO_BOT_ADMIN_USER_ID=admin_user_id
 
 # Topics Management
 set TG_EVO_BOT_CLOSED_TOPICS_IDS=topic_id_1,topic_id_2,topic_id_3
