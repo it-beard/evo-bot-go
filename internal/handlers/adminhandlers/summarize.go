@@ -1,4 +1,4 @@
-package privatehandlers
+package adminhandlers
 
 import (
 	"context"

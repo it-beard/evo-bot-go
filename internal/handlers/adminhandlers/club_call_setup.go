@@ -1,4 +1,4 @@
-package privatehandlers
+package adminhandlers
 
 import (
 	"fmt"
@@ -15,32 +15,28 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
-const (
-	SetupClubCallHandlerName = "setup_club_call_handler"
-)
-
-type SetupClubCallHandler struct {
+type ClubCallSetupHandler struct {
 	contentRepository *repositories.ContentRepository
 	config            *config.Config
 }
 
-func NewSetupClubCallHandler(
+func NewClubCallSetupHandler(
 	contentRepository *repositories.ContentRepository,
 	config *config.Config,
 ) handlers.Handler {
-	return &SetupClubCallHandler{
+	return &ClubCallSetupHandler{
 		contentRepository: contentRepository,
 		config:            config,
 	}
 }
 
-func (h *SetupClubCallHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *ClubCallSetupHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
 	// Extract club call name from command text
 	clubCallName := h.extractCommandText(msg)
 	if clubCallName == "" {
-		_, err := msg.Reply(b, fmt.Sprintf("Пожалуйста, введи название для клубного звонка после команды. Например: %s <название звонка>", constants.SetupClubCallCommand), nil)
+		_, err := msg.Reply(b, fmt.Sprintf("Пожалуйста, введи название для клубного звонка после команды. Например: %s <название звонка>", constants.ClubCallSetupCommand), nil)
 		return err
 	}
 
@@ -56,13 +52,13 @@ func (h *SetupClubCallHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) er
 	return err
 }
 
-func (h *SetupClubCallHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
+func (h *ClubCallSetupHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 	msg := ctx.EffectiveMessage
 	if msg == nil || msg.Text == "" {
 		return false
 	}
 
-	if strings.HasPrefix(msg.Text, constants.SetupClubCallCommand) && msg.Chat.Type == constants.PrivateChat {
+	if strings.HasPrefix(msg.Text, constants.ClubCallSetupCommand) && msg.Chat.Type == constants.PrivateChatType {
 		// Check if the user is an admin in the configured supergroup chat
 		if !utils.IsUserAdminOrCreator(b, msg.From.Id, h.config.SuperGroupChatID) {
 			msg.Reply(b, "Эта команда доступна только администраторам.", nil)
@@ -72,7 +68,7 @@ func (h *SetupClubCallHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) boo
 
 		// Check if there is text after the command
 		if h.extractCommandText(msg) == "" {
-			msg.Reply(b, fmt.Sprintf("Пожалуйста, введи название для клубного звонка после команды. Например: %s <название звонка>", constants.SetupClubCallCommand), nil)
+			msg.Reply(b, fmt.Sprintf("Пожалуйста, введи название для клубного звонка после команды. Например: %s <название звонка>", constants.ClubCallSetupCommand), nil)
 			return false
 		}
 
@@ -82,14 +78,14 @@ func (h *SetupClubCallHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) boo
 	return false
 }
 
-func (h *SetupClubCallHandler) Name() string {
-	return SetupClubCallHandlerName
+func (h *ClubCallSetupHandler) Name() string {
+	return constants.ClubCallSetupHandlerName
 }
 
-func (h *SetupClubCallHandler) extractCommandText(msg *gotgbot.Message) string {
+func (h *ClubCallSetupHandler) extractCommandText(msg *gotgbot.Message) string {
 	var commandText string
-	if strings.HasPrefix(msg.Text, constants.SetupClubCallCommand) {
-		commandText = strings.TrimPrefix(msg.Text, constants.SetupClubCallCommand)
+	if strings.HasPrefix(msg.Text, constants.ClubCallSetupCommand) {
+		commandText = strings.TrimPrefix(msg.Text, constants.ClubCallSetupCommand)
 	}
 	return strings.TrimSpace(commandText)
 }

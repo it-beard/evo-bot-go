@@ -1,4 +1,4 @@
-package privatehandlers
+package adminhandlers
 
 import (
 	"evo-bot-go/internal/config"
@@ -19,9 +19,6 @@ import (
 )
 
 const (
-	EditClubCallHandlerName = "edit_club_call_handler"
-	lastClubCallsLimitEdit  = 5
-
 	// Conversation states
 	stateAskClubCallID = "ask_club_call_id"
 	stateAskNewName    = "ask_new_name"
@@ -43,8 +40,8 @@ type userDataStore struct {
 	userData map[int64]map[string]any
 }
 
-// NewEditClubCallHandler creates a conversation handler for editing club calls
-func NewEditClubCallHandler(
+// NewClubCallEditHandler creates a conversation handler for editing club calls
+func NewClubCallEditHandler(
 	contentRepo *repositories.ContentRepository,
 	config *config.Config,
 ) ext.Handler {
@@ -60,7 +57,7 @@ func NewEditClubCallHandler(
 
 	return handlers.NewConversation(
 		[]ext.Handler{
-			handlers.NewCommand(constants.EditClubCallCommand, h.startEdit),
+			handlers.NewCommand(constants.ClubCallEditCommand, h.startEdit),
 		},
 		map[string][]ext.Handler{
 			stateAskClubCallID: {
@@ -87,12 +84,19 @@ func (h *editClubCallHandler) startEdit(b *gotgbot.Bot, ctx *ext.Context) error 
 		if _, err := msg.Reply(b, "Эта команда доступна только администраторам.", nil); err != nil {
 			log.Printf("Failed to send admin-only message: %v", err)
 		}
-		log.Printf("User %d tried to use %s without admin rights", msg.From.Id, constants.EditClubCallCommand)
+		log.Printf("User %d tried to use %s without admin rights", msg.From.Id, constants.ClubCallEditCommand)
+		return handlers.EndConversation()
+	}
+
+	if msg.Chat.Type != constants.PrivateChatType {
+		if _, err := msg.Reply(b, "Эта команда доступна только в личном чате.", nil); err != nil {
+			log.Printf("Failed to send private-only message: %v", err)
+		}
 		return handlers.EndConversation()
 	}
 
 	// Get club calls for editing
-	clubCalls, err := h.contentRepo.GetLastClubCalls(lastClubCallsLimitEdit)
+	clubCalls, err := h.contentRepo.GetLastClubCalls(constants.ClubCallEditGetLastLimit)
 	if err != nil {
 		log.Printf("Failed to get last club calls for editing: %v", err)
 		if _, err := msg.Reply(b, "Произошла ошибка при получении списка клубных звонков.", nil); err != nil {

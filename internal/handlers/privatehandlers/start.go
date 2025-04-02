@@ -28,7 +28,9 @@ func (h *StartHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 	if msg == nil {
 		return false
 	}
-	return msg.Text != "" && msg.Text == "/start" && msg.Chat.Type == "private"
+	return msg.Text != "" &&
+		msg.Text == constants.StartCommand &&
+		msg.Chat.Type == constants.PrivateChatType
 }
 
 func (h *StartHandler) Name() string {

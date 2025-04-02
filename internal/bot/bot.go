@@ -9,6 +9,7 @@ import (
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/database"
 	"evo-bot-go/internal/database/repositories"
+	"evo-bot-go/internal/handlers/adminhandlers"
 	"evo-bot-go/internal/handlers/privatehandlers"
 	"evo-bot-go/internal/handlers/publichandlers"
 	"evo-bot-go/internal/services"
@@ -116,17 +117,24 @@ func (b *TgBotClient) registerHandlers(
 	messageSenderService services.MessageSenderService,
 	contentRepository *repositories.ContentRepository,
 ) {
+	// Register admin chat handlers
+	adminHandlers := []ext.Handler{
+		adminhandlers.NewCodeHandler(appConfig),
+		adminhandlers.NewClubCallEditHandler(contentRepository, appConfig),
+		adminhandlers.NewClubCallsGetLastHandler(contentRepository, appConfig),
+		adminhandlers.NewClubCallSetupHandler(contentRepository, appConfig),
+		adminhandlers.NewSummarizeHandler(summarizationService, messageSenderService, appConfig),
+	}
+	for _, handler := range adminHandlers {
+		b.dispatcher.AddHandler(handler)
+	}
+
 	// Register private chat handlers
 	privateHandlers := []ext.Handler{
 		privatehandlers.NewStartHandler(),
 		privatehandlers.NewHelpHandler(),
 		privatehandlers.NewToolHandler(openaiClient, messageSenderService, promptingTemplateService, appConfig),
 		privatehandlers.NewContentHandler(openaiClient, messageSenderService, promptingTemplateService, appConfig),
-		privatehandlers.NewCodeHandler(appConfig),
-		privatehandlers.NewSummarizeHandler(summarizationService, messageSenderService, appConfig),
-		privatehandlers.NewSetupClubCallHandler(contentRepository, appConfig),
-		privatehandlers.NewGetLastClubCallsHandler(contentRepository, appConfig),
-		privatehandlers.NewEditClubCallHandler(contentRepository, appConfig),
 	}
 	for _, handler := range privateHandlers {
 		b.dispatcher.AddHandler(handler)

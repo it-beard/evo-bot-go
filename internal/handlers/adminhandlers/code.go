@@ -1,4 +1,4 @@
-package privatehandlers
+package adminhandlers
 
 import (
 	"log"
@@ -51,7 +51,7 @@ func (h *CodeHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 		return false
 	}
 
-	if msg.Text != "" && strings.HasPrefix(msg.Text, constants.CodeCommand) && msg.Chat.Type == constants.PrivateChat {
+	if msg.Text != "" && strings.HasPrefix(msg.Text, constants.CodeCommand) && msg.Chat.Type == constants.PrivateChatType {
 		if !utils.IsUserAdminOrCreator(b, msg.From.Id, h.config.SuperGroupChatID) {
 			msg.Reply(b, "Команда доступна только для администраторов.", nil)
 			log.Print("Trying to use /code command without admin rights")

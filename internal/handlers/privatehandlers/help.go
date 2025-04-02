@@ -31,7 +31,9 @@ func (h *HelpHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 	if ctx.EffectiveMessage == nil {
 		return false
 	}
-	return ctx.EffectiveMessage.Text != "" && ctx.EffectiveMessage.Text == "/help" && ctx.EffectiveMessage.Chat.Type == "private"
+	return ctx.EffectiveMessage.Text != "" &&
+		ctx.EffectiveMessage.Text == constants.HelpCommand &&
+		ctx.EffectiveMessage.Chat.Type == constants.PrivateChatType
 }
 
 func (h *HelpHandler) Name() string {

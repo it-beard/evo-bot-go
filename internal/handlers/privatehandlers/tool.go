@@ -127,7 +127,7 @@ func (h *ToolHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
 
 	if msg.Text != "" &&
 		(strings.HasPrefix(msg.Text, constants.ToolsCommand) || strings.HasPrefix(msg.Text, constants.ToolCommand)) &&
-		msg.Chat.Type == constants.PrivateChat {
+		msg.Chat.Type == constants.PrivateChatType {
 
 		if !utils.IsUserClubMember(b, msg, h.config) {
 			msg.Reply(b, "Команда доступна только для членов клуба.", nil)
