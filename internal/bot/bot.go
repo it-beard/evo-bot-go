@@ -125,6 +125,7 @@ func (b *TgBotClient) registerHandlers(
 		contenthandlers.NewContentEditHandler(contentRepository, appConfig),
 		contenthandlers.NewContentSetupHandler(contentRepository, appConfig),
 		contenthandlers.NewContentDeleteHandler(contentRepository, appConfig),
+		contenthandlers.NewContentFinishHandler(contentRepository, appConfig),
 	}
 	for _, handler := range adminHandlers {
 		b.dispatcher.AddHandler(handler)

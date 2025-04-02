@@ -45,7 +45,8 @@ func (h *helpHandler) handleHelp(b *gotgbot.Bot, ctx *ext.Context) error {
 	adminHelpText := "<blockquote> Доступные команды для администраторов</blockquote>\n" +
 		"/contentEdit - Редактирование контента клуба.\n" +
 		"/contentSetup - Создание нового контента клуба.\n" +
-		"/contentDelete - Удаление контента клуба.\n"
+		"/contentDelete - Удаление контента клуба.\n" +
+		"/contentFinish - Изменение статуса контента на 'finished'.\n"
 
 	if utils.CheckAdminAndPrivateChat(b, ctx, h.config.SuperGroupChatID, constants.HelpCommand) {
 		helpText += "\n" + adminHelpText
