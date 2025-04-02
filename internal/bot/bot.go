@@ -10,8 +10,8 @@ import (
 	"evo-bot-go/internal/database"
 	"evo-bot-go/internal/database/repositories"
 	"evo-bot-go/internal/handlers/adminhandlers"
+	"evo-bot-go/internal/handlers/grouphandlers"
 	"evo-bot-go/internal/handlers/privatehandlers"
-	"evo-bot-go/internal/handlers/publichandlers"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/tasks"
 
@@ -140,14 +140,13 @@ func (b *TgBotClient) registerHandlers(
 		b.dispatcher.AddHandler(handler)
 	}
 
-	// Register public chat handlers
-	publicHandlers := []ext.Handler{
-		publichandlers.NewDeleteJoinLeftMessagesHandler(),
-		publichandlers.NewSaveHandler(messageSenderService, appConfig),
-		publichandlers.NewRepliesFromClosedThreadsHandler(messageSenderService, appConfig),
-		publichandlers.NewCleanClosedThreadsHandler(messageSenderService, appConfig),
+	// Register group chat handlers
+	groupHandlers := []ext.Handler{
+		grouphandlers.NewDeleteJoinLeftMessagesHandler(),
+		grouphandlers.NewRepliesFromClosedThreadsHandler(messageSenderService, appConfig),
+		grouphandlers.NewCleanClosedThreadsHandler(messageSenderService, appConfig),
 	}
-	for _, handler := range publicHandlers {
+	for _, handler := range groupHandlers {
 		b.dispatcher.AddHandler(handler)
 	}
 }

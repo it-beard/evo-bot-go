@@ -1,10 +1,10 @@
-package publichandlers
+package grouphandlers
 
 import (
-	"fmt"
-	"log"
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/handlers"
+	"fmt"
+	"log"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"

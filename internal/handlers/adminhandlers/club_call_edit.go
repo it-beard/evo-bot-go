@@ -25,6 +25,7 @@ const (
 
 	// Context data keys
 	ctxDataKeyClubCallID = "club_call_id"
+	cancelCommand        = "cancel"
 )
 
 // editClubCallHandler manages the conversation for editing club call names
@@ -68,7 +69,7 @@ func NewClubCallEditHandler(
 			},
 		},
 		&handlers.ConversationOpts{
-			Exits:        []ext.Handler{handlers.NewCommand("cancel", h.handleCancel)},
+			Exits:        []ext.Handler{handlers.NewCommand(cancelCommand, h.handleCancel)},
 			StateStorage: conversation.NewInMemoryStorage(conversation.KeyStrategySenderAndChat),
 			AllowReEntry: true,
 		},
@@ -88,6 +89,7 @@ func (h *editClubCallHandler) startEdit(b *gotgbot.Bot, ctx *ext.Context) error 
 		return handlers.EndConversation()
 	}
 
+	// Check if the command is used in a private chat
 	if msg.Chat.Type != constants.PrivateChatType {
 		if _, err := msg.Reply(b, "Эта команда доступна только в личном чате.", nil); err != nil {
 			log.Printf("Failed to send private-only message: %v", err)
@@ -118,7 +120,7 @@ func (h *editClubCallHandler) startEdit(b *gotgbot.Bot, ctx *ext.Context) error 
 	for _, call := range clubCalls {
 		response.WriteString(fmt.Sprintf("- ID: %d, Название: %s\n", call.ID, call.Name))
 	}
-	response.WriteString("\nПожалуйста, отправь ID клубного звонка, который ты хочешь отредактировать, или /cancel для отмены.")
+	response.WriteString(fmt.Sprintf("\nПожалуйста, отправь ID клубного звонка, который ты хочешь отредактировать, или /%s для отмены.", cancelCommand))
 
 	if _, err := msg.Reply(b, response.String(), nil); err != nil {
 		log.Printf("Error sending club call list: %v", err)
@@ -142,7 +144,7 @@ func (h *editClubCallHandler) handleClubCallID(b *gotgbot.Bot, ctx *ext.Context)
 
 	h.userStore.set(ctx.EffectiveUser.Id, ctxDataKeyClubCallID, callID)
 
-	if _, err := msg.Reply(b, "Хорошо. Теперь введи новое название для этого клубного звонка, или /cancel для отмены.", nil); err != nil {
+	if _, err := msg.Reply(b, fmt.Sprintf("Хорошо. Теперь введи новое название для этого клубного звонка, или /%s для отмены.", cancelCommand), nil); err != nil {
 		log.Printf("Error asking for new name: %v", err)
 	}
 

@@ -1,4 +1,4 @@
-package publichandlers
+package grouphandlers
 
 import (
 	"fmt"
