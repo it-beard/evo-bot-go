@@ -9,6 +9,7 @@ import (
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/database"
 	"evo-bot-go/internal/database/repositories"
+	"evo-bot-go/internal/handlers"
 	"evo-bot-go/internal/handlers/adminhandlers"
 	"evo-bot-go/internal/handlers/adminhandlers/contenthandlers"
 	"evo-bot-go/internal/handlers/grouphandlers"
@@ -118,6 +119,10 @@ func (b *TgBotClient) registerHandlers(
 	messageSenderService services.MessageSenderService,
 	contentRepository *repositories.ContentRepository,
 ) {
+
+	// Register start handler, that avaliable for all users
+	b.dispatcher.AddHandler(handlers.NewStartHandler())
+
 	// Register admin chat handlers
 	adminHandlers := []ext.Handler{
 		adminhandlers.NewCodeHandler(appConfig),
@@ -133,7 +138,6 @@ func (b *TgBotClient) registerHandlers(
 
 	// Register private chat handlers
 	privateHandlers := []ext.Handler{
-		privatehandlers.NewStartHandler(),
 		privatehandlers.NewHelpHandler(appConfig),
 		privatehandlers.NewToolHandler(openaiClient, messageSenderService, promptingTemplateService, appConfig),
 		privatehandlers.NewContentHandler(openaiClient, messageSenderService, promptingTemplateService, appConfig),

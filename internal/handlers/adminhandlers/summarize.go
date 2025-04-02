@@ -9,17 +9,15 @@ import (
 
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
-	"evo-bot-go/internal/handlers"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 )
 
-// todo: refactor to use ext.Handler
-
-type SummarizeHandler struct {
+type summarizeHandler struct {
 	summarizationService *services.SummarizationService
 	messageSenderService services.MessageSenderService
 	config               *config.Config
@@ -30,17 +28,24 @@ func NewSummarizeHandler(
 	summarizationService *services.SummarizationService,
 	messageSenderService services.MessageSenderService,
 	config *config.Config,
-) handlers.Handler {
-	return &SummarizeHandler{
+) ext.Handler {
+	h := &summarizeHandler{
 		summarizationService: summarizationService,
 		messageSenderService: messageSenderService,
 		config:               config,
 	}
+
+	return handlers.NewCommand(constants.SummarizeCommand, h.handleSummarize)
 }
 
-// HandleUpdate handles the update
-func (h *SummarizeHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *summarizeHandler) handleSummarize(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
+
+	// Check if the user is an admin
+	if !utils.IsUserAdminOrCreator(b, msg.From.Id, h.config.SuperGroupChatID) {
+		msg.Reply(b, "Эта команда доступна только администраторам.", nil)
+		return nil
+	}
 
 	// Check if the DM flag is present
 	sendToDM := strings.Contains(msg.Text, constants.SummarizeDmFlag)
@@ -105,30 +110,4 @@ func (h *SummarizeHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error 
 	}()
 
 	return nil
-}
-
-// CheckUpdate checks if the update should be handled
-func (h *SummarizeHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
-	msg := ctx.EffectiveMessage
-	if msg == nil {
-		return false
-	}
-
-	// Check if the message is the summarize command (with or without DM flag)
-	if !strings.HasPrefix(msg.Text, constants.SummarizeCommand) {
-		return false
-	}
-
-	// Check if the user is an admin
-	if !utils.IsUserAdminOrCreator(b, msg.From.Id, h.config.SuperGroupChatID) {
-		msg.Reply(b, "Эта команда доступна только администраторам.", nil)
-		return false
-	}
-
-	return true
-}
-
-// Name returns the handler name
-func (h *SummarizeHandler) Name() string {
-	return constants.SummarizeHandlerName
 }

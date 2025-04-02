@@ -4,6 +4,7 @@ import (
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/utils"
+	"fmt"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -19,19 +20,20 @@ func NewHelpHandler(config *config.Config) ext.Handler {
 		config: config,
 	}
 
-	return handlers.NewConversation(
-		[]ext.Handler{
-			handlers.NewCommand(constants.HelpCommand, h.handleHelp),
-		},
-		map[string][]ext.Handler{},
-		nil,
-	)
+	return handlers.NewCommand(constants.HelpCommand, h.handleCommand)
 }
 
-func (h *helpHandler) handleHelp(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *helpHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
+	msg := ctx.EffectiveMessage
 
 	// Only proceed if this is a private chat
 	if !utils.CheckPrivateChatType(b, ctx) {
+		return handlers.EndConversation()
+	}
+
+	// Check if user is a club member
+	if !utils.IsUserClubMember(b, msg, h.config) {
+		utils.SendLoggedReply(b, msg, fmt.Sprintf("Команда /%s доступна только для членов клуба.", constants.ContentCommand), nil)
 		return handlers.EndConversation()
 	}
 

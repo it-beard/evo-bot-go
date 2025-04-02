@@ -2,23 +2,31 @@ package grouphandlers
 
 import (
 	"evo-bot-go/internal/constants"
-	"evo-bot-go/internal/handlers"
 	"fmt"
 	"log"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 )
 
-// todo: refactor to use ext.Handler
+type deleteJoinLeftMessagesHandler struct{}
 
-type DeleteJoinLeftMessagesHandler struct{}
+func NewDeleteJoinLeftMessagesHandler() ext.Handler {
+	h := &deleteJoinLeftMessagesHandler{}
 
-func NewDeleteJoinLeftMessagesHandler() handlers.Handler {
-	return &DeleteJoinLeftMessagesHandler{}
+	return handlers.NewMessage(h.check, h.handle)
 }
 
-func (h *DeleteJoinLeftMessagesHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *deleteJoinLeftMessagesHandler) check(msg *gotgbot.Message) bool {
+	if msg == nil {
+		return false
+	}
+
+	return msg.NewChatMembers != nil || msg.LeftChatMember != nil
+}
+
+func (h *deleteJoinLeftMessagesHandler) handle(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
 	_, err := msg.Delete(b, nil)
@@ -32,18 +40,5 @@ func (h *DeleteJoinLeftMessagesHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Co
 		log.Printf("%s: User left. Username: %v. User ID: %v", constants.DeleteJoinLeftMessagesHandlerName, msg.LeftChatMember.Username, msg.LeftChatMember.Id)
 	}
 
-	return nil
-}
-
-func (h *DeleteJoinLeftMessagesHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
-	msg := ctx.EffectiveMessage
-	if msg == nil {
-		return false
-	}
-
-	return msg.NewChatMembers != nil || msg.LeftChatMember != nil
-}
-
-func (h *DeleteJoinLeftMessagesHandler) Name() string {
-	return constants.DeleteJoinLeftMessagesHandlerName
+	return handlers.EndConversation()
 }

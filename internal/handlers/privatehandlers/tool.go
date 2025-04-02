@@ -13,18 +13,16 @@ import (
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/constants/prompts"
-	"evo-bot-go/internal/handlers"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 	"github.com/gotd/td/tg"
 )
 
-// todo: refactor to use ext.Handler
-
-type ToolHandler struct {
+type toolHandler struct {
 	openaiClient             *clients.OpenAiClient
 	config                   *config.Config
 	promptingTemplateService *services.PromptingTemplateService
@@ -36,37 +34,52 @@ func NewToolHandler(
 	messageSenderService services.MessageSenderService,
 	promptingTemplateService *services.PromptingTemplateService,
 	config *config.Config,
-) handlers.Handler {
-	return &ToolHandler{
+) ext.Handler {
+	h := &toolHandler{
 		openaiClient:             openaiClient,
 		config:                   config,
 		promptingTemplateService: promptingTemplateService,
 		messageSenderService:     messageSenderService,
 	}
+
+	return handlers.NewCommand(constants.ToolCommand, h.handleCommand)
 }
 
-func (h *ToolHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *toolHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
 	// Extract text after command
 	commandText := h.extractCommandText(msg)
 	if commandText == "" {
-		_, err := msg.Reply(b, fmt.Sprintf("Пожалуйста, введи поисковый запрос после команды. Например: %s <текст>", constants.ToolCommand), nil)
-		return err
+		utils.SendLoggedReply(b, msg, fmt.Sprintf("Пожалуйста, введи поисковый запрос после команды. Например: /%s <текст>", constants.ToolCommand), nil)
+		return handlers.EndConversation()
+	}
+
+	// Only proceed if this is a private chat
+	if !utils.CheckPrivateChatType(b, ctx) {
+		return handlers.EndConversation()
+	}
+
+	// Check if user is a club member
+	if !utils.IsUserClubMember(b, msg, h.config) {
+		utils.SendLoggedReply(b, msg, fmt.Sprintf("Команда /%s доступна только для членов клуба.", constants.ToolCommand), nil)
+		return handlers.EndConversation()
 	}
 
 	// Send typing action using MessageSender.
 	h.messageSenderService.SendTypingAction(msg.Chat.Id)
 
 	// Get messages from chat
-	messages, err := clients.GetChatMessages(h.config.SuperGroupChatID, h.config.ToolTopicID) // Get last 100 messages
+	messages, err := clients.GetChatMessages(h.config.SuperGroupChatID, h.config.ToolTopicID)
 	if err != nil {
-		return fmt.Errorf("failed to get chat messages: %w", err)
+		utils.SendLoggedReply(b, msg, "Произошла ошибка при получении сообщений из чата.", err)
+		return handlers.EndConversation()
 	}
 
 	dataMessages, err := h.prepareTelegramMessages(messages)
 	if err != nil {
-		return err
+		utils.SendLoggedReply(b, msg, "Произошла ошибка при подготовке сообщений для поиска.", err)
+		return handlers.EndConversation()
 	}
 
 	topicLink := fmt.Sprintf("https://t.me/c/%d/%d", h.config.SuperGroupChatID, h.config.ToolTopicID)
@@ -112,51 +125,25 @@ func (h *ToolHandler) HandleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
 	// Cancel the periodic typing action immediately after getting the response.
 	cancelTyping()
 	if err != nil {
-		return fmt.Errorf("failed to get OpenAI completion: %w", err)
+		utils.SendLoggedReply(b, msg, "Произошла ошибка при получении ответа от OpenAI.", err)
+		return handlers.EndConversation()
 	}
 
-	_, err = msg.Reply(b, responseOpenAi, &gotgbot.SendMessageOpts{
-		ParseMode: "Markdown",
-	})
-	return err
+	utils.SendLoggedMarkdownReply(b, msg, responseOpenAi, nil)
+	return handlers.EndConversation()
 }
 
-func (h *ToolHandler) CheckUpdate(b *gotgbot.Bot, ctx *ext.Context) bool {
-	msg := ctx.EffectiveMessage
-	if msg == nil {
-		return false
-	}
-
-	if msg.Text != "" &&
-		(strings.HasPrefix(msg.Text, constants.ToolsCommand) || strings.HasPrefix(msg.Text, constants.ToolCommand)) &&
-		msg.Chat.Type == constants.PrivateChatType {
-
-		if !utils.IsUserClubMember(b, msg, h.config) {
-			msg.Reply(b, "Команда доступна только для членов клуба.", nil)
-			log.Print("Trying to use /tool command without club membership")
-			return false
-		}
-		return true
-	}
-
-	return false
-}
-
-func (h *ToolHandler) Name() string {
-	return constants.ToolHandlerName
-}
-
-func (h *ToolHandler) extractCommandText(msg *gotgbot.Message) string {
+func (h *toolHandler) extractCommandText(msg *gotgbot.Message) string {
 	var commandText string
 	if strings.HasPrefix(msg.Text, constants.ToolsCommand) {
 		commandText = strings.TrimPrefix(msg.Text, constants.ToolsCommand)
-	} else {
+	} else if strings.HasPrefix(msg.Text, constants.ToolCommand) {
 		commandText = strings.TrimPrefix(msg.Text, constants.ToolCommand)
 	}
 	return strings.TrimSpace(commandText)
 }
 
-func (h *ToolHandler) prepareTelegramMessages(messages []tg.Message) ([]byte, error) {
+func (h *toolHandler) prepareTelegramMessages(messages []tg.Message) ([]byte, error) {
 	type MessageObject struct {
 		ID      int    `json:"id"`
 		Message string `json:"message"`

@@ -1,4 +1,4 @@
-package privatehandlers
+package handlers
 
 import (
 	"evo-bot-go/internal/constants"
@@ -14,16 +14,10 @@ type startHandler struct{}
 func NewStartHandler() ext.Handler {
 	h := &startHandler{}
 
-	return handlers.NewConversation(
-		[]ext.Handler{
-			handlers.NewCommand(constants.StartCommand, h.handleStart),
-		},
-		map[string][]ext.Handler{},
-		nil,
-	)
+	return handlers.NewCommand(constants.StartCommand, h.handleCommand)
 }
 
-func (h *startHandler) handleStart(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *startHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 	// Only proceed if this is a private chat
 	if !utils.CheckPrivateChatType(b, ctx) {
 		return handlers.EndConversation()
