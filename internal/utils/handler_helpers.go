@@ -67,6 +67,9 @@ func SendLoggedReply(b *gotgbot.Bot, msg *gotgbot.Message, text string, err erro
 func SendLoggedMarkdownReply(b *gotgbot.Bot, msg *gotgbot.Message, text string, err error) {
 	if _, replyErr := msg.Reply(b, text, &gotgbot.SendMessageOpts{
 		ParseMode: "Markdown",
+		LinkPreviewOptions: &gotgbot.LinkPreviewOptions{
+			IsDisabled: true,
+		},
 	}); replyErr != nil {
 		log.Printf("Failed to send error message: %v", replyErr)
 	}

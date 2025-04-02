@@ -14,7 +14,7 @@ type Config struct {
 	BotToken         string
 	SuperGroupChatID int64
 	OpenAIAPIKey     string
-	AnonymousUserID  int64
+	AdminUserID      int64
 
 	// Topics Management
 	ClosedTopicsIDs   []int
@@ -76,13 +76,13 @@ func LoadConfig() (*Config, error) {
 		}
 	}
 
-	anonymousUserIDStr := os.Getenv("TG_EVO_BOT_ANONYMOUS_USER_ID")
-	if anonymousUserIDStr != "" {
-		anonymousUserID, err := strconv.ParseInt(anonymousUserIDStr, 10, 64)
+	adminUserIDStr := os.Getenv("TG_EVO_BOT_ADMIN_USER_ID")
+	if adminUserIDStr != "" {
+		adminUserID, err := strconv.ParseInt(adminUserIDStr, 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("invalid anonymous user ID: %s", anonymousUserIDStr)
+			return nil, fmt.Errorf("invalid admin user ID: %s", adminUserIDStr)
 		}
-		config.AnonymousUserID = anonymousUserID
+		config.AdminUserID = adminUserID
 	}
 
 	forwardingTopicIDStr := os.Getenv("TG_EVO_BOT_FORWARDING_TOPIC_ID")
