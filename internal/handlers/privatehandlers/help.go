@@ -55,7 +55,8 @@ func (h *helpHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 			"• /contentSetup - Создать новый контент\n" +
 			"• /contentDelete - Удалить контент\n" +
 			"• /contentFinish - Отметить контент как завершенный\n" +
-			"• /showTopics - Просмотреть темы и вопросы к предстоящим мероприятиям с возможностью удаления\n"
+			"• /showTopics - Просмотреть темы и вопросы к предстоящим мероприятиям с возможностью удаления\n" +
+			"• /code - Ввести код для авторизации TG-клиента (задом наперед)\n"
 
 		helpText += adminHelpText
 	}
