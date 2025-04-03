@@ -33,7 +33,9 @@ func CheckPrivateChatType(b *gotgbot.Bot, ctx *ext.Context) bool {
 	msg := ctx.EffectiveMessage
 
 	if msg.Chat.Type != constants.PrivateChatType {
-		if _, err := ReplyAndDeleteWithReplayAfterDelay(b, msg, "Команда доступна только в личном чате.\nВведенная вами команда и это сообщение автоматически удалятся через 10 секунд.", 10, nil); err != nil {
+		if _, err := ReplyAndDeleteWithReplayAfterDelay(b, msg, "*Прошу прощения* 🧐\n\nЭта команда работает только в _личной беседе_ со мной. Напишите мне напрямую, и я с удовольствием помогу.\n\nДанное сообщение и твоя команда будут автоматически удалены через 10 секунд.", 10, &gotgbot.SendMessageOpts{
+			ParseMode: "Markdown",
+		}); err != nil {
 			log.Printf("Failed to send private-only message: %v", err)
 		}
 		return false
