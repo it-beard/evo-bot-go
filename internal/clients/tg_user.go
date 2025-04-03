@@ -30,7 +30,7 @@ func init() {
 	// Load configuration
 	appConfig, err := config.LoadConfig()
 	if err != nil {
-		log.Printf("Failed to load configuration, using in-memory session storage: %v", err)
+		log.Printf("TG User Client: Failed to load configuration, using in-memory session storage: %v", err)
 		sessionStorage = new(session.StorageMemory)
 		return
 	}
@@ -40,33 +40,33 @@ func init() {
 	switch sessionType {
 	case constants.TGUserClientSessionTypeFile:
 		sessionStorage = &session.FileStorage{Path: constants.TGUserClientDefaultSessionFile}
-		log.Printf("Using file session storage (%s)", constants.TGUserClientDefaultSessionFile)
+		log.Printf("TG User Client: Using file session storage (%s)", constants.TGUserClientDefaultSessionFile)
 	case constants.TGUserClientSessionTypeDatabase:
 		// Initialize database storage
 		dbSessionStorage, err := initDatabaseStorage(appConfig.DBConnection)
 		if err != nil {
-			log.Printf("Failed to initialize database session storage: %v, falling back to in-memory storage", err)
+			log.Printf("TG User Client: Failed to initialize database session storage: %v, falling back to in-memory storage", err)
 			sessionStorage = new(session.StorageMemory)
 		} else {
 			sessionStorage = dbSessionStorage
-			log.Print("Using database session storage")
+			log.Print("TG User Client: Using database session storage")
 		}
 	default:
 		sessionStorage = new(session.StorageMemory)
-		log.Print("Using in-memory session storage")
+		log.Print("TG User Client: Using in-memory session storage")
 	}
 }
 
 // initDatabaseStorage initializes a database-backed session storage
 func initDatabaseStorage(connectionString string) (session.Storage, error) {
 	if connectionString == "" {
-		return nil, fmt.Errorf("database connection string is empty")
+		return nil, fmt.Errorf("TG User Client: database connection string is empty")
 	}
 
 	// Create database connection
 	db, err := database.NewDB(connectionString)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %w", err)
+		return nil, fmt.Errorf("TG User Client: failed to connect to database: %w", err)
 	}
 
 	// Create session repository
@@ -89,7 +89,7 @@ func NewTelegramConfig() (*TelegramConfig, error) {
 	// Load configuration
 	appConfig, err := config.LoadConfig()
 	if err != nil {
-		return nil, fmt.Errorf("failed to load configuration: %w", err)
+		return nil, fmt.Errorf("TG User Client: failed to load configuration: %w", err)
 	}
 
 	appID := appConfig.TGUserClientAppID
@@ -98,7 +98,7 @@ func NewTelegramConfig() (*TelegramConfig, error) {
 	password := appConfig.TGUserClient2FAPass
 
 	if appID == 0 || appHash == "" || phoneNumber == "" || password == "" {
-		return nil, fmt.Errorf("missing required telegram client configuration")
+		return nil, fmt.Errorf("TG User Client: missing required telegram client configuration")
 	}
 
 	return &TelegramConfig{
@@ -119,7 +119,7 @@ type TelegramClient struct {
 func NewTelegramClient() (*TelegramClient, error) {
 	config, err := NewTelegramConfig()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get telegram config: %w", err)
+		return nil, fmt.Errorf("TG User Client: failed to get telegram config: %w", err)
 	}
 
 	client := telegram.NewClient(config.AppID, config.AppHash, telegram.Options{
@@ -156,7 +156,7 @@ func TgGetChatMessageById(chatID int64, messageID int) (*tg.Message, error) {
 		api := tgClient.client.API()
 		inputPeer, err := tgClient.getPeerInfoByChatID(ctx, chatID)
 		if err != nil {
-			return fmt.Errorf("failed to get peer info: %w", err)
+			return fmt.Errorf("TG User Client: failed to get peer info: %w", err)
 		}
 
 		// For channels, try to get forum topics directly
@@ -187,15 +187,15 @@ func TgGetChatMessageById(chatID int64, messageID int) (*tg.Message, error) {
 			}
 		}
 
-		return fmt.Errorf("message not found or unexpected response type")
+		return fmt.Errorf("TG User Client: message not found or unexpected response type")
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get message: %w", err)
+		return nil, fmt.Errorf("TG User Client: failed to get message: %w", err)
 	}
 
 	if message == nil {
-		return nil, fmt.Errorf("message not found")
+		return nil, fmt.Errorf("TG User Client: message not found")
 	}
 
 	return message, nil
@@ -217,14 +217,14 @@ func GetChatMessages(chatID int64, topicID int) ([]tg.Message, error) {
 		api := tgClient.client.API()
 		inputPeer, err := tgClient.getPeerInfoByChatID(ctx, chatID)
 		if err != nil {
-			return fmt.Errorf("failed to get peer info: %w", err)
+			return fmt.Errorf("TG User Client: failed to get peer info: %w", err)
 		}
 
 		return tgClient.fetchMessages(ctx, api, inputPeer, topicID, &allMessages)
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get messages: %w", err)
+		return nil, fmt.Errorf("TG User Client: failed to get messages: %w", err)
 	}
 
 	return allMessages, nil
@@ -256,7 +256,7 @@ func GetLastTopicMessagesByTime(chatID int64, topicID int, hours int) ([]tg.Mess
 		api := tgClient.client.API()
 		inputPeer, err := tgClient.getPeerInfoByChatID(ctx, chatID)
 		if err != nil {
-			return fmt.Errorf("failed to get peer info: %w", err)
+			return fmt.Errorf("TG User Client: failed to get peer info: %w", err)
 		}
 
 		// Use a direct approach to get messages with reply filtering
@@ -264,7 +264,7 @@ func GetLastTopicMessagesByTime(chatID int64, topicID int, hours int) ([]tg.Mess
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get messages: %w", err)
+		return nil, fmt.Errorf("TG User Client: failed to get messages: %w", err)
 	}
 
 	return allMessages, nil
@@ -284,7 +284,7 @@ func (t *TelegramClient) fetchMessages(ctx context.Context, api *tg.Client, inpu
 			AddOffset: offset,
 		})
 		if err != nil {
-			return fmt.Errorf("failed to get messages: %w", err)
+			return fmt.Errorf("TG User Client: failed to get messages: %w", err)
 		}
 
 		// Extract messages from response
@@ -327,7 +327,7 @@ func fetchMessagesWithDateFilter(ctx context.Context, api *tg.Client, inputPeer 
 			Limit:     limit,
 		})
 		if err != nil {
-			return fmt.Errorf("failed to get messages: %w", err)
+			return fmt.Errorf("TG User Client: failed to get messages: %w", err)
 		}
 
 		// Extract messages from response
@@ -372,7 +372,7 @@ func extractMessages(resp tg.MessagesMessagesClass) ([]tg.Message, error) {
 			}
 		}
 	default:
-		return nil, fmt.Errorf("unexpected response type: %T", resp)
+		return nil, fmt.Errorf("TG User Client: unexpected response type: %T", resp)
 	}
 
 	return messages, nil
@@ -393,14 +393,14 @@ func TgKeepSessionAlive() error {
 		// Make a simple request to keep session alive
 		_, err := tgClient.client.API().HelpGetConfig(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to get config: %w", err)
+			return fmt.Errorf("TG User Client: failed to get config: %w", err)
 		}
 
 		return nil
 	})
 
 	if err != nil {
-		return fmt.Errorf("failed to keep session alive: %w", err)
+		return fmt.Errorf("TG User Client: failed to keep session alive: %w", err)
 	}
 
 	return nil
@@ -416,7 +416,7 @@ func (t *TelegramClient) getPeerInfoByChatID(ctx context.Context, chatID int64) 
 		OffsetPeer: &tg.InputPeerChat{},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get dialogs: %w", err)
+		return nil, fmt.Errorf("TG User Client: failed to get dialogs: %w", err)
 	}
 
 	switch dlg := dialogs.(type) {
@@ -437,10 +437,10 @@ func (t *TelegramClient) getPeerInfoByChatID(ctx context.Context, chatID int64) 
 			}
 		}
 	default:
-		return nil, fmt.Errorf("unexpected response type: %T", dialogs)
+		return nil, fmt.Errorf("TG User Client: unexpected response type: %T", dialogs)
 	}
 
-	return nil, fmt.Errorf("chat with ID %d not found", chatID)
+	return nil, fmt.Errorf("TG User Client: chat with ID %d not found", chatID)
 }
 
 // ensureAuthorized ensures the client is authorized
@@ -449,7 +449,7 @@ func (t *TelegramClient) ensureAuthorized(ctx context.Context) error {
 
 	status, err := authCli.Status(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get auth status: %w", err)
+		return fmt.Errorf("TG User Client: failed to get auth status: %w", err)
 	}
 
 	if !status.Authorized {
@@ -457,7 +457,7 @@ func (t *TelegramClient) ensureAuthorized(ctx context.Context) error {
 			AllowAppHash: true,
 		})
 		if err != nil {
-			return fmt.Errorf("failed to send code: %w", err)
+			return fmt.Errorf("TG User Client: failed to send code: %w", err)
 		}
 		sentCode := code.(*tg.AuthSentCode)
 
@@ -466,19 +466,19 @@ func (t *TelegramClient) ensureAuthorized(ctx context.Context) error {
 		codeMutex.RUnlock()
 
 		if receivedCode == "" {
-			return fmt.Errorf("verification code not set - use /code command to set it")
+			return fmt.Errorf("TG User Client: verification code not set - use /code command to set it")
 		}
-		log.Print("Code applied")
+		log.Print("TG User Client: Code applied")
 
 		_, err = authCli.SignIn(ctx, t.config.PhoneNumber, receivedCode, sentCode.PhoneCodeHash)
 		if err != nil {
 			if strings.Contains(err.Error(), "2FA required") {
 				_, err = authCli.Password(ctx, t.config.Password)
 				if err != nil {
-					return fmt.Errorf("failed to send 2FA password: %w", err)
+					return fmt.Errorf("TG User Client: failed to send 2FA password: %w", err)
 				}
 			} else {
-				return fmt.Errorf("sign in error: %w", err)
+				return fmt.Errorf("TG User Client: sign in error: %w", err)
 			}
 		}
 	}
