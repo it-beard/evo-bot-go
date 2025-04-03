@@ -91,7 +91,7 @@ func FormatEventListForAdmin(events []repositories.Event, title string, cancelCo
 			statusEmoji, event.Type, startedAtStr))
 	}
 
-	response.WriteString(fmt.Sprintf("\nПожалуйста, отправь ID события, %s, или /%s для отмены.",
+	response.WriteString(fmt.Sprintf("\nПожалуйста, отправь ID мероприятия, %s, или /%s для отмены.",
 		actionDescription, cancelCommand))
 
 	return response.String()
@@ -108,11 +108,11 @@ func FormatTopicListForUsers(topics []repositories.Topic, eventName string, even
 	} else if eventType == "meetup" {
 		typeEmoji = "🎙"
 	}
-	response.WriteString(fmt.Sprintf("\n %s _Событие:_ *%s*\n", typeEmoji, eventName))
+	response.WriteString(fmt.Sprintf("\n %s _Мероприятие:_ *%s*\n", typeEmoji, eventName))
 
 	if len(topics) == 0 {
 		response.WriteString(
-			fmt.Sprintf("\n🔍 Для этого события пока нет тем и вопросов. \n Используй команду /%s для добавления.", constants.TopicAddCommand))
+			fmt.Sprintf("\n🔍 Для этого мероприятия пока нет тем и вопросов. \n Используй команду /%s для добавления.", constants.TopicAddCommand))
 	} else {
 		topicCount := len(topics)
 		response.WriteString(fmt.Sprintf("📋 _Найдено тем:_ *%d*\n\n", topicCount))
@@ -142,10 +142,10 @@ func FormatTopicListForAdmin(topics []repositories.Topic, eventName string, even
 	} else if eventType == "meetup" {
 		typeEmoji = "🎙"
 	}
-	response.WriteString(fmt.Sprintf("\n %s _Событие:_ *%s*\n", typeEmoji, eventName))
+	response.WriteString(fmt.Sprintf("\n %s _Мероприятие:_ *%s*\n", typeEmoji, eventName))
 
 	if len(topics) == 0 {
-		response.WriteString("\nДля этого события пока нет тем и вопросов.")
+		response.WriteString("\nДля этого мероприятия пока нет тем и вопросов.")
 	} else {
 		for _, topic := range topics {
 			userNickname := "не указано"

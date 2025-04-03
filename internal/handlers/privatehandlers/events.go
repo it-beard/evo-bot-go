@@ -45,22 +45,22 @@ func (h *eventsHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 	// Get actual events to show
 	events, err := h.eventRepository.GetLastActualEvents(10) // Fetch last 10 actual events
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Ошибка при получении списка событий.", err)
+		utils.SendLoggedReply(b, msg, "Ошибка при получении списка мероприятий.", err)
 		return nil
 	}
 
 	if len(events) == 0 {
-		utils.SendLoggedReply(b, msg, "На данный момент нет актуальных событий.", nil)
+		utils.SendLoggedReply(b, msg, "На данный момент нет актуальных мероприятий.", nil)
 		return nil
 	}
 
 	// Format and display event list
 	formattedEvents := utils.FormatEventListForUsersWithoutIds(
 		events,
-		"📋 Список ближайших событий",
+		"📋 Список ближайших мероприятий",
 	)
-	formattedEvents += fmt.Sprintf("\nИспользуй команду /%s, если хочешь предложить тему или вопросы к этим событиям.", constants.TopicAddCommand)
-	formattedEvents += "\n\nА вот ссылка на [клубный календарь](https://itbeard.com/s/evo-calendar), который можно добавить к себе и удобно следить всеми событиями клуба."
+	formattedEvents += fmt.Sprintf("\nИспользуй команду /%s, если хочешь предложить тему или вопросы к этим мероприятиям.", constants.TopicAddCommand)
+	formattedEvents += "\n\nА вот ссылка на [клубный календарь](https://itbeard.com/s/evo-calendar), который можно добавить к себе и удобно следить всеми мероприятиями клуба."
 	utils.SendLoggedMarkdownReply(b, msg, formattedEvents, nil)
 
 	return nil
