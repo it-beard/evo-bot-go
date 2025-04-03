@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"evo-bot-go/internal/database/migrations"
+	"evo-bot-go/internal/database/prompts"
 	"fmt"
 	"log"
 
@@ -136,7 +137,43 @@ func (db *DB) initPromptingTemplatesSchema() error {
 		return fmt.Errorf("failed to create prompting_templates table: %w", err)
 	}
 
+	// Insert default prompts if they don't exist
+	if err := db.insertDefaultPromptIfNotExists(prompts.GetContentPromptTemplateDbKey, prompts.GetContentPromptDefaultTemplate); err != nil {
+		return fmt.Errorf("failed to insert content prompt: %w", err)
+	}
+
+	if err := db.insertDefaultPromptIfNotExists(prompts.DailySummarizationPromptTemplateDbKey, prompts.DailySummarizationPromptDefaultTemplate); err != nil {
+		return fmt.Errorf("failed to insert summarization prompt: %w", err)
+	}
+
+	if err := db.insertDefaultPromptIfNotExists(prompts.GetToolPromptTemplateDbKey, prompts.GetToolPromptDefaultTemplate); err != nil {
+		return fmt.Errorf("failed to insert tool prompt: %w", err)
+	}
+
 	log.Println("Prompting templates schema initialized successfully")
+	return nil
+}
+
+// insertDefaultPromptIfNotExists inserts a default prompt if it doesn't already exist
+func (db *DB) insertDefaultPromptIfNotExists(key, text string) error {
+	// Check if the prompt already exists
+	var exists bool
+	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM prompting_templates WHERE template_key = $1)", key).Scan(&exists)
+	if err != nil {
+		return fmt.Errorf("failed to check if prompt exists: %w", err)
+	}
+
+	// If it doesn't exist, insert it
+	if !exists {
+		_, err = db.Exec("INSERT INTO prompting_templates (template_key, template_text) VALUES ($1, $2)", key, text)
+		if err != nil {
+			return fmt.Errorf("failed to insert prompt: %w", err)
+		}
+		log.Printf("Inserted default prompt: %s", key)
+	} else {
+		log.Printf("Default prompt already exists: %s", key)
+	}
+
 	return nil
 }
 

@@ -1,7 +1,6 @@
 package bot
 
 import (
-	"context"
 	"log"
 	"time"
 
@@ -60,14 +59,13 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	}
 
 	// Initialize repositories
-	promptingTemplateService := services.NewPromptingTemplateService(repositories.NewPromptingTemplateRepository(db))
 	eventRepository := repositories.NewEventRepository(db.DB)
 	topicRepository := repositories.NewTopicRepository(db.DB)
-
+	promptingTemplateRepository := repositories.NewPromptingTemplateRepository(db.DB)
 	// Initialize services
 	messageSenderService := services.NewMessageSenderService(bot)
 	summarizationService := services.NewSummarizationService(
-		appConfig, openaiClient, messageSenderService, promptingTemplateService,
+		appConfig, openaiClient, messageSenderService, promptingTemplateRepository,
 	)
 
 	// Initialize scheduled tasks
@@ -85,7 +83,14 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	}
 
 	// Register all handlers
-	client.registerHandlers(openaiClient, appConfig, promptingTemplateService, summarizationService, messageSenderService, eventRepository, topicRepository)
+	client.registerHandlers(openaiClient,
+		appConfig,
+		summarizationService,
+		messageSenderService,
+		eventRepository,
+		topicRepository,
+		promptingTemplateRepository,
+	)
 
 	return client, nil
 }
@@ -101,14 +106,6 @@ func setupDatabase(connectionString string) (*database.DB, error) {
 		return nil, err
 	}
 
-	// Initialize default prompting templates
-	ctx := context.Background()
-	promptingTemplateRepo := repositories.NewPromptingTemplateRepository(db)
-	promptingTemplateService := services.NewPromptingTemplateService(promptingTemplateRepo)
-	if err := promptingTemplateService.InitializeDefaultTemplates(ctx); err != nil {
-		log.Printf("Warning: Failed to initialize default prompting templates: %v", err)
-	}
-
 	return db, nil
 }
 
@@ -116,11 +113,11 @@ func setupDatabase(connectionString string) (*database.DB, error) {
 func (b *TgBotClient) registerHandlers(
 	openaiClient *clients.OpenAiClient,
 	appConfig *config.Config,
-	promptingTemplateService *services.PromptingTemplateService,
 	summarizationService *services.SummarizationService,
 	messageSenderService services.MessageSenderService,
 	eventRepository *repositories.EventRepository,
 	topicRepository *repositories.TopicRepository,
+	promptingTemplateRepository *repositories.PromptingTemplateRepository,
 ) {
 	// Register start handler, that avaliable for all users
 	b.dispatcher.AddHandler(handlers.NewStartHandler(appConfig))
@@ -142,8 +139,8 @@ func (b *TgBotClient) registerHandlers(
 	// Register private chat handlers
 	privateHandlers := []ext.Handler{
 		privatehandlers.NewHelpHandler(appConfig),
-		privatehandlers.NewToolsHandler(openaiClient, messageSenderService, promptingTemplateService, appConfig),
-		privatehandlers.NewContentHandler(openaiClient, messageSenderService, promptingTemplateService, appConfig),
+		privatehandlers.NewToolsHandler(openaiClient, messageSenderService, promptingTemplateRepository, appConfig),
+		privatehandlers.NewContentHandler(openaiClient, messageSenderService, promptingTemplateRepository, appConfig),
 		privatehandlers.NewEventsHandler(eventRepository, appConfig),
 		topicshandlers.NewTopicsHandler(topicRepository, eventRepository, messageSenderService, appConfig),
 		topicshandlers.NewTopicAddHandler(topicRepository, eventRepository, messageSenderService, appConfig),
