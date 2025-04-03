@@ -11,7 +11,7 @@ import (
 	"evo-bot-go/internal/database/repositories"
 	"evo-bot-go/internal/handlers"
 	"evo-bot-go/internal/handlers/adminhandlers"
-	"evo-bot-go/internal/handlers/adminhandlers/contenthandlers"
+	"evo-bot-go/internal/handlers/adminhandlers/eventhandlers"
 	"evo-bot-go/internal/handlers/grouphandlers"
 	"evo-bot-go/internal/handlers/privatehandlers"
 	"evo-bot-go/internal/handlers/privatehandlers/topicshandlers"
@@ -61,7 +61,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 
 	// Initialize repositories
 	promptingTemplateService := services.NewPromptingTemplateService(repositories.NewPromptingTemplateRepository(db))
-	contentRepository := repositories.NewContentRepository(db.DB)
+	eventRepository := repositories.NewEventRepository(db.DB)
 	topicRepository := repositories.NewTopicRepository(db.DB)
 
 	// Initialize services
@@ -85,7 +85,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	}
 
 	// Register all handlers
-	client.registerHandlers(openaiClient, appConfig, promptingTemplateService, summarizationService, messageSenderService, contentRepository, topicRepository)
+	client.registerHandlers(openaiClient, appConfig, promptingTemplateService, summarizationService, messageSenderService, eventRepository, topicRepository)
 
 	return client, nil
 }
@@ -119,7 +119,7 @@ func (b *TgBotClient) registerHandlers(
 	promptingTemplateService *services.PromptingTemplateService,
 	summarizationService *services.SummarizationService,
 	messageSenderService services.MessageSenderService,
-	contentRepository *repositories.ContentRepository,
+	eventRepository *repositories.EventRepository,
 	topicRepository *repositories.TopicRepository,
 ) {
 	// Register start handler, that avaliable for all users
@@ -129,11 +129,11 @@ func (b *TgBotClient) registerHandlers(
 	adminHandlers := []ext.Handler{
 		adminhandlers.NewCodeHandler(appConfig),
 		adminhandlers.NewSummarizeHandler(summarizationService, messageSenderService, appConfig),
-		adminhandlers.NewShowTopicsHandler(topicRepository, contentRepository, messageSenderService, appConfig),
-		contenthandlers.NewContentEditHandler(contentRepository, appConfig),
-		contenthandlers.NewContentSetupHandler(contentRepository, appConfig),
-		contenthandlers.NewContentDeleteHandler(contentRepository, appConfig),
-		contenthandlers.NewContentFinishHandler(contentRepository, appConfig),
+		adminhandlers.NewShowTopicsHandler(topicRepository, eventRepository, messageSenderService, appConfig),
+		eventhandlers.NewEventEditHandler(eventRepository, appConfig),
+		eventhandlers.NewEventSetupHandler(eventRepository, appConfig),
+		eventhandlers.NewEventDeleteHandler(eventRepository, appConfig),
+		eventhandlers.NewEventFinishHandler(eventRepository, appConfig),
 	}
 	for _, handler := range adminHandlers {
 		b.dispatcher.AddHandler(handler)
@@ -144,9 +144,9 @@ func (b *TgBotClient) registerHandlers(
 		privatehandlers.NewHelpHandler(appConfig),
 		privatehandlers.NewToolsHandler(openaiClient, messageSenderService, promptingTemplateService, appConfig),
 		privatehandlers.NewContentHandler(openaiClient, messageSenderService, promptingTemplateService, appConfig),
-		privatehandlers.NewShowContentHandler(contentRepository, appConfig),
-		topicshandlers.NewTopicsShowHandler(topicRepository, contentRepository, messageSenderService, appConfig),
-		topicshandlers.NewTopicAddHandler(topicRepository, contentRepository, messageSenderService, appConfig),
+		privatehandlers.NewEventsHandler(eventRepository, appConfig),
+		topicshandlers.NewTopicsHandler(topicRepository, eventRepository, messageSenderService, appConfig),
+		topicshandlers.NewTopicAddHandler(topicRepository, eventRepository, messageSenderService, appConfig),
 	}
 	for _, handler := range privateHandlers {
 		b.dispatcher.AddHandler(handler)

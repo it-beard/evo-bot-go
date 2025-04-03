@@ -20,17 +20,17 @@ import (
 
 const (
 	// Conversation states
-	showTopicsStateSelectContent = "admin_show_topics_select_content"
-	showTopicsStateDeleteTopic   = "admin_show_topics_delete_topic"
+	showTopicsStateSelectEvent = "admin_show_topics_select_event"
+	showTopicsStateDeleteTopic = "admin_show_topics_delete_topic"
 
 	// UserStore keys
 	showTopicsUserStoreKeyCancelFunc = "admin_show_topics_cancel_func"
-	showTopicsUserStoreContentID     = "admin_show_topics_content_id"
+	showTopicsUserStoreEventID       = "admin_show_topics_event_id"
 )
 
 type showTopicsHandler struct {
 	topicRepository      *repositories.TopicRepository
-	contentRepository    *repositories.ContentRepository
+	eventRepository      *repositories.EventRepository
 	messageSenderService services.MessageSenderService
 	config               *config.Config
 	userStore            *utils.UserDataStore
@@ -38,13 +38,13 @@ type showTopicsHandler struct {
 
 func NewShowTopicsHandler(
 	topicRepository *repositories.TopicRepository,
-	contentRepository *repositories.ContentRepository,
+	eventRepository *repositories.EventRepository,
 	messageSenderService services.MessageSenderService,
 	config *config.Config,
 ) ext.Handler {
 	h := &showTopicsHandler{
 		topicRepository:      topicRepository,
-		contentRepository:    contentRepository,
+		eventRepository:      eventRepository,
 		messageSenderService: messageSenderService,
 		config:               config,
 		userStore:            utils.NewUserDataStore(),
@@ -55,8 +55,8 @@ func NewShowTopicsHandler(
 			handlers.NewCommand(constants.ShowTopicsCommand, h.startShowTopics),
 		},
 		map[string][]ext.Handler{
-			showTopicsStateSelectContent: {
-				handlers.NewMessage(message.All, h.handleContentSelection),
+			showTopicsStateSelectEvent: {
+				handlers.NewMessage(message.All, h.handleEventSelection),
 			},
 			showTopicsStateDeleteTopic: {
 				handlers.NewMessage(message.All, h.handleTopicDeletion),
@@ -83,72 +83,72 @@ func (h *showTopicsHandler) startShowTopics(b *gotgbot.Bot, ctx *ext.Context) er
 		return handlers.EndConversation()
 	}
 
-	// Get last contents to show for selection
-	contents, err := h.contentRepository.GetLastContents(10)
+	// Get last events to show for selection
+	events, err := h.eventRepository.GetLastEvents(10)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Ошибка при получении списка контента.", err)
+		utils.SendLoggedReply(b, msg, "Ошибка при получении списка событий.", err)
 		return handlers.EndConversation()
 	}
 
-	if len(contents) == 0 {
-		utils.SendLoggedReply(b, msg, "Нет доступного контента для просмотра тем и вопросов.", nil)
+	if len(events) == 0 {
+		utils.SendLoggedReply(b, msg, "Нет доступных событий для просмотра тем и вопросов.", nil)
 		return handlers.EndConversation()
 	}
 
-	// Format and display content list for admin
-	formattedContents := utils.FormatContentListForAdmin(
-		contents,
-		"Список мероприятий",
+	// Format and display event list for admin
+	formattedEvents := utils.FormatEventListForAdmin(
+		events,
+		"Список событий",
 		constants.CancelCommand,
 		"для которого ты хочешь увидеть темы и вопросы",
 	)
 
-	utils.SendLoggedMarkdownReply(b, msg, formattedContents, nil)
+	utils.SendLoggedMarkdownReply(b, msg, formattedEvents, nil)
 
-	return handlers.NextConversationState(showTopicsStateSelectContent)
+	return handlers.NextConversationState(showTopicsStateSelectEvent)
 }
 
-// 2. handleContentSelection processes the admin's content selection
-func (h *showTopicsHandler) handleContentSelection(b *gotgbot.Bot, ctx *ext.Context) error {
+// 2. handleEventSelection processes the admin's event selection
+func (h *showTopicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	userInput := strings.TrimSpace(msg.Text)
 
-	// Check if the input is a valid content ID
-	contentID, err := strconv.Atoi(userInput)
+	// Check if the input is a valid event ID
+	eventID, err := strconv.Atoi(userInput)
 	if err != nil {
 		utils.SendLoggedReply(
 			b,
 			msg,
-			fmt.Sprintf("Пожалуйста, отправь корректный ID контента или /%s для отмены.", constants.CancelCommand),
+			fmt.Sprintf("Пожалуйста, отправь корректный ID события или /%s для отмены.", constants.CancelCommand),
 			nil,
 		)
 		return nil // Stay in the same state
 	}
 
-	// Get the content information
-	content, err := h.contentRepository.GetContentByID(contentID)
+	// Get the event information
+	event, err := h.eventRepository.GetEventByID(eventID)
 	if err != nil {
 		utils.SendLoggedReply(
 			b,
 			msg,
-			fmt.Sprintf("Не удалось найти контент с ID %d. Пожалуйста, проверь ID.", contentID),
+			fmt.Sprintf("Не удалось найти событие с ID %d. Пожалуйста, проверь ID.", eventID),
 			err,
 		)
 		return nil // Stay in the same state
 	}
 
-	// Get topics for this content
-	topics, err := h.topicRepository.GetTopicsByContentID(contentID)
+	// Get topics for this event
+	topics, err := h.topicRepository.GetTopicsByEventID(eventID)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Ошибка при получении тем для выбранного контента.", err)
+		utils.SendLoggedReply(b, msg, "Ошибка при получении тем для выбранного события.", err)
 		return handlers.EndConversation()
 	}
 
-	// Store the content ID for use in topic deletion
-	h.userStore.Set(ctx.EffectiveUser.Id, showTopicsUserStoreContentID, contentID)
+	// Store the event ID for use in topic deletion
+	h.userStore.Set(ctx.EffectiveUser.Id, showTopicsUserStoreEventID, eventID)
 
 	// Format and display topics for admin
-	formattedTopics := utils.FormatTopicListForAdmin(topics, content.Name, content.Type)
+	formattedTopics := utils.FormatTopicListForAdmin(topics, event.Name, event.Type)
 	utils.SendLoggedMarkdownReply(b, msg, formattedTopics, nil)
 
 	// If there are topics, suggest deletion option
@@ -178,15 +178,15 @@ func (h *showTopicsHandler) handleTopicDeletion(b *gotgbot.Bot, ctx *ext.Context
 		return nil // Stay in the same state
 	}
 
-	// Get the content ID from user store
-	contentIDVal, ok := h.userStore.Get(ctx.EffectiveUser.Id, showTopicsUserStoreContentID)
+	// Get the event ID from user store
+	eventIDVal, ok := h.userStore.Get(ctx.EffectiveUser.Id, showTopicsUserStoreEventID)
 	if !ok {
-		utils.SendLoggedReply(b, msg, "Ошибка: не найден ID контента в сессии. Попробуй начать сначала.", nil)
+		utils.SendLoggedReply(b, msg, "Ошибка: не найден ID события в сессии. Попробуй начать сначала.", nil)
 		return handlers.EndConversation()
 	}
-	contentID, ok := contentIDVal.(int)
+	eventID, ok := eventIDVal.(int)
 	if !ok {
-		utils.SendLoggedReply(b, msg, "Ошибка при получении ID контента из сессии. Попробуй начать сначала.", nil)
+		utils.SendLoggedReply(b, msg, "Ошибка при получении ID события из сессии. Попробуй начать сначала.", nil)
 		return handlers.EndConversation()
 	}
 
@@ -202,14 +202,14 @@ func (h *showTopicsHandler) handleTopicDeletion(b *gotgbot.Bot, ctx *ext.Context
 		return nil // Stay in the same state
 	}
 
-	// Check if the topic belongs to the selected content
-	if topic.ContentID != contentID {
+	// Check if the topic belongs to the selected event
+	if topic.EventID != eventID {
 		utils.SendLoggedReply(
 			b,
 			msg,
 			fmt.Sprintf(
-				"Тема с ID %d относится к другому мероприятию (контент ID: %d), а не к выбранному (контент ID: %d).\nПожалуйста, выбери корректный ID темы или /%s для отмены.",
-				topicID, topic.ContentID, contentID, constants.CancelCommand,
+				"Тема с ID %d относится к другому событию (событие ID: %d), а не к выбранному (событие ID: %d).\nПожалуйста, выбери корректный ID темы или /%s для отмены.",
+				topicID, topic.EventID, eventID, constants.CancelCommand,
 			),
 			nil,
 		)
@@ -226,22 +226,22 @@ func (h *showTopicsHandler) handleTopicDeletion(b *gotgbot.Bot, ctx *ext.Context
 	// Confirmation message
 	utils.SendLoggedReply(b, msg, fmt.Sprintf("✅ Тема с ID %d успешно удалена.", topicID), nil)
 
-	// Get updated list of topics for this content
-	topics, err := h.topicRepository.GetTopicsByContentID(contentID)
+	// Get updated list of topics for this event
+	topics, err := h.topicRepository.GetTopicsByEventID(eventID)
 	if err != nil {
 		utils.SendLoggedReply(b, msg, "Ошибка при получении обновленного списка тем.", err)
 		return handlers.EndConversation()
 	}
 
-	// Get the content information for displaying in the updated list
-	content, err := h.contentRepository.GetContentByID(contentID)
+	// Get the event information for displaying in the updated list
+	event, err := h.eventRepository.GetEventByID(eventID)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Ошибка при получении информации о контенте.", err)
+		utils.SendLoggedReply(b, msg, "Ошибка при получении информации о событии.", err)
 		return handlers.EndConversation()
 	}
 
 	// Show updated list of topics
-	formattedTopics := utils.FormatTopicListForAdmin(topics, content.Name, content.Type)
+	formattedTopics := utils.FormatTopicListForAdmin(topics, event.Name, event.Type)
 	utils.SendLoggedMarkdownReply(b, msg, formattedTopics, nil)
 
 	// If there are still topics, allow for more deletions
