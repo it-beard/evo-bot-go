@@ -41,7 +41,6 @@ func RunMigrations(db *sql.DB) error {
 
 		// Skip already applied migrations
 		if _, exists := appliedMigrations[migrationName]; exists {
-			log.Printf("Migration %s already applied, skipping", migrationName)
 			continue
 		}
 

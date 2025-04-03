@@ -31,7 +31,7 @@ func (s *DailySummarizationTask) Start() {
 		log.Println("Daily summarization task is disabled")
 		return
 	}
-	log.Println("Starting daily summarization task")
+	log.Println("Starting daily summarization task with time ", s.config.SummaryTime)
 	go s.run()
 }
 

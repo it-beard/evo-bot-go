@@ -101,7 +101,6 @@ func (db *DB) InitSchema() error {
 		return err
 	}
 
-	log.Println("All database schemas initialized successfully")
 	return nil
 }
 
@@ -117,7 +116,6 @@ func (db *DB) InitWithMigrations() error {
 		return fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	log.Println("All migrations applied successfully")
 	return nil
 }
 
@@ -127,7 +125,6 @@ func (db *DB) initSessionSchema() error {
 		return fmt.Errorf("failed to create tg_sessions table: %w", err)
 	}
 
-	log.Println("Session schema initialized successfully")
 	return nil
 }
 
@@ -150,7 +147,6 @@ func (db *DB) initPromptingTemplatesSchema() error {
 		return fmt.Errorf("failed to insert tool prompt: %w", err)
 	}
 
-	log.Println("Prompting templates schema initialized successfully")
 	return nil
 }
 
@@ -170,8 +166,6 @@ func (db *DB) insertDefaultPromptIfNotExists(key, text string) error {
 			return fmt.Errorf("failed to insert prompt: %w", err)
 		}
 		log.Printf("Inserted default prompt: %s", key)
-	} else {
-		log.Printf("Default prompt already exists: %s", key)
 	}
 
 	return nil
@@ -183,7 +177,6 @@ func (db *DB) initContentsSchema() error {
 		return fmt.Errorf("failed to create contents table: %w", err)
 	}
 
-	log.Println("Contents schema initialized successfully")
 	return nil
 }
 
@@ -193,7 +186,6 @@ func (db *DB) initTopicsSchema() error {
 		return fmt.Errorf("failed to create topics table: %w", err)
 	}
 
-	log.Println("Topics schema initialized successfully")
 	return nil
 }
 
@@ -203,7 +195,6 @@ func (db *DB) initMigrationsSchema() error {
 		return fmt.Errorf("failed to create migrations table: %w", err)
 	}
 
-	log.Println("Migrations schema initialized successfully")
 	return nil
 }
 
