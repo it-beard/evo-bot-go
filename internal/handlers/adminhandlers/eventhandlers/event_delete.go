@@ -79,16 +79,16 @@ func (h *eventDeleteHandler) startDelete(b *gotgbot.Bot, ctx *ext.Context) error
 	// Get a list of the last N events
 	events, err := h.eventRepository.GetLastEvents(constants.EventEditGetLastLimit)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Произошла ошибка при получении списка событий.", err)
+		utils.SendLoggedReply(b, msg, "Произошла ошибка при получении списка мероприятий.", err)
 		return handlers.EndConversation()
 	}
 
 	if len(events) == 0 {
-		utils.SendLoggedReply(b, msg, "Нет созданных событий для удаления.", nil)
+		utils.SendLoggedReply(b, msg, "Нет созданных мероприятий для удаления.", nil)
 		return handlers.EndConversation()
 	}
 
-	title := fmt.Sprintf("Последние %d события:", len(events))
+	title := fmt.Sprintf("Последние %d мероприятия:", len(events))
 	actionDescription := "которое ты хочешь удалить"
 	formattedResponse := utils.FormatEventListForAdmin(events, title, constants.CancelCommand, actionDescription)
 
@@ -110,7 +110,7 @@ func (h *eventDeleteHandler) handleSelectEvent(b *gotgbot.Bot, ctx *ext.Context)
 	// Get the last N events
 	events, err := h.eventRepository.GetLastEvents(constants.EventEditGetLastLimit)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Произошла ошибка при получении списка событий.", err)
+		utils.SendLoggedReply(b, msg, "Произошла ошибка при получении списка мероприятий.", err)
 		return handlers.EndConversation()
 	}
 
@@ -126,7 +126,7 @@ func (h *eventDeleteHandler) handleSelectEvent(b *gotgbot.Bot, ctx *ext.Context)
 	}
 
 	if !found {
-		utils.SendLoggedReply(b, msg, fmt.Sprintf("Событие с ID %d не найдено. Пожалуйста, введи корректный ID или /%s для отмены.", eventID, constants.CancelCommand), nil)
+		utils.SendLoggedReply(b, msg, fmt.Sprintf("Мероприятие с ID %d не найдено. Пожалуйста, введи корректный ID или /%s для отмены.", eventID, constants.CancelCommand), nil)
 		return nil // Stay in the same state
 	}
 
@@ -136,7 +136,7 @@ func (h *eventDeleteHandler) handleSelectEvent(b *gotgbot.Bot, ctx *ext.Context)
 
 	// Ask for confirmation
 	confirmMessage := fmt.Sprintf(
-		"Ты действительно хочешь удалить событие '%s' (ID: %d)? Это также удалит все связанные с ним темы.\n\nВведи 'да' для подтверждения или 'нет' для отмены (или используй /%s):",
+		"Ты действительно хочешь удалить мероприятие '%s' (ID: %d)? Это также удалит все связанные с ним темы и вопросы.\n\nВведи 'да' для подтверждения или 'нет' для отмены (или используй /%s):",
 		eventName, eventID, constants.CancelCommand)
 
 	utils.SendLoggedReply(b, msg, confirmMessage, nil)
@@ -160,7 +160,7 @@ func (h *eventDeleteHandler) handleConfirmation(b *gotgbot.Bot, ctx *ext.Context
 
 	// If user said "no", cancel the operation
 	if confirmationText == eventDeleteConfirmNo {
-		utils.SendLoggedReply(b, msg, "Операция удаления события отменена.", nil)
+		utils.SendLoggedReply(b, msg, "Операция удаления мероприятия отменена.", nil)
 		h.userStore.Clear(ctx.EffectiveUser.Id)
 		return handlers.EndConversation()
 	}
@@ -169,7 +169,7 @@ func (h *eventDeleteHandler) handleConfirmation(b *gotgbot.Bot, ctx *ext.Context
 	eventIDVal, ok := h.userStore.Get(ctx.EffectiveUser.Id, eventDeleteCtxDataKeySelectedEventID)
 	if !ok {
 		utils.SendLoggedReply(b, msg, fmt.Sprintf(
-			"Произошла ошибка при получении выбранного события. Пожалуйста, начни заново с /%s",
+			"Произошла ошибка при получении выбранного мероприятия. Пожалуйста, начни заново с /%s",
 			constants.EventDeleteCommand,
 		), nil)
 		return handlers.EndConversation()
@@ -196,12 +196,12 @@ func (h *eventDeleteHandler) handleConfirmation(b *gotgbot.Bot, ctx *ext.Context
 	// Delete the event
 	err := h.eventRepository.DeleteEvent(eventID)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Произошла ошибка при удалении события.", err)
+		utils.SendLoggedReply(b, msg, "Произошла ошибка при удалении мероприятия.", err)
 		return handlers.EndConversation()
 	}
 
 	// Confirmation message
-	utils.SendLoggedReply(b, msg, fmt.Sprintf("Событие '%s' успешно удалено.", eventName), nil)
+	utils.SendLoggedReply(b, msg, fmt.Sprintf("Мероприятие '%s' успешно удалено.", eventName), nil)
 
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)
@@ -212,7 +212,7 @@ func (h *eventDeleteHandler) handleConfirmation(b *gotgbot.Bot, ctx *ext.Context
 // 4. handleCancel handles the /cancel command
 func (h *eventDeleteHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
-	utils.SendLoggedReply(b, msg, "Операция удаления события отменена.", nil)
+	utils.SendLoggedReply(b, msg, "Операция удаления мероприятия отменена.", nil)
 
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)

@@ -86,19 +86,19 @@ func (h *topicAddHandler) startTopicAdd(b *gotgbot.Bot, ctx *ext.Context) error 
 	// Get last actual events to show for selection
 	events, err := h.eventRepository.GetLastActualEvents(10)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Ошибка при получении списка событий.", err)
+		utils.SendLoggedReply(b, msg, "Ошибка при получении списка мероприятий.", err)
 		return handlers.EndConversation()
 	}
 
 	if len(events) == 0 {
-		utils.SendLoggedReply(b, msg, "Нет доступных событий для добавления тем.", nil)
+		utils.SendLoggedReply(b, msg, "Нет доступных мероприятий для добавления тем и вопросов.", nil)
 		return handlers.EndConversation()
 	}
 
 	// Format and display event list for selection
 	formattedEvents := utils.FormatEventListForUsers(
 		events,
-		fmt.Sprintf("Выбери ID события, к которому ты хочешь закинуть темы или вопросы, либо жми /%s для отмены диалога", constants.CancelCommand),
+		fmt.Sprintf("Выбери ID мероприятия, к которому ты хочешь закинуть темы или вопросы, либо жми /%s для отмены диалога", constants.CancelCommand),
 	)
 
 	utils.SendLoggedMarkdownReply(b, msg, formattedEvents, nil)
@@ -117,7 +117,7 @@ func (h *topicAddHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Context)
 		utils.SendLoggedReply(
 			b,
 			msg,
-			fmt.Sprintf("Пожалуйста, отправь корректный ID события или жми /%s для отмены.", constants.CancelCommand),
+			fmt.Sprintf("Пожалуйста, отправь корректный ID мероприятия или жми /%s для отмены.", constants.CancelCommand),
 			nil,
 		)
 		return nil // Stay in the same state
@@ -129,7 +129,7 @@ func (h *topicAddHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Context)
 		utils.SendLoggedReply(
 			b,
 			msg,
-			fmt.Sprintf("Не удалось найти событие с ID %d. Пожалуйста, проверь ID.", eventID),
+			fmt.Sprintf("Не удалось найти мероприятие с ID %d. Пожалуйста, проверь ID.", eventID),
 			err,
 		)
 		return nil // Stay in the same state
@@ -143,7 +143,7 @@ func (h *topicAddHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Context)
 	utils.SendLoggedMarkdownReply(
 		b,
 		msg,
-		fmt.Sprintf("Отправь мне темы или вопросы к событию *%s*, либо используй /%s для отмены диалога.", event.Name, constants.CancelCommand),
+		fmt.Sprintf("Отправь мне темы и вопросы к мероприятию *%s*, либо используй /%s для отмены диалога.", event.Name, constants.CancelCommand),
 		nil,
 	)
 
@@ -171,7 +171,7 @@ func (h *topicAddHandler) handleTopicEntry(b *gotgbot.Bot, ctx *ext.Context) err
 		utils.SendLoggedReply(
 			b,
 			msg,
-			"Произошла ошибка: не найден выбранное событие. Пожалуйста, начни заново.",
+			"Произошла ошибка: не найден выбранное мероприятие. Пожалуйста, начни заново.",
 			nil,
 		)
 		return handlers.EndConversation()
@@ -196,7 +196,7 @@ func (h *topicAddHandler) handleTopicEntry(b *gotgbot.Bot, ctx *ext.Context) err
 
 	adminMsg := fmt.Sprintf(
 		"🔔 *Новая тема добавлена*\n\n"+
-			"_Событие:_ %s\n"+
+			"_Мероприятие:_ %s\n"+
 			"_Автор:_ @%s\n"+
 			"_Топик:_ %s",
 		eventName,
@@ -211,7 +211,7 @@ func (h *topicAddHandler) handleTopicEntry(b *gotgbot.Bot, ctx *ext.Context) err
 	}
 
 	utils.SendLoggedReply(b, msg,
-		fmt.Sprintf("Добавлено! \nИспользуй команду /%s для просмотра всех тем и вопросов к событию.", constants.TopicsCommand),
+		fmt.Sprintf("Добавлено! \nИспользуй команду /%s для просмотра всех тем и вопросов к мероприятию.", constants.TopicsCommand),
 		nil,
 	)
 

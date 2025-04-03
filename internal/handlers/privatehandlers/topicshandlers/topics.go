@@ -80,19 +80,19 @@ func (h *topicsHandler) startTopics(b *gotgbot.Bot, ctx *ext.Context) error {
 	// Get last actual events to show for selection
 	events, err := h.eventRepository.GetLastActualEvents(10)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Ошибка при получении списка событий.", err)
+		utils.SendLoggedReply(b, msg, "Ошибка при получении списка мероприятий.", err)
 		return handlers.EndConversation()
 	}
 
 	if len(events) == 0 {
-		utils.SendLoggedReply(b, msg, "Нет доступных событий для просмотра тем и вопросов.", nil)
+		utils.SendLoggedReply(b, msg, "Нет доступных мероприятий для просмотра тем и вопросов.", nil)
 		return handlers.EndConversation()
 	}
 
 	// Format and display event list for selection
 	formattedEvents := utils.FormatEventListForUsers(
 		events,
-		fmt.Sprintf("Выбери ID события, для которого ты хочешь увидеть темы и вопросы, либо жми /%s для отмены диалога", constants.CancelCommand),
+		fmt.Sprintf("Выбери ID мероприятия, для которого ты хочешь увидеть темы и вопросы, либо жми /%s для отмены диалога", constants.CancelCommand),
 	)
 
 	utils.SendLoggedMarkdownReply(b, msg, formattedEvents, nil)
@@ -111,7 +111,7 @@ func (h *topicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Context) e
 		utils.SendLoggedReply(
 			b,
 			msg,
-			fmt.Sprintf("Пожалуйста, отправь корректный ID события или /%s для отмены.", constants.CancelCommand),
+			fmt.Sprintf("Пожалуйста, отправь корректный ID мероприятия или /%s для отмены.", constants.CancelCommand),
 			nil,
 		)
 		return nil // Stay in the same state
@@ -123,7 +123,7 @@ func (h *topicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Context) e
 		utils.SendLoggedReply(
 			b,
 			msg,
-			fmt.Sprintf("Не удалось найти событие с ID %d. Пожалуйста, проверь ID.", eventID),
+			fmt.Sprintf("Не удалось найти мероприятие с ID %d. Пожалуйста, проверь ID.", eventID),
 			err,
 		)
 		return nil // Stay in the same state
@@ -132,7 +132,7 @@ func (h *topicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Context) e
 	// Get topics for this event
 	topics, err := h.topicRepository.GetTopicsByEventID(eventID)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Ошибка при получении тем для выбранного события.", err)
+		utils.SendLoggedReply(b, msg, "Ошибка при получении тем и вопросов для выбранного мероприятия.", err)
 		return handlers.EndConversation()
 	}
 

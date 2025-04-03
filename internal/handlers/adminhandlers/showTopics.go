@@ -86,19 +86,19 @@ func (h *showTopicsHandler) startShowTopics(b *gotgbot.Bot, ctx *ext.Context) er
 	// Get last events to show for selection
 	events, err := h.eventRepository.GetLastEvents(10)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Ошибка при получении списка событий.", err)
+		utils.SendLoggedReply(b, msg, "Ошибка при получении списка мероприятий.", err)
 		return handlers.EndConversation()
 	}
 
 	if len(events) == 0 {
-		utils.SendLoggedReply(b, msg, "Нет доступных событий для просмотра тем и вопросов.", nil)
+		utils.SendLoggedReply(b, msg, "Нет доступных мероприятий для просмотра тем и вопросов.", nil)
 		return handlers.EndConversation()
 	}
 
 	// Format and display event list for admin
 	formattedEvents := utils.FormatEventListForAdmin(
 		events,
-		"Список событий",
+		"Список мероприятий",
 		constants.CancelCommand,
 		"для которого ты хочешь увидеть темы и вопросы",
 	)
@@ -119,7 +119,7 @@ func (h *showTopicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Contex
 		utils.SendLoggedReply(
 			b,
 			msg,
-			fmt.Sprintf("Пожалуйста, отправь корректный ID события или /%s для отмены.", constants.CancelCommand),
+			fmt.Sprintf("Пожалуйста, отправь корректный ID мероприятия или /%s для отмены.", constants.CancelCommand),
 			nil,
 		)
 		return nil // Stay in the same state
@@ -131,7 +131,7 @@ func (h *showTopicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Contex
 		utils.SendLoggedReply(
 			b,
 			msg,
-			fmt.Sprintf("Не удалось найти событие с ID %d. Пожалуйста, проверь ID.", eventID),
+			fmt.Sprintf("Не удалось найти мероприятие с ID %d. Пожалуйста, проверь ID.", eventID),
 			err,
 		)
 		return nil // Stay in the same state
@@ -140,7 +140,7 @@ func (h *showTopicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Contex
 	// Get topics for this event
 	topics, err := h.topicRepository.GetTopicsByEventID(eventID)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Ошибка при получении тем для выбранного события.", err)
+		utils.SendLoggedReply(b, msg, "Ошибка при получении тем для выбранного мероприятия.", err)
 		return handlers.EndConversation()
 	}
 
@@ -181,12 +181,12 @@ func (h *showTopicsHandler) handleTopicDeletion(b *gotgbot.Bot, ctx *ext.Context
 	// Get the event ID from user store
 	eventIDVal, ok := h.userStore.Get(ctx.EffectiveUser.Id, showTopicsUserStoreEventID)
 	if !ok {
-		utils.SendLoggedReply(b, msg, "Ошибка: не найден ID события в сессии. Попробуй начать сначала.", nil)
+		utils.SendLoggedReply(b, msg, "Ошибка: не найден ID мероприятия в сессии. Попробуй начать сначала.", nil)
 		return handlers.EndConversation()
 	}
 	eventID, ok := eventIDVal.(int)
 	if !ok {
-		utils.SendLoggedReply(b, msg, "Ошибка при получении ID события из сессии. Попробуй начать сначала.", nil)
+		utils.SendLoggedReply(b, msg, "Ошибка при получении ID мероприятия из сессии. Попробуй начать сначала.", nil)
 		return handlers.EndConversation()
 	}
 
@@ -208,7 +208,7 @@ func (h *showTopicsHandler) handleTopicDeletion(b *gotgbot.Bot, ctx *ext.Context
 			b,
 			msg,
 			fmt.Sprintf(
-				"Тема с ID %d относится к другому событию (событие ID: %d), а не к выбранному (событие ID: %d).\nПожалуйста, выбери корректный ID темы или /%s для отмены.",
+				"Тема с ID %d относится к другому мероприятию (ID: %d), а не к выбранному (ID: %d).\nПожалуйста, выбери корректный ID темы или /%s для отмены.",
 				topicID, topic.EventID, eventID, constants.CancelCommand,
 			),
 			nil,
@@ -236,7 +236,7 @@ func (h *showTopicsHandler) handleTopicDeletion(b *gotgbot.Bot, ctx *ext.Context
 	// Get the event information for displaying in the updated list
 	event, err := h.eventRepository.GetEventByID(eventID)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Ошибка при получении информации о событии.", err)
+		utils.SendLoggedReply(b, msg, "Ошибка при получении информации о мероприятии.", err)
 		return handlers.EndConversation()
 	}
 

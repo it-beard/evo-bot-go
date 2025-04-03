@@ -78,16 +78,16 @@ func (h *eventFinishHandler) startFinish(b *gotgbot.Bot, ctx *ext.Context) error
 	// Get a list of active events
 	events, err := h.eventRepository.GetLastActualEvents(constants.EventEditGetLastLimit)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Произошла ошибка при получении списка актуальных событий.", err)
+		utils.SendLoggedReply(b, msg, "Произошла ошибка при получении списка актуальных мероприятий.", err)
 		return handlers.EndConversation()
 	}
 
 	if len(events) == 0 {
-		utils.SendLoggedReply(b, msg, "Нет активных событий для завершения.", nil)
+		utils.SendLoggedReply(b, msg, "Нет активных мероприятий для завершения.", nil)
 		return handlers.EndConversation()
 	}
 
-	title := fmt.Sprintf("Последние %d события:", len(events))
+	title := fmt.Sprintf("Последние %d мероприятия:", len(events))
 	actionDescription := "которое ты хочешь завершить"
 	formattedResponse := utils.FormatEventListForAdmin(events, title, constants.CancelCommand, actionDescription)
 
@@ -112,7 +112,7 @@ func (h *eventFinishHandler) handleSelectEvent(b *gotgbot.Bot, ctx *ext.Context)
 
 	// Ask for confirmation
 	utils.SendLoggedReply(b, msg, fmt.Sprintf(
-		"Ты действительно хочешь завершить это событие? Это пометит его как неактуальное.\n\nВведи 'да' для подтверждения или 'нет' для отмены (или используй /%s):",
+		"Ты действительно хочешь завершить это мероприятие? Это пометит его как неактуальное.\n\nВведи 'да' для подтверждения или 'нет' для отмены (или используй /%s):",
 		constants.CancelCommand,
 	), nil)
 
@@ -135,7 +135,7 @@ func (h *eventFinishHandler) handleConfirmation(b *gotgbot.Bot, ctx *ext.Context
 
 	// If user said "no", cancel the operation
 	if confirmationText == eventFinishConfirmNo {
-		utils.SendLoggedReply(b, msg, "Операция завершения события отменена.", nil)
+		utils.SendLoggedReply(b, msg, "Операция завершения мероприятия отменена.", nil)
 		h.userStore.Clear(ctx.EffectiveUser.Id)
 		return handlers.EndConversation()
 	}
@@ -144,7 +144,7 @@ func (h *eventFinishHandler) handleConfirmation(b *gotgbot.Bot, ctx *ext.Context
 	eventIDVal, ok := h.userStore.Get(ctx.EffectiveUser.Id, eventFinishCtxDataKeySelectedEventID)
 	if !ok {
 		utils.SendLoggedReply(b, msg, fmt.Sprintf(
-			"Произошла ошибка при получении выбранного события. Пожалуйста, начни заново с /%s",
+			"Произошла ошибка при получении выбранного мероприятия. Пожалуйста, начни заново с /%s",
 			constants.EventFinishCommand,
 		), nil)
 		return handlers.EndConversation()
@@ -163,19 +163,19 @@ func (h *eventFinishHandler) handleConfirmation(b *gotgbot.Bot, ctx *ext.Context
 	// Get the event details for the success message
 	event, err := h.eventRepository.GetEventByID(eventID)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, fmt.Sprintf("Ошибка при получении события с ID %d", eventID), err)
+		utils.SendLoggedReply(b, msg, fmt.Sprintf("Ошибка при получении мероприятия с ID %d", eventID), err)
 		return handlers.EndConversation()
 	}
 
 	// Update the event status to finished
 	err = h.eventRepository.UpdateEventStatus(eventID, constants.EventStatusFinished)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Произошла ошибка при обновлении статуса события.", err)
+		utils.SendLoggedReply(b, msg, "Произошла ошибка при обновлении статуса мероприятия.", err)
 		return handlers.EndConversation()
 	}
 
 	// Confirmation message
-	utils.SendLoggedReply(b, msg, fmt.Sprintf("Событие '%s' (ID: %d) успешно завершено.", event.Name, event.ID), nil)
+	utils.SendLoggedReply(b, msg, fmt.Sprintf("Мероприятие '%s' (ID: %d) успешно завершено.", event.Name, event.ID), nil)
 
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)
@@ -186,7 +186,7 @@ func (h *eventFinishHandler) handleConfirmation(b *gotgbot.Bot, ctx *ext.Context
 // 4. handleCancel handles the /cancel command
 func (h *eventFinishHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
-	utils.SendLoggedReply(b, msg, "Операция завершения события отменена.", nil)
+	utils.SendLoggedReply(b, msg, "Операция завершения мероприятия отменена.", nil)
 
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)
