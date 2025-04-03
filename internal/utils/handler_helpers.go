@@ -2,6 +2,7 @@ package utils
 
 import (
 	"log"
+	"time"
 
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
@@ -32,13 +33,87 @@ func CheckPrivateChatType(b *gotgbot.Bot, ctx *ext.Context) bool {
 	msg := ctx.EffectiveMessage
 
 	if msg.Chat.Type != constants.PrivateChatType {
-		if _, err := msg.Reply(b, "Эта команда доступна только в личном чате.", nil); err != nil {
+		if _, err := ReplyAndDeleteWithReplayAfterDelay(b, msg, "Команда доступна только в личном чате.\nВведенная вами команда и это сообщение автоматически удалятся через 10 секунд.", 10, nil); err != nil {
 			log.Printf("Failed to send private-only message: %v", err)
 		}
 		return false
 	}
 
 	return true
+}
+
+// SendAndDeleteAfterDelay sends a message and then deletes it after the specified delay in seconds
+// Returns the sent message and any error that occurred during sending
+func SendAndDeleteAfterDelay(b *gotgbot.Bot, chatID int64, text string, delaySeconds int, opts *gotgbot.SendMessageOpts) (*gotgbot.Message, error) {
+	// Send the message
+	sentMsg, err := b.SendMessage(chatID, text, opts)
+	if err != nil {
+		log.Printf("Failed to send message: %v", err)
+		return nil, err
+	}
+
+	// Start a goroutine to delete the message after the delay
+	go func() {
+		time.Sleep(time.Duration(delaySeconds) * time.Second)
+		_, err := sentMsg.Delete(b, nil)
+		if err != nil {
+			log.Printf("Failed to delete message after delay: %v", err)
+		}
+	}()
+
+	return sentMsg, nil
+}
+
+// ReplyAndDeleteAfterDelay replies to a message and then deletes the reply after the specified delay in seconds
+// Returns the sent message and any error that occurred during sending
+func ReplyAndDeleteAfterDelay(b *gotgbot.Bot, msg *gotgbot.Message, text string, delaySeconds int, opts *gotgbot.SendMessageOpts) (*gotgbot.Message, error) {
+	// Reply to the message
+	sentMsg, err := msg.Reply(b, text, opts)
+	if err != nil {
+		log.Printf("Failed to send reply: %v", err)
+		return nil, err
+	}
+
+	// Start a goroutine to delete the message after the delay
+	go func() {
+		time.Sleep(time.Duration(delaySeconds) * time.Second)
+		_, err := sentMsg.Delete(b, nil)
+		if err != nil {
+			log.Printf("Failed to delete reply after delay: %v", err)
+		}
+	}()
+
+	return sentMsg, nil
+}
+
+// ReplyAndDeleteWithReplayAfterDelay replies to a message and then deletes both the reply and the original message after the specified delay
+// Returns the sent message and any error that occurred during sending
+func ReplyAndDeleteWithReplayAfterDelay(b *gotgbot.Bot, msg *gotgbot.Message, text string, delaySeconds int, opts *gotgbot.SendMessageOpts) (*gotgbot.Message, error) {
+	// Reply to the message
+	sentMsg, err := msg.Reply(b, text, opts)
+	if err != nil {
+		log.Printf("Failed to send reply: %v", err)
+		return nil, err
+	}
+
+	// Start a goroutine to delete both messages after the delay
+	go func() {
+		time.Sleep(time.Duration(delaySeconds) * time.Second)
+
+		// Delete the reply message
+		_, replyErr := sentMsg.Delete(b, nil)
+		if replyErr != nil {
+			log.Printf("Failed to delete reply message after delay: %v", replyErr)
+		}
+
+		// Delete the original message
+		_, origErr := msg.Delete(b, nil)
+		if origErr != nil {
+			log.Printf("Failed to delete original message after delay: %v", origErr)
+		}
+	}()
+
+	return sentMsg, nil
 }
 
 func CheckClubMemberPermissions(b *gotgbot.Bot, msg *gotgbot.Message, config *config.Config, commandName string) bool {
