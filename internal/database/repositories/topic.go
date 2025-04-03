@@ -12,7 +12,7 @@ type Topic struct {
 	ID           int
 	Topic        string
 	UserNickname *string
-	ContentID    int
+	EventID      int
 	CreatedAt    time.Time
 }
 
@@ -27,34 +27,34 @@ func NewTopicRepository(db *sql.DB) *TopicRepository {
 }
 
 // CreateTopic inserts a new topic record into the database
-func (r *TopicRepository) CreateTopic(topic string, userNickname string, contentID int) (int, error) {
+func (r *TopicRepository) CreateTopic(topic string, userNickname string, eventID int) (int, error) {
 	var id int
-	query := `INSERT INTO topics (topic, user_nickname, content_id) VALUES ($1, $2, $3) RETURNING id`
-	err := r.db.QueryRow(query, topic, userNickname, contentID).Scan(&id)
+	query := `INSERT INTO topics (topic, user_nickname, event_id) VALUES ($1, $2, $3) RETURNING id`
+	err := r.db.QueryRow(query, topic, userNickname, eventID).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert topic: %w", err)
 	}
 	return id, nil
 }
 
-// GetTopicsByContentID retrieves all topics for a specific content
-func (r *TopicRepository) GetTopicsByContentID(contentID int) ([]Topic, error) {
+// GetTopicsByEventID retrieves all topics for a specific event
+func (r *TopicRepository) GetTopicsByEventID(eventID int) ([]Topic, error) {
 	query := `
-		SELECT id, topic, user_nickname, content_id, created_at
+		SELECT id, topic, user_nickname, event_id, created_at
 		FROM topics
-		WHERE content_id = $1
+		WHERE event_id = $1
 		ORDER BY created_at DESC`
 
-	rows, err := r.db.Query(query, contentID)
+	rows, err := r.db.Query(query, eventID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query topics for content ID %d: %w", contentID, err)
+		return nil, fmt.Errorf("failed to query topics for event ID %d: %w", eventID, err)
 	}
 	defer rows.Close()
 
 	var topics []Topic
 	for rows.Next() {
 		var t Topic
-		if err := rows.Scan(&t.ID, &t.Topic, &t.UserNickname, &t.ContentID, &t.CreatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.Topic, &t.UserNickname, &t.EventID, &t.CreatedAt); err != nil {
 			return nil, fmt.Errorf("failed to scan topic row: %w", err)
 		}
 		topics = append(topics, t)
@@ -70,7 +70,7 @@ func (r *TopicRepository) GetTopicsByContentID(contentID int) ([]Topic, error) {
 // GetTopicByID retrieves a single topic record by its ID
 func (r *TopicRepository) GetTopicByID(id int) (*Topic, error) {
 	query := `
-		SELECT id, topic, user_nickname, content_id, created_at
+		SELECT id, topic, user_nickname, event_id, created_at
 		FROM topics
 		WHERE id = $1`
 
@@ -79,7 +79,7 @@ func (r *TopicRepository) GetTopicByID(id int) (*Topic, error) {
 		&topic.ID,
 		&topic.Topic,
 		&topic.UserNickname,
-		&topic.ContentID,
+		&topic.EventID,
 		&topic.CreatedAt,
 	)
 

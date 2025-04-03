@@ -20,18 +20,18 @@ import (
 
 const (
 	// Conversation states
-	topicAddStateSelectContent = "topic_add_select_content"
-	topicAddStateEnterTopic    = "topic_add_enter_topic"
+	topicAddStateSelectEvent = "topic_add_select_event"
+	topicAddStateEnterTopic  = "topic_add_enter_topic"
 
 	// UserStore keys
-	topicAddUserStoreKeySelectedContentID   = "topic_add_selected_content_id"
-	topicAddUserStoreKeySelectedContentName = "topic_add_selected_content_name"
-	topicAddUserStoreKeyCancelFunc          = "topic_add_cancel_func"
+	topicAddUserStoreKeySelectedEventID   = "topic_add_selected_event_id"
+	topicAddUserStoreKeySelectedEventName = "topic_add_selected_event_name"
+	topicAddUserStoreKeyCancelFunc        = "topic_add_cancel_func"
 )
 
 type topicAddHandler struct {
 	topicRepository      *repositories.TopicRepository
-	contentRepository    *repositories.ContentRepository
+	eventRepository      *repositories.EventRepository
 	messageSenderService services.MessageSenderService
 	config               *config.Config
 	userStore            *utils.UserDataStore
@@ -39,13 +39,13 @@ type topicAddHandler struct {
 
 func NewTopicAddHandler(
 	topicRepository *repositories.TopicRepository,
-	contentRepository *repositories.ContentRepository,
+	eventRepository *repositories.EventRepository,
 	messageSenderService services.MessageSenderService,
 	config *config.Config,
 ) ext.Handler {
 	h := &topicAddHandler{
 		topicRepository:      topicRepository,
-		contentRepository:    contentRepository,
+		eventRepository:      eventRepository,
 		messageSenderService: messageSenderService,
 		config:               config,
 		userStore:            utils.NewUserDataStore(),
@@ -56,8 +56,8 @@ func NewTopicAddHandler(
 			handlers.NewCommand(constants.TopicAddCommand, h.startTopicAdd),
 		},
 		map[string][]ext.Handler{
-			topicAddStateSelectContent: {
-				handlers.NewMessage(message.All, h.handleContentSelection),
+			topicAddStateSelectEvent: {
+				handlers.NewMessage(message.All, h.handleEventSelection),
 			},
 			topicAddStateEnterTopic: {
 				handlers.NewMessage(message.All, h.handleTopicEntry),
@@ -83,67 +83,67 @@ func (h *topicAddHandler) startTopicAdd(b *gotgbot.Bot, ctx *ext.Context) error 
 		return handlers.EndConversation()
 	}
 
-	// Get last actual contents to show for selection
-	contents, err := h.contentRepository.GetLastActualContents(10)
+	// Get last actual events to show for selection
+	events, err := h.eventRepository.GetLastActualEvents(10)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Ошибка при получении списка контента.", err)
+		utils.SendLoggedReply(b, msg, "Ошибка при получении списка событий.", err)
 		return handlers.EndConversation()
 	}
 
-	if len(contents) == 0 {
-		utils.SendLoggedReply(b, msg, "Нет доступного контента для добавления тем.", nil)
+	if len(events) == 0 {
+		utils.SendLoggedReply(b, msg, "Нет доступных событий для добавления тем.", nil)
 		return handlers.EndConversation()
 	}
 
-	// Format and display content list for selection
-	formattedContents := utils.FormatContentListForUsers(
-		contents,
-		fmt.Sprintf("Выбери ID мероприятия, на которое ты хочешь закинуть тему или вопросы, либо жми /%s для отмены диалога", constants.CancelCommand),
+	// Format and display event list for selection
+	formattedEvents := utils.FormatEventListForUsers(
+		events,
+		fmt.Sprintf("Выбери ID события, к которому ты хочешь закинуть темы или вопросы, либо жми /%s для отмены диалога", constants.CancelCommand),
 	)
 
-	utils.SendLoggedMarkdownReply(b, msg, formattedContents, nil)
+	utils.SendLoggedMarkdownReply(b, msg, formattedEvents, nil)
 
-	return handlers.NextConversationState(topicAddStateSelectContent)
+	return handlers.NextConversationState(topicAddStateSelectEvent)
 }
 
-// 2. handleContentSelection processes the user's content selection
-func (h *topicAddHandler) handleContentSelection(b *gotgbot.Bot, ctx *ext.Context) error {
+// 2. handleEventSelection processes the user's event selection
+func (h *topicAddHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	userInput := strings.TrimSpace(msg.Text)
 
-	// Check if the input is a valid content ID
-	contentID, err := strconv.Atoi(userInput)
+	// Check if the input is a valid event ID
+	eventID, err := strconv.Atoi(userInput)
 	if err != nil {
 		utils.SendLoggedReply(
 			b,
 			msg,
-			fmt.Sprintf("Пожалуйста, отправь корректный ID контента или /%s для отмены.", constants.CancelCommand),
+			fmt.Sprintf("Пожалуйста, отправь корректный ID события или жми /%s для отмены.", constants.CancelCommand),
 			nil,
 		)
 		return nil // Stay in the same state
 	}
 
-	// Get the content information
-	content, err := h.contentRepository.GetContentByID(contentID)
+	// Get the event information
+	event, err := h.eventRepository.GetEventByID(eventID)
 	if err != nil {
 		utils.SendLoggedReply(
 			b,
 			msg,
-			fmt.Sprintf("Не удалось найти контент с ID %d. Пожалуйста, проверь ID.", contentID),
+			fmt.Sprintf("Не удалось найти событие с ID %d. Пожалуйста, проверь ID.", eventID),
 			err,
 		)
 		return nil // Stay in the same state
 	}
 
-	// Store the selected content ID for later use when creating a new topic
-	h.userStore.Set(ctx.EffectiveUser.Id, topicAddUserStoreKeySelectedContentID, contentID)
-	h.userStore.Set(ctx.EffectiveUser.Id, topicAddUserStoreKeySelectedContentName, content.Name)
+	// Store the selected event ID for later use when creating a new topic
+	h.userStore.Set(ctx.EffectiveUser.Id, topicAddUserStoreKeySelectedEventID, eventID)
+	h.userStore.Set(ctx.EffectiveUser.Id, topicAddUserStoreKeySelectedEventName, event.Name)
 
 	// Prompt user to enter a topic
 	utils.SendLoggedMarkdownReply(
 		b,
 		msg,
-		fmt.Sprintf("Отправь мне темы или вопросы к мероприятию *%s*, либо используй /%s для отмены диалога.", content.Name, constants.CancelCommand),
+		fmt.Sprintf("Отправь мне темы или вопросы к событию *%s*, либо используй /%s для отмены диалога.", event.Name, constants.CancelCommand),
 		nil,
 	)
 
@@ -165,41 +165,41 @@ func (h *topicAddHandler) handleTopicEntry(b *gotgbot.Bot, ctx *ext.Context) err
 		return nil // Stay in the same state
 	}
 
-	// Get the selected content ID from user store
-	contentIDInterface, ok := h.userStore.Get(ctx.EffectiveUser.Id, topicAddUserStoreKeySelectedContentID)
+	// Get the selected event ID from user store
+	eventIDInterface, ok := h.userStore.Get(ctx.EffectiveUser.Id, topicAddUserStoreKeySelectedEventID)
 	if !ok {
 		utils.SendLoggedReply(
 			b,
 			msg,
-			"Произошла ошибка: не найден выбранный контент. Пожалуйста, начни заново.",
+			"Произошла ошибка: не найден выбранное событие. Пожалуйста, начни заново.",
 			nil,
 		)
 		return handlers.EndConversation()
 	}
 
-	contentID := contentIDInterface.(int)
+	eventID := eventIDInterface.(int)
 	userNickname := "не указано"
 	if ctx.EffectiveUser.Username != "" {
 		userNickname = ctx.EffectiveUser.Username
 	}
 
 	// Create the new topic
-	_, err := h.topicRepository.CreateTopic(topicText, userNickname, contentID)
+	_, err := h.topicRepository.CreateTopic(topicText, userNickname, eventID)
 	if err != nil {
 		utils.SendLoggedReply(b, msg, "Ой! Ошибка записи в базу данных...", err)
 		return handlers.EndConversation()
 	}
 
 	// Send notification to admin about new topic
-	contentName, _ := h.userStore.Get(ctx.EffectiveUser.Id, topicAddUserStoreKeySelectedContentName)
+	eventName, _ := h.userStore.Get(ctx.EffectiveUser.Id, topicAddUserStoreKeySelectedEventName)
 	adminChatID := h.config.AdminUserID
 
 	adminMsg := fmt.Sprintf(
 		"🔔 *Новая тема добавлена*\n\n"+
-			"_Мероприятие:_ %s\n"+
+			"_Событие:_ %s\n"+
 			"_Автор:_ @%s\n"+
 			"_Топик:_ %s",
-		contentName,
+		eventName,
 		userNickname,
 		topicText,
 	)
@@ -211,7 +211,7 @@ func (h *topicAddHandler) handleTopicEntry(b *gotgbot.Bot, ctx *ext.Context) err
 	}
 
 	utils.SendLoggedReply(b, msg,
-		fmt.Sprintf("Добавлено! \nИспользуй команду /%s для просмотра всех тем и вопросов к мероприятию.", constants.TopicsShowCommand),
+		fmt.Sprintf("Добавлено! \nИспользуй команду /%s для просмотра всех тем и вопросов к событию.", constants.TopicsCommand),
 		nil,
 	)
 

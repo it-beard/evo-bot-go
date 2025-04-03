@@ -12,7 +12,7 @@ func NewAddStartedAtToContents() *AddStartedAtToContents {
 	return &AddStartedAtToContents{
 		BaseMigration: BaseMigration{
 			name:      "add_started_at_to_contents",
-			timestamp: "20240402",
+			timestamp: "20250402",
 		},
 	}
 }

@@ -4,12 +4,12 @@ const CodeCommand = "code"
 const SummarizeCommand = "summarize"
 const SummarizeDmFlag = "-dm"
 
-// Content Handlers
-const ContentEditCommand = "contentEdit"
-const ContentEditGetLastLimit = 10
-const ContentSetupCommand = "contentSetup"
-const ContentDeleteCommand = "contentDelete"
-const ContentFinishCommand = "contentFinish"
+// Event Handlers
+const EventEditCommand = "eventEdit"
+const EventEditGetLastLimit = 10
+const EventSetupCommand = "eventSetup"
+const EventDeleteCommand = "eventDelete"
+const EventFinishCommand = "eventFinish"
 
 // Topics Handlers
 const ShowTopicsCommand = "showTopics"

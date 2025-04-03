@@ -14,7 +14,7 @@ func NewRenameUserIdToUserNickname() *RenameUserIdToUserNickname {
 	return &RenameUserIdToUserNickname{
 		BaseMigration: BaseMigration{
 			name:      "rename_user_id_to_user_nickname",
-			timestamp: "20240624",
+			timestamp: "20250402",
 		},
 	}
 }

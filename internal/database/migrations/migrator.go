@@ -13,6 +13,7 @@ func Registry() []implementations.Migration {
 		implementations.NewAddStartedAtToContents(),
 		implementations.NewChangeUserIdToNullableString(),
 		implementations.NewRenameUserIdToUserNickname(),
+		implementations.NewRenameContentsToEvents(),
 		// Add new migrations here
 	}
 }

@@ -1,29 +1,29 @@
 package constants
 
-// ContentType represents the type of content
-type ContentType string
+// EventType represents the type of event
+type EventType string
 
 const (
-	ContentTypeClubCall ContentType = "club-call"
-	ContentTypeMeetup   ContentType = "meetup"
+	EventTypeClubCall EventType = "club-call"
+	EventTypeMeetup   EventType = "meetup"
 )
 
-// AllContentTypes is a slice containing all possible ContentType values
-var AllContentTypes = []ContentType{
-	ContentTypeClubCall,
-	ContentTypeMeetup,
+// AllEventTypes is a slice containing all possible EventType values
+var AllEventTypes = []EventType{
+	EventTypeClubCall,
+	EventTypeMeetup,
 }
 
-// ContentStatus represents the status of content
-type ContentStatus string
+// EventStatus represents the status of event
+type EventStatus string
 
 const (
-	ContentStatusFinished ContentStatus = "finished"
-	ContentStatusActual   ContentStatus = "actual"
+	EventStatusFinished EventStatus = "finished"
+	EventStatusActual   EventStatus = "actual"
 )
 
-// AllContentStatuses is a slice containing all possible ContentStatus values
-var AllContentStatuses = []ContentStatus{
-	ContentStatusFinished,
-	ContentStatusActual,
+// AllEventStatuses is a slice containing all possible EventStatus values
+var AllEventStatuses = []EventStatus{
+	EventStatusFinished,
+	EventStatusActual,
 }
