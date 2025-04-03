@@ -12,7 +12,8 @@ import (
 	"evo-bot-go/internal/clients"
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
-	"evo-bot-go/internal/constants/prompts"
+	"evo-bot-go/internal/database/prompts"
+	"evo-bot-go/internal/database/repositories"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
@@ -33,25 +34,25 @@ const (
 )
 
 type toolsHandler struct {
-	openaiClient             *clients.OpenAiClient
-	config                   *config.Config
-	promptingTemplateService *services.PromptingTemplateService
-	messageSenderService     services.MessageSenderService
-	userStore                *utils.UserDataStore
+	openaiClient                *clients.OpenAiClient
+	config                      *config.Config
+	promptingTemplateRepository *repositories.PromptingTemplateRepository
+	messageSenderService        services.MessageSenderService
+	userStore                   *utils.UserDataStore
 }
 
 func NewToolsHandler(
 	openaiClient *clients.OpenAiClient,
 	messageSenderService services.MessageSenderService,
-	promptingTemplateService *services.PromptingTemplateService,
+	promptingTemplateRepository *repositories.PromptingTemplateRepository,
 	config *config.Config,
 ) ext.Handler {
 	h := &toolsHandler{
-		openaiClient:             openaiClient,
-		config:                   config,
-		promptingTemplateService: promptingTemplateService,
-		messageSenderService:     messageSenderService,
-		userStore:                utils.NewUserDataStore(),
+		openaiClient:                openaiClient,
+		config:                      config,
+		promptingTemplateRepository: promptingTemplateRepository,
+		messageSenderService:        messageSenderService,
+		userStore:                   utils.NewUserDataStore(),
 	}
 
 	return handlers.NewConversation(
@@ -152,11 +153,11 @@ func (h *toolsHandler) processToolSearch(b *gotgbot.Bot, ctx *ext.Context) error
 
 	topicLink := fmt.Sprintf("https://t.me/c/%d/%d", h.config.SuperGroupChatID, h.config.ToolTopicID)
 
-	templateText := h.promptingTemplateService.GetTemplateWithFallback(
-		context.Background(),
-		prompts.GetToolPromptTemplateDbKey,
-		prompts.GetToolPromptDefaultTemplate,
-	)
+	templateText, err := h.promptingTemplateRepository.Get(prompts.GetToolPromptTemplateDbKey)
+	if err != nil {
+		utils.SendLoggedReply(b, msg, "Произошла ошибка при получении шаблона для поиска инструментов.", err)
+		return handlers.EndConversation()
+	}
 
 	prompt := fmt.Sprintf(
 		templateText,

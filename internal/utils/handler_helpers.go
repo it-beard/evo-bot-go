@@ -2,6 +2,7 @@ package utils
 
 import (
 	"log"
+	"math/rand"
 	"time"
 
 	"evo-bot-go/internal/config"
@@ -33,9 +34,15 @@ func CheckPrivateChatType(b *gotgbot.Bot, ctx *ext.Context) bool {
 	msg := ctx.EffectiveMessage
 
 	if msg.Chat.Type != constants.PrivateChatType {
-		if _, err := ReplyAndDeleteWithReplayAfterDelay(b, msg, "*Прошу прощения* 🧐\n\nЭта команда работает только в _личной беседе_ со мной. Напишите мне напрямую, и я с удовольствием помогу.\n\nДанное сообщение и твоя команда будут автоматически удалены через 10 секунд.", 10, &gotgbot.SendMessageOpts{
-			ParseMode: "Markdown",
-		}); err != nil {
+		if _, err := ReplyWithCleanupAfterDelayWithPingMessage(
+			b,
+			msg,
+			"*Прошу прощения* 🧐\n\nЭта команда работает только в _личной беседе_ со мной. "+
+				"Напишите мне в ЛС, и я с удовольствием помогу (я тебя там пинганул, если мы общались ранее)."+
+				"\n\nДанное сообщение и твоя команда будут автоматически удалены через 10 секунд.",
+			10, &gotgbot.SendMessageOpts{
+				ParseMode: "Markdown",
+			}); err != nil {
 			log.Printf("Failed to send private-only message: %v", err)
 		}
 		return false
@@ -88,14 +95,29 @@ func ReplyAndDeleteAfterDelay(b *gotgbot.Bot, msg *gotgbot.Message, text string,
 	return sentMsg, nil
 }
 
-// ReplyAndDeleteWithReplayAfterDelay replies to a message and then deletes both the reply and the original message after the specified delay
+// ReplyWithCleanupAfterDelay replies to a message and then deletes both the reply and the original message after the specified delay
 // Returns the sent message and any error that occurred during sending
-func ReplyAndDeleteWithReplayAfterDelay(b *gotgbot.Bot, msg *gotgbot.Message, text string, delaySeconds int, opts *gotgbot.SendMessageOpts) (*gotgbot.Message, error) {
+func ReplyWithCleanupAfterDelayWithPingMessage(b *gotgbot.Bot, msg *gotgbot.Message, text string, delaySeconds int, opts *gotgbot.SendMessageOpts) (*gotgbot.Message, error) {
 	// Reply to the message
 	sentMsg, err := msg.Reply(b, text, opts)
 	if err != nil {
 		log.Printf("Failed to send reply: %v", err)
 		return nil, err
+	}
+
+	// Send a random greeting message
+	greetings := []string{
+		"Ping!",
+		"Hi!",
+		"Ку!",
+		"Приветы!",
+		"Дзень добры!",
+		"Пинг!",
+	}
+	randomGreeting := greetings[rand.Intn(len(greetings))]
+	_, greetErr := b.SendMessage(msg.From.Id, randomGreeting, nil)
+	if greetErr != nil {
+		log.Printf("Failed to send greeting message: %v", greetErr)
 	}
 
 	// Start a goroutine to delete both messages after the delay

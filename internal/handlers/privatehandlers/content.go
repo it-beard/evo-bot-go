@@ -12,7 +12,8 @@ import (
 	"evo-bot-go/internal/clients"
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
-	"evo-bot-go/internal/constants/prompts"
+	"evo-bot-go/internal/database/prompts"
+	"evo-bot-go/internal/database/repositories"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
@@ -33,25 +34,25 @@ const (
 )
 
 type contentHandler struct {
-	openaiClient             *clients.OpenAiClient
-	promptingTemplateService *services.PromptingTemplateService
-	messageSenderService     services.MessageSenderService
-	config                   *config.Config
-	userStore                *utils.UserDataStore
+	openaiClient                *clients.OpenAiClient
+	promptingTemplateRepository *repositories.PromptingTemplateRepository
+	messageSenderService        services.MessageSenderService
+	config                      *config.Config
+	userStore                   *utils.UserDataStore
 }
 
 func NewContentHandler(
 	openaiClient *clients.OpenAiClient,
 	messageSenderService services.MessageSenderService,
-	promptingTemplateService *services.PromptingTemplateService,
+	promptingTemplateRepository *repositories.PromptingTemplateRepository,
 	config *config.Config,
 ) ext.Handler {
 	h := &contentHandler{
-		openaiClient:             openaiClient,
-		promptingTemplateService: promptingTemplateService,
-		messageSenderService:     messageSenderService,
-		config:                   config,
-		userStore:                utils.NewUserDataStore(),
+		openaiClient:                openaiClient,
+		promptingTemplateRepository: promptingTemplateRepository,
+		messageSenderService:        messageSenderService,
+		config:                      config,
+		userStore:                   utils.NewUserDataStore(),
 	}
 
 	return handlers.NewConversation(
@@ -153,11 +154,11 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 	topicLink := fmt.Sprintf("https://t.me/c/%d/%d", h.config.SuperGroupChatID, h.config.ContentTopicID)
 
 	// Get the prompt template from the database
-	templateText := h.promptingTemplateService.GetTemplateWithFallback(
-		context.Background(),
-		prompts.GetContentPromptTemplateDbKey,
-		prompts.GetContentPromptDefaultTemplate,
-	)
+	templateText, err := h.promptingTemplateRepository.Get(prompts.GetContentPromptTemplateDbKey)
+	if err != nil {
+		utils.SendLoggedReply(b, msg, "Произошла ошибка при получении шаблона для поиска контента.", err)
+		return handlers.EndConversation()
+	}
 
 	prompt := fmt.Sprintf(
 		templateText,

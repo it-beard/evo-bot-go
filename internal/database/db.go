@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"evo-bot-go/internal/database/migrations"
+	"evo-bot-go/internal/database/prompts"
 	"fmt"
 	"log"
 
@@ -100,7 +101,6 @@ func (db *DB) InitSchema() error {
 		return err
 	}
 
-	log.Println("All database schemas initialized successfully")
 	return nil
 }
 
@@ -116,7 +116,6 @@ func (db *DB) InitWithMigrations() error {
 		return fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	log.Println("All migrations applied successfully")
 	return nil
 }
 
@@ -126,7 +125,6 @@ func (db *DB) initSessionSchema() error {
 		return fmt.Errorf("failed to create tg_sessions table: %w", err)
 	}
 
-	log.Println("Session schema initialized successfully")
 	return nil
 }
 
@@ -136,7 +134,40 @@ func (db *DB) initPromptingTemplatesSchema() error {
 		return fmt.Errorf("failed to create prompting_templates table: %w", err)
 	}
 
-	log.Println("Prompting templates schema initialized successfully")
+	// Insert default prompts if they don't exist
+	if err := db.insertDefaultPromptIfNotExists(prompts.GetContentPromptTemplateDbKey, prompts.GetContentPromptDefaultTemplate); err != nil {
+		return fmt.Errorf("failed to insert content prompt: %w", err)
+	}
+
+	if err := db.insertDefaultPromptIfNotExists(prompts.DailySummarizationPromptTemplateDbKey, prompts.DailySummarizationPromptDefaultTemplate); err != nil {
+		return fmt.Errorf("failed to insert summarization prompt: %w", err)
+	}
+
+	if err := db.insertDefaultPromptIfNotExists(prompts.GetToolPromptTemplateDbKey, prompts.GetToolPromptDefaultTemplate); err != nil {
+		return fmt.Errorf("failed to insert tool prompt: %w", err)
+	}
+
+	return nil
+}
+
+// insertDefaultPromptIfNotExists inserts a default prompt if it doesn't already exist
+func (db *DB) insertDefaultPromptIfNotExists(key, text string) error {
+	// Check if the prompt already exists
+	var exists bool
+	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM prompting_templates WHERE template_key = $1)", key).Scan(&exists)
+	if err != nil {
+		return fmt.Errorf("failed to check if prompt exists: %w", err)
+	}
+
+	// If it doesn't exist, insert it
+	if !exists {
+		_, err = db.Exec("INSERT INTO prompting_templates (template_key, template_text) VALUES ($1, $2)", key, text)
+		if err != nil {
+			return fmt.Errorf("failed to insert prompt: %w", err)
+		}
+		log.Printf("Inserted default prompt: %s", key)
+	}
+
 	return nil
 }
 
@@ -146,7 +177,6 @@ func (db *DB) initContentsSchema() error {
 		return fmt.Errorf("failed to create contents table: %w", err)
 	}
 
-	log.Println("Contents schema initialized successfully")
 	return nil
 }
 
@@ -156,7 +186,6 @@ func (db *DB) initTopicsSchema() error {
 		return fmt.Errorf("failed to create topics table: %w", err)
 	}
 
-	log.Println("Topics schema initialized successfully")
 	return nil
 }
 
@@ -166,7 +195,6 @@ func (db *DB) initMigrationsSchema() error {
 		return fmt.Errorf("failed to create migrations table: %w", err)
 	}
 
-	log.Println("Migrations schema initialized successfully")
 	return nil
 }
 

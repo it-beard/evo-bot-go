@@ -8,7 +8,8 @@ import (
 
 	"evo-bot-go/internal/clients"
 	"evo-bot-go/internal/config"
-	"evo-bot-go/internal/constants/prompts"
+	"evo-bot-go/internal/database/prompts"
+	"evo-bot-go/internal/database/repositories"
 	"evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -17,10 +18,10 @@ import (
 
 // SummarizationService handles the daily summarization of messages
 type SummarizationService struct {
-	config                   *config.Config
-	openaiClient             *clients.OpenAiClient
-	messageSenderService     MessageSenderService
-	promptingTemplateService *PromptingTemplateService
+	config                      *config.Config
+	openaiClient                *clients.OpenAiClient
+	messageSenderService        MessageSenderService
+	promptingTemplateRepository *repositories.PromptingTemplateRepository
 }
 
 // NewSummarizationService creates a new summarization service
@@ -28,13 +29,13 @@ func NewSummarizationService(
 	config *config.Config,
 	openaiClient *clients.OpenAiClient,
 	messageSenderService MessageSenderService,
-	promptingTemplateService *PromptingTemplateService,
+	promptingTemplateRepository *repositories.PromptingTemplateRepository,
 ) *SummarizationService {
 	return &SummarizationService{
-		config:                   config,
-		openaiClient:             openaiClient,
-		messageSenderService:     messageSenderService,
-		promptingTemplateService: promptingTemplateService,
+		config:                      config,
+		openaiClient:                openaiClient,
+		messageSenderService:        messageSenderService,
+		promptingTemplateRepository: promptingTemplateRepository,
 	}
 }
 
@@ -104,11 +105,10 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 	}
 
 	// Get the prompt template from the database with fallback to default
-	templateText := s.promptingTemplateService.GetTemplateWithFallback(
-		ctx,
-		prompts.DailySummarizationPromptTemplateDbKey,
-		prompts.DailySummarizationPromptDefaultTemplate,
-	)
+	templateText, err := s.promptingTemplateRepository.Get(prompts.DailySummarizationPromptTemplateDbKey)
+	if err != nil {
+		return fmt.Errorf("failed to get prompt template: %w", err)
+	}
 
 	// Generate summary using OpenAI with the prompt from the database
 	prompt := fmt.Sprintf(templateText, topicName, context)

@@ -1,7 +1,6 @@
 package bot
 
 import (
-	"context"
 	"log"
 	"time"
 
@@ -22,14 +21,24 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
+// HandlerDependencies contains all dependencies needed by handlers
+type HandlerDependencies struct {
+	OpenAiClient                *clients.OpenAiClient
+	AppConfig                   *config.Config
+	SummarizationService        *services.SummarizationService
+	MessageSenderService        services.MessageSenderService
+	EventRepository             *repositories.EventRepository
+	TopicRepository             *repositories.TopicRepository
+	PromptingTemplateRepository *repositories.PromptingTemplateRepository
+}
+
 // TgBotClient represents a Telegram bot client with all required dependencies
 type TgBotClient struct {
-	bot                    *gotgbot.Bot
-	dispatcher             *ext.Dispatcher
-	updater                *ext.Updater
-	db                     *database.DB
-	dailySummarizationTask *tasks.DailySummarizationTask
-	sessionKeepAliveTask   *tasks.SessionKeepAliveTask
+	bot        *gotgbot.Bot
+	dispatcher *ext.Dispatcher
+	updater    *ext.Updater
+	db         *database.DB
+	tasks      []tasks.Task
 }
 
 // NewTgBotClient creates and initializes a new Telegram bot client
@@ -60,32 +69,43 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	}
 
 	// Initialize repositories
-	promptingTemplateService := services.NewPromptingTemplateService(repositories.NewPromptingTemplateRepository(db))
 	eventRepository := repositories.NewEventRepository(db.DB)
 	topicRepository := repositories.NewTopicRepository(db.DB)
-
+	promptingTemplateRepository := repositories.NewPromptingTemplateRepository(db.DB)
 	// Initialize services
 	messageSenderService := services.NewMessageSenderService(bot)
 	summarizationService := services.NewSummarizationService(
-		appConfig, openaiClient, messageSenderService, promptingTemplateService,
+		appConfig, openaiClient, messageSenderService, promptingTemplateRepository,
 	)
 
 	// Initialize scheduled tasks
-	dailySummarization := tasks.NewDailySummarizationTask(appConfig, summarizationService)
-	sessionKeepAlive := tasks.NewSessionKeepAliveTask(30 * time.Minute)
+	scheduledTasks := []tasks.Task{
+		tasks.NewSessionKeepAliveTask(30 * time.Minute),
+		tasks.NewDailySummarizationTask(appConfig, summarizationService),
+	}
 
 	// Create bot client
 	client := &TgBotClient{
-		bot:                    bot,
-		dispatcher:             dispatcher,
-		updater:                updater,
-		db:                     db,
-		dailySummarizationTask: dailySummarization,
-		sessionKeepAliveTask:   sessionKeepAlive,
+		bot:        bot,
+		dispatcher: dispatcher,
+		updater:    updater,
+		db:         db,
+		tasks:      scheduledTasks,
+	}
+
+	// Create dependencies container
+	deps := &HandlerDependencies{
+		OpenAiClient:                openaiClient,
+		AppConfig:                   appConfig,
+		SummarizationService:        summarizationService,
+		MessageSenderService:        messageSenderService,
+		EventRepository:             eventRepository,
+		TopicRepository:             topicRepository,
+		PromptingTemplateRepository: promptingTemplateRepository,
 	}
 
 	// Register all handlers
-	client.registerHandlers(openaiClient, appConfig, promptingTemplateService, summarizationService, messageSenderService, eventRepository, topicRepository)
+	client.registerHandlers(deps)
 
 	return client, nil
 }
@@ -101,64 +121,45 @@ func setupDatabase(connectionString string) (*database.DB, error) {
 		return nil, err
 	}
 
-	// Initialize default prompting templates
-	ctx := context.Background()
-	promptingTemplateRepo := repositories.NewPromptingTemplateRepository(db)
-	promptingTemplateService := services.NewPromptingTemplateService(promptingTemplateRepo)
-	if err := promptingTemplateService.InitializeDefaultTemplates(ctx); err != nil {
-		log.Printf("Warning: Failed to initialize default prompting templates: %v", err)
-	}
-
 	return db, nil
 }
 
 // registerHandlers registers all bot handlers
-func (b *TgBotClient) registerHandlers(
-	openaiClient *clients.OpenAiClient,
-	appConfig *config.Config,
-	promptingTemplateService *services.PromptingTemplateService,
-	summarizationService *services.SummarizationService,
-	messageSenderService services.MessageSenderService,
-	eventRepository *repositories.EventRepository,
-	topicRepository *repositories.TopicRepository,
-) {
+func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 	// Register start handler, that avaliable for all users
-	b.dispatcher.AddHandler(handlers.NewStartHandler(appConfig))
+	b.dispatcher.AddHandler(handlers.NewStartHandler(deps.AppConfig))
 
 	// Register admin chat handlers
 	adminHandlers := []ext.Handler{
-		adminhandlers.NewCodeHandler(appConfig),
-		adminhandlers.NewSummarizeHandler(summarizationService, messageSenderService, appConfig),
-		adminhandlers.NewShowTopicsHandler(topicRepository, eventRepository, messageSenderService, appConfig),
-		eventhandlers.NewEventEditHandler(eventRepository, appConfig),
-		eventhandlers.NewEventSetupHandler(eventRepository, appConfig),
-		eventhandlers.NewEventDeleteHandler(eventRepository, appConfig),
-		eventhandlers.NewEventFinishHandler(eventRepository, appConfig),
-	}
-	for _, handler := range adminHandlers {
-		b.dispatcher.AddHandler(handler)
+		adminhandlers.NewCodeHandler(deps.AppConfig),
+		adminhandlers.NewSummarizeHandler(deps.SummarizationService, deps.MessageSenderService, deps.AppConfig),
+		adminhandlers.NewShowTopicsHandler(deps.TopicRepository, deps.EventRepository, deps.MessageSenderService, deps.AppConfig),
+		eventhandlers.NewEventEditHandler(deps.EventRepository, deps.AppConfig),
+		eventhandlers.NewEventSetupHandler(deps.EventRepository, deps.AppConfig),
+		eventhandlers.NewEventDeleteHandler(deps.EventRepository, deps.AppConfig),
+		eventhandlers.NewEventFinishHandler(deps.EventRepository, deps.AppConfig),
 	}
 
 	// Register private chat handlers
 	privateHandlers := []ext.Handler{
-		privatehandlers.NewHelpHandler(appConfig),
-		privatehandlers.NewToolsHandler(openaiClient, messageSenderService, promptingTemplateService, appConfig),
-		privatehandlers.NewContentHandler(openaiClient, messageSenderService, promptingTemplateService, appConfig),
-		privatehandlers.NewEventsHandler(eventRepository, appConfig),
-		topicshandlers.NewTopicsHandler(topicRepository, eventRepository, messageSenderService, appConfig),
-		topicshandlers.NewTopicAddHandler(topicRepository, eventRepository, messageSenderService, appConfig),
-	}
-	for _, handler := range privateHandlers {
-		b.dispatcher.AddHandler(handler)
+		privatehandlers.NewHelpHandler(deps.AppConfig),
+		privatehandlers.NewToolsHandler(deps.OpenAiClient, deps.MessageSenderService, deps.PromptingTemplateRepository, deps.AppConfig),
+		privatehandlers.NewContentHandler(deps.OpenAiClient, deps.MessageSenderService, deps.PromptingTemplateRepository, deps.AppConfig),
+		privatehandlers.NewEventsHandler(deps.EventRepository, deps.AppConfig),
+		topicshandlers.NewTopicsHandler(deps.TopicRepository, deps.EventRepository, deps.MessageSenderService, deps.AppConfig),
+		topicshandlers.NewTopicAddHandler(deps.TopicRepository, deps.EventRepository, deps.MessageSenderService, deps.AppConfig),
 	}
 
 	// Register group chat handlers
 	groupHandlers := []ext.Handler{
 		grouphandlers.NewDeleteJoinLeftMessagesHandler(),
-		grouphandlers.NewRepliesFromClosedThreadsHandler(messageSenderService, appConfig),
-		grouphandlers.NewCleanClosedThreadsHandler(messageSenderService, appConfig),
+		grouphandlers.NewRepliesFromClosedThreadsHandler(deps.MessageSenderService, deps.AppConfig),
+		grouphandlers.NewCleanClosedThreadsHandler(deps.MessageSenderService, deps.AppConfig),
 	}
-	for _, handler := range groupHandlers {
+
+	// Combine all handlers
+	allHandlers := append(append(adminHandlers, privateHandlers...), groupHandlers...)
+	for _, handler := range allHandlers {
 		b.dispatcher.AddHandler(handler)
 	}
 }
@@ -166,8 +167,9 @@ func (b *TgBotClient) registerHandlers(
 // Start begins the bot polling and starts scheduled tasks
 func (b *TgBotClient) Start() {
 	// Start scheduled tasks
-	b.dailySummarizationTask.Start()
-	b.sessionKeepAliveTask.Start()
+	for _, task := range b.tasks {
+		task.Start()
+	}
 
 	// Configure and start polling
 	pollingOpts := &ext.PollingOpts{
@@ -191,8 +193,9 @@ func (b *TgBotClient) Start() {
 // Close gracefully shuts down the bot and all its resources
 func (b *TgBotClient) Close() error {
 	// Stop scheduled tasks
-	b.dailySummarizationTask.Stop()
-	b.sessionKeepAliveTask.Stop()
+	for _, task := range b.tasks {
+		task.Stop()
+	}
 
 	// Close database connection
 	return b.db.Close()
