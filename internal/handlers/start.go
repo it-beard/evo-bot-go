@@ -8,6 +8,14 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/callbackquery"
+)
+
+const (
+	// Conversation states names
+	startHandlerStateProcessCallback = "start_handler_state_process_callback"
+	// Callbacks names
+	startHandlerCallbackHelp = "start_handler_callback_help"
 )
 
 type startHandler struct {
@@ -18,14 +26,23 @@ func NewStartHandler(config *config.Config) ext.Handler {
 	h := &startHandler{
 		config: config,
 	}
-
-	return handlers.NewCommand(constants.StartCommand, h.handleCommand)
+	return handlers.NewConversation(
+		[]ext.Handler{
+			handlers.NewCommand(constants.StartCommand, h.handleStart),
+		},
+		map[string][]ext.Handler{
+			startHandlerStateProcessCallback: {
+				handlers.NewCallback(callbackquery.Equal(startHandlerCallbackHelp), h.handleCallbackHelp),
+			},
+		},
+		nil,
+	)
 }
 
-func (h *startHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *startHandler) handleStart(b *gotgbot.Bot, ctx *ext.Context) error {
 	// Only proceed if this is a private chat
 	if !utils.CheckPrivateChatType(b, ctx) {
-		return nil
+		return handlers.EndConversation()
 	}
 
 	userName := ""
@@ -58,7 +75,41 @@ func (h *startHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 			"👉 [Жду тебя в клубе!](https://web.tribute.tg/l/get-started)"
 	}
 
-	utils.SendLoggedMarkdownReply(b, ctx.EffectiveMessage, message, nil)
+	inlineKeyboard := gotgbot.InlineKeyboardMarkup{
+		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
+			{
+				{
+					Text:         "💡 Инструкция",
+					CallbackData: startHandlerCallbackHelp,
+				},
+			},
+		},
+	}
 
-	return nil
+	utils.SendLoggedReplyWithOptions(
+		b,
+		ctx.EffectiveMessage,
+		message,
+		&gotgbot.SendMessageOpts{
+			ParseMode: "Markdown",
+			LinkPreviewOptions: &gotgbot.LinkPreviewOptions{
+				IsDisabled: true,
+			},
+			ReplyMarkup: inlineKeyboard,
+		},
+		nil)
+
+	return handlers.NextConversationState(startHandlerStateProcessCallback)
+}
+
+func (h *startHandler) handleCallbackHelp(b *gotgbot.Bot, ctx *ext.Context) error {
+	cb := ctx.Update.CallbackQuery
+	_, _ = cb.Answer(b, nil)
+
+	isAdmin := utils.IsUserAdminOrCreator(b, ctx.EffectiveMessage.From.Id, h.config.SuperGroupChatID)
+	helpText := utils.FormatHelpMessage(isAdmin)
+
+	utils.SendLoggedHtmlReply(b, ctx.EffectiveMessage, helpText, nil)
+
+	return handlers.EndConversation()
 }

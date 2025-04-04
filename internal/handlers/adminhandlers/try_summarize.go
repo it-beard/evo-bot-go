@@ -18,11 +18,11 @@ import (
 )
 
 const (
-	// Conversation states
-	trySummarizeHandlerStateConfirmation = "try_summarize_handler_confirmation"
-	// Callback data
-	trySummarizeCallbackConfirmYes    = "try_summarize_confirm_yes"
-	trySummarizeCallbackConfirmCancel = "try_summarize_confirm_cancel"
+	// Conversation states names
+	trySummarizeHandlerStateProcessCallbacks = "try_summarize_handler_state_process_callbacks"
+	// Callbacks names
+	trySummarizeCallbackConfirmYes    = "try_summarize_callback_confirm_yes"
+	trySummarizeCallbackConfirmCancel = "try_summarize_callback_confirm_cancel"
 )
 
 type trySummarizeHandler struct {
@@ -32,7 +32,6 @@ type trySummarizeHandler struct {
 	userStore            *utils.UserDataStore
 }
 
-// NewTrySummarizeHandler creates a new try summarize handler
 func NewTrySummarizeHandler(
 	summarizationService *services.SummarizationService,
 	messageSenderService services.MessageSenderService,
@@ -50,7 +49,7 @@ func NewTrySummarizeHandler(
 			handlers.NewCommand(constants.TrySummarizeCommand, h.startSummarizeConversation),
 		},
 		map[string][]ext.Handler{
-			trySummarizeHandlerStateConfirmation: {
+			trySummarizeHandlerStateProcessCallbacks: {
 				handlers.NewCallback(callbackquery.Equal(trySummarizeCallbackConfirmYes), h.handleCallbackConfirmation),
 				handlers.NewCallback(callbackquery.Equal(trySummarizeCallbackConfirmCancel), h.handleCallbackCancel),
 				handlers.NewMessage(message.All, h.handleTextDuringConfirmation),
@@ -98,7 +97,7 @@ func (h *trySummarizeHandler) startSummarizeConversation(b *gotgbot.Bot, ctx *ex
 		},
 		nil)
 
-	return handlers.NextConversationState(trySummarizeHandlerStateConfirmation)
+	return handlers.NextConversationState(trySummarizeHandlerStateProcessCallbacks)
 }
 
 // handleCallbackConfirmation processes the user's callback confirmation
