@@ -102,6 +102,12 @@ func (s *MessageSenderService) SendHtml(chatId int64, text string, opts *gotgbot
 
 // Reply to a message
 func (s *MessageSenderService) Reply(msg *gotgbot.Message, replyText string, opts *gotgbot.SendMessageOpts) error {
+	_, err := s.ReplyWithReturnMessage(msg, replyText, opts)
+	return err
+}
+
+// Reply to a message
+func (s *MessageSenderService) ReplyWithReturnMessage(msg *gotgbot.Message, replyText string, opts *gotgbot.SendMessageOpts) (*gotgbot.Message, error) {
 	// default link preview options are disabled
 	if opts == nil {
 		opts = &gotgbot.SendMessageOpts{
@@ -115,13 +121,13 @@ func (s *MessageSenderService) Reply(msg *gotgbot.Message, replyText string, opt
 		}
 	}
 
-	_, err := msg.Reply(s.bot, replyText, opts)
+	sentMsg, err := msg.Reply(s.bot, replyText, opts)
 
 	if err != nil {
 		log.Printf("%s: Reply: Failed to send message: %v", utils.GetCurrentTypeName(), err)
 	}
 
-	return err
+	return sentMsg, err
 }
 
 // Reply to a message with markdown

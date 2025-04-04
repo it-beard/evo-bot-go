@@ -26,7 +26,7 @@ const (
 	eventStartStateEnterLink   = "event_start_state_enter_link"
 	eventStartStateConfirm     = "event_start_state_confirm"
 
-	// Context context data keys
+	// Context data keys
 	eventStartCtxDataKeySelectedEventID   = "event_start_ctx_data_key_selected_event_id"
 	eventStartCtxDataKeyEventLink         = "event_start_ctx_data_key_event_link"
 	eventStartCtxDataKeyPreviousMessageID = "event_start_ctx_data_key_previous_message_id"
@@ -116,7 +116,7 @@ func (h *eventStartHandler) startEvent(b *gotgbot.Bot, ctx *ext.Context) error {
 	actionDescription := "которое ты хочешь запустить"
 	formattedResponse := formatters.FormatEventListForAdmin(events, title, constants.CancelCommand, actionDescription)
 
-	sentMsg, err := h.messageSenderService.ReplyMarkdownWithReturnMessage(msg, formattedResponse, &gotgbot.SendMessageOpts{
+	sentMsg, _ := h.messageSenderService.ReplyMarkdownWithReturnMessage(msg, formattedResponse, &gotgbot.SendMessageOpts{
 		ReplyMarkup: formatters.CancelButton(eventStartCallbackConfirmCancel),
 	})
 
@@ -146,8 +146,8 @@ func (h *eventStartHandler) handleSelectEvent(b *gotgbot.Bot, ctx *ext.Context) 
 		return handlers.EndConversation()
 	}
 
-	h.MessageRemoveInlineKeyboard(b, nil, &ctx.EffectiveUser.Id)
-	sentMsg, err := h.messageSenderService.ReplyMarkdownWithReturnMessage(
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
+	sentMsg, _ := h.messageSenderService.ReplyMarkdownWithReturnMessage(
 		msg,
 		fmt.Sprintf(
 			"🔗 Отправь мне ссылку на мероприятие '%s' (ID: %d)\nЭта ссылка будет отправлена в чат объявлений.",
@@ -209,7 +209,7 @@ func (h *eventStartHandler) handleEnterLink(b *gotgbot.Bot, ctx *ext.Context) er
 		return handlers.EndConversation()
 	}
 
-	h.MessageRemoveInlineKeyboard(b, nil, &ctx.EffectiveUser.Id)
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 
 	sentMsg, err := h.messageSenderService.ReplyMarkdownWithReturnMessage(msg, fmt.Sprintf(
 		"*Подтверждение запуска мероприятия*\n\n🎯 *%s* _(ID: %d)_\n\n🔗 Ссылка: `%s`\n\nЭта ссылка будет отправлена в чат объявлений.\n\nНажми на кнопку ниже для подтверждения или отмены",
@@ -227,8 +227,6 @@ func (h *eventStartHandler) handleCallbackYes(b *gotgbot.Bot, ctx *ext.Context) 
 	// Answer the callback query to remove the loading state on the button
 	cb := ctx.Update.CallbackQuery
 	_, _ = cb.Answer(b, nil)
-
-	h.MessageRemoveInlineKeyboard(b, ctx, nil)
 
 	// Get the selected event ID
 	eventIDVal, ok := h.userStore.Get(ctx.EffectiveUser.Id, eventStartCtxDataKeySelectedEventID)
@@ -315,6 +313,8 @@ func (h *eventStartHandler) handleCallbackYes(b *gotgbot.Bot, ctx *ext.Context) 
 		nil,
 	)
 
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
+
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)
 
@@ -339,37 +339,25 @@ func (h *eventStartHandler) handleCallbackCancel(b *gotgbot.Bot, ctx *ext.Contex
 	cb := ctx.Update.CallbackQuery
 	_, _ = cb.Answer(b, nil)
 
-	h.MessageRemoveInlineKeyboard(b, ctx, nil)
-
-	h.messageSenderService.Reply(ctx.EffectiveMessage, "Операция старта мероприятия отменена.", nil)
-	log.Printf("%s: Event start canceled", utils.GetCurrentTypeName())
-
-	// Clean up user data
-	h.userStore.Clear(ctx.EffectiveUser.Id)
-
-	return handlers.EndConversation()
+	return h.handleCancel(b, ctx)
 }
 
 // handleCancel handles the /cancel command
 func (h *eventStartHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	h.messageSenderService.Reply(msg, "Операция старта мероприятия отменена.", nil)
+	log.Printf("%s: Event start canceled", utils.GetCurrentTypeName())
+
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 
 	// Clean up user data
-	h.MessageRemoveInlineKeyboard(b, nil, &ctx.EffectiveUser.Id)
 	h.userStore.Clear(ctx.EffectiveUser.Id)
 
 	return handlers.EndConversation()
 }
 
-func (h *eventStartHandler) MessageRemoveInlineKeyboard(b *gotgbot.Bot, ctx *ext.Context, userID *int64) {
+func (h *eventStartHandler) MessageRemoveInlineKeyboard(b *gotgbot.Bot, userID *int64) {
 	var chatID, messageID int64
-
-	// Try to get message info from context first
-	if ctx != nil {
-		chatID = ctx.EffectiveChat.Id
-		messageID = ctx.EffectiveMessage.MessageId
-	}
 
 	// If userID provided, try to get stored message info
 	if userID != nil {
