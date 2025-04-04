@@ -10,6 +10,7 @@ import (
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/repositories"
+	"evo-bot-go/internal/formatters"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
@@ -105,7 +106,7 @@ func (h *eventEditHandler) startEdit(b *gotgbot.Bot, ctx *ext.Context) error {
 	// Create a list of events to display
 	title := fmt.Sprintf("Последние %d мероприятия:", len(events))
 	actionDescription := "которое ты хочешь отредактировать"
-	formattedResponse := utils.FormatEventListForAdmin(events, title, constants.CancelCommand, actionDescription)
+	formattedResponse := formatters.FormatEventListForAdmin(events, title, constants.CancelCommand, actionDescription)
 
 	h.messageSenderService.ReplyMarkdown(b, msg, formattedResponse, nil)
 

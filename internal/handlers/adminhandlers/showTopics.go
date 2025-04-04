@@ -10,6 +10,7 @@ import (
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/repositories"
+	"evo-bot-go/internal/formatters"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
@@ -98,7 +99,7 @@ func (h *showTopicsHandler) startShowTopics(b *gotgbot.Bot, ctx *ext.Context) er
 	}
 
 	// Format and display event list for admin
-	formattedEvents := utils.FormatEventListForAdmin(
+	formattedEvents := formatters.FormatEventListForAdmin(
 		events,
 		"Список мероприятий",
 		constants.CancelCommand,
@@ -152,7 +153,7 @@ func (h *showTopicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Contex
 	h.userStore.Set(ctx.EffectiveUser.Id, showTopicsUserStoreEventID, eventID)
 
 	// Format and display topics for admin
-	formattedTopics := utils.FormatTopicListForAdmin(topics, event.Name, event.Type)
+	formattedTopics := formatters.FormatTopicListForAdmin(topics, event.Name, event.Type)
 	h.messageSenderService.ReplyMarkdown(b, msg, formattedTopics, nil)
 
 	// If there are topics, suggest deletion option
@@ -249,7 +250,7 @@ func (h *showTopicsHandler) handleTopicDeletion(b *gotgbot.Bot, ctx *ext.Context
 	}
 
 	// Show updated list of topics
-	formattedTopics := utils.FormatTopicListForAdmin(topics, event.Name, event.Type)
+	formattedTopics := formatters.FormatTopicListForAdmin(topics, event.Name, event.Type)
 	h.messageSenderService.ReplyMarkdown(b, msg, formattedTopics, nil)
 
 	// If there are still topics, allow for more deletions

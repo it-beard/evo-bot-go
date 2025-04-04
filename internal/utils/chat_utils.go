@@ -1,12 +1,15 @@
 package utils
 
 import (
-	"fmt"
-	"log"
-
 	"evo-bot-go/internal/clients"
 	"evo-bot-go/internal/config"
+	"fmt"
+	"log"
 )
+
+func ChatIdToFullChatId(chatId int64) int64 {
+	return -1000000000000 - chatId
+}
 
 // GetTopicName retrieves the topic name from the topic ID using the Telegram API
 func GetTopicName(topicId int) (string, error) {

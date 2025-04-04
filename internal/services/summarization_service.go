@@ -42,7 +42,7 @@ func NewSummarizationService(
 
 // RunDailySummarization runs the daily summarization process
 func (s *SummarizationService) RunDailySummarization(ctx context.Context, sendToDM bool) error {
-	log.Println("Summarization Service: Starting daily summarization process")
+	log.Printf("%s: Starting daily summarization process", utils.GetCurrentTypeName())
 
 	// Get the time 24 hours ago
 	since := time.Now().Add(-24 * time.Hour)
@@ -50,13 +50,13 @@ func (s *SummarizationService) RunDailySummarization(ctx context.Context, sendTo
 	// Process each monitored topic
 	for _, topicID := range s.config.MonitoredTopicsIDs {
 		if err := s.summarizeTopicMessages(ctx, topicID, since, sendToDM); err != nil {
-			log.Printf("Summarization Service: Error summarizing topic %d: %v", topicID, err)
+			log.Printf("%s: Error summarizing topic %d: %v", utils.GetCurrentTypeName(), topicID, err)
 			// Continue with other chats even if one fails
 			continue
 		}
 	}
 
-	log.Println("Summarization Service: Daily summarization process completed")
+	log.Printf("%s: Daily summarization process completed", utils.GetCurrentTypeName())
 	return nil
 }
 
@@ -65,7 +65,7 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 	// Get topic name
 	topicName, err := utils.GetTopicName(topicID)
 	if err != nil {
-		return fmt.Errorf("Summarization Service: failed to get topic name: %w", err)
+		return fmt.Errorf("%s: failed to get topic name: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	// Calculate hours since the given time
@@ -74,15 +74,15 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 	// Get messages directly from Telegram instead of database
 	tgMessages, err := clients.GetLastTopicMessagesByTime(s.config.SuperGroupChatID, topicID, hoursSince)
 	if err != nil {
-		return fmt.Errorf("Summarization Service: failed to get messages from Telegram: %w", err)
+		return fmt.Errorf("%s: failed to get messages from Telegram: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	if len(tgMessages) == 0 {
-		log.Printf("Summarization Service: No messages found for topic %d since %v", topicID, since)
+		log.Printf("%s: No messages found for topic %d since %v", utils.GetCurrentTypeName(), topicID, since)
 		return nil
 	}
 
-	log.Printf("Summarization Service: Found %d messages for topic %d", len(tgMessages), topicID)
+	log.Printf("%s: Found %d messages for topic %d", utils.GetCurrentTypeName(), len(tgMessages), topicID)
 
 	// Build context directly from all messages without using RAG
 	context := ""
@@ -128,7 +128,7 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 	// Get the prompt template from the database with fallback to default
 	templateText, err := s.promptingTemplateRepository.Get(prompts.DailySummarizationPromptTemplateDbKey)
 	if err != nil {
-		return fmt.Errorf("Summarization Service: failed to get prompt template: %w", err)
+		return fmt.Errorf("%s: failed to get prompt template: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	dateNow := time.Now().Format("02.01.2006")
@@ -156,7 +156,7 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 	// Save the prompt into a temporary file for logging purposes.
 	err = os.WriteFile("last-prompt-log.txt", []byte(prompt), 0644)
 	if err != nil {
-		log.Printf("Summarization Service: Error writing prompt to file: %v", err)
+		log.Printf("%s: Error writing prompt to file: %v", utils.GetCurrentTypeName(), err)
 	}
 
 	summary, err := s.openaiClient.GetCompletion(ctx, prompt)
@@ -176,13 +176,13 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 		if userID, ok := ctx.Value("userID").(int64); ok {
 			targetTopicID = userID
 		} else {
-			log.Println("Summarization Service: Warning: sendToDM is true but userID not found in context, using SummaryTopicID instead")
+			log.Printf("%s: Warning: sendToDM is true but userID not found in context, using SummaryTopicID instead", utils.GetCurrentTypeName())
 		}
 	}
 
 	// Send the summary to the target chat
 	s.messageSenderService.SendHtml(targetTopicID, finalSummary, nil)
 
-	log.Printf("Summarization Service: Summary sent successfully")
+	log.Printf("%s: Summary sent successfully", utils.GetCurrentTypeName())
 	return nil
 }

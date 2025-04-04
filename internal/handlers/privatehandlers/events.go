@@ -4,6 +4,7 @@ import (
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/repositories"
+	"evo-bot-go/internal/formatters"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 	"fmt"
@@ -61,7 +62,7 @@ func (h *eventsHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	// Format and display event list
-	formattedEvents := utils.FormatEventListForUsersWithoutIds(
+	formattedEvents := formatters.FormatEventListForUsersWithoutIds(
 		events,
 		"📋 Список ближайших мероприятий",
 	)

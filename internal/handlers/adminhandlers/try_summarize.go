@@ -65,7 +65,7 @@ func NewTrySummarizeHandler(
 // startSummarizeConversation initiates the summarize conversation
 func (h *trySummarizeHandler) startSummarizeConversation(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
-	log.Printf("%s: User %d initiated summarization", utils.GetCurrentHandlerName(), msg.From.Id)
+	log.Printf("%s: User %d initiated summarization", utils.GetCurrentTypeName(), msg.From.Id)
 
 	// Check if the user is an admin
 	if !utils.IsUserAdminOrCreator(b, msg.From.Id, h.config.SuperGroupChatID) {
@@ -105,7 +105,7 @@ func (h *trySummarizeHandler) startSummarizeConversation(b *gotgbot.Bot, ctx *ex
 func (h *trySummarizeHandler) handleCallbackConfirmation(b *gotgbot.Bot, ctx *ext.Context) error {
 	// Answer the callback query to remove the loading state on the button
 	cb := ctx.Update.CallbackQuery
-	log.Printf("%s: User %d confirmed summarization", utils.GetCurrentHandlerName(), cb.From.Id)
+	log.Printf("%s: User %d confirmed summarization", utils.GetCurrentTypeName(), cb.From.Id)
 	_, _ = cb.Answer(b, nil)
 
 	return h.startSummarization(b, ctx)
@@ -131,7 +131,7 @@ func (h *trySummarizeHandler) startSummarization(b *gotgbot.Bot, ctx *ext.Contex
 	chatId := ctx.EffectiveMessage.Chat.Id
 
 	// Get the handler name using our new utility function
-	log.Printf("%s: Starting summarization process", utils.GetCurrentHandlerName())
+	log.Printf("%s: Starting summarization process", utils.GetCurrentTypeName())
 
 	h.messageSenderService.Reply(b, ctx.EffectiveMessage, "Запуск процесса саммаризации...", nil)
 
@@ -166,8 +166,11 @@ func (h *trySummarizeHandler) startSummarization(b *gotgbot.Bot, ctx *ext.Contex
 		err := h.summarizationService.RunDailySummarization(ctxTimeout, true)
 		if err != nil {
 			h.messageSenderService.Reply(b, ctx.EffectiveMessage, "Ошибка при создании саммаризации.", nil)
-			log.Printf("%s: Error during summarization: %v", utils.GetCurrentHandlerName(), err)
+			log.Printf("%s: Error during summarization: %v", utils.GetCurrentTypeName(), err)
 		}
+
+		h.messageSenderService.Reply(b, ctx.EffectiveMessage, "Саммаризация успешно создана.", nil)
+		log.Printf("%s: Summarization created successfully", utils.GetCurrentTypeName())
 
 		// Cancel the periodic typing action immediately after getting the response.
 		cancelTyping()
@@ -183,7 +186,7 @@ func (h *trySummarizeHandler) startSummarization(b *gotgbot.Bot, ctx *ext.Contex
 // handleCancel handles the /cancel command
 func (h *trySummarizeHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
-	log.Printf("%s: User %d canceled using /cancel command", utils.GetCurrentHandlerName(), msg.From.Id)
+	log.Printf("%s: User %d canceled using /cancel command", utils.GetCurrentTypeName(), msg.From.Id)
 
 	h.messageSenderService.Reply(b, msg, "Операция саммаризации отменена.", nil)
 
@@ -195,7 +198,7 @@ func (h *trySummarizeHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) err
 
 // handleTextDuringConfirmation handles text messages during the confirmation state
 func (h *trySummarizeHandler) handleTextDuringConfirmation(b *gotgbot.Bot, ctx *ext.Context) error {
-	log.Printf("%s: User %d sent text during confirmation", utils.GetCurrentHandlerName(), ctx.EffectiveUser.Id)
+	log.Printf("%s: User %d sent text during confirmation", utils.GetCurrentTypeName(), ctx.EffectiveUser.Id)
 
 	h.messageSenderService.Reply(
 		b,

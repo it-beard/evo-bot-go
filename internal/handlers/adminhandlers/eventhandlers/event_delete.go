@@ -9,6 +9,7 @@ import (
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/repositories"
+	"evo-bot-go/internal/formatters"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
@@ -84,7 +85,7 @@ func (h *eventDeleteHandler) startDelete(b *gotgbot.Bot, ctx *ext.Context) error
 	events, err := h.eventRepository.GetLastEvents(constants.EventEditGetLastLimit)
 	if err != nil {
 		h.messageSenderService.Reply(b, msg, "Произошла ошибка при получении списка мероприятий.", nil)
-		log.Printf("EventDeleteHandler: Error during event retrieval: %v", err)
+		log.Printf("%s: Error during event retrieval: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 
@@ -95,7 +96,7 @@ func (h *eventDeleteHandler) startDelete(b *gotgbot.Bot, ctx *ext.Context) error
 
 	title := fmt.Sprintf("Последние %d мероприятия:", len(events))
 	actionDescription := "которое ты хочешь удалить"
-	formattedResponse := utils.FormatEventListForAdmin(events, title, constants.CancelCommand, actionDescription)
+	formattedResponse := formatters.FormatEventListForAdmin(events, title, constants.CancelCommand, actionDescription)
 
 	h.messageSenderService.ReplyMarkdown(b, msg, formattedResponse, nil)
 
@@ -116,7 +117,7 @@ func (h *eventDeleteHandler) handleSelectEvent(b *gotgbot.Bot, ctx *ext.Context)
 	events, err := h.eventRepository.GetLastEvents(constants.EventEditGetLastLimit)
 	if err != nil {
 		h.messageSenderService.Reply(b, msg, "Произошла ошибка при получении списка мероприятий.", nil)
-		log.Printf("EventDeleteHandler: Error during event retrieval: %v", err)
+		log.Printf("%s: Error during event retrieval: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 
@@ -193,7 +194,7 @@ func (h *eventDeleteHandler) handleConfirmation(b *gotgbot.Bot, ctx *ext.Context
 			),
 			nil,
 		)
-		log.Printf("EventDeleteHandler: Error during event retrieval.")
+		log.Printf("%s: Error during event retrieval.", utils.GetCurrentTypeName())
 		return handlers.EndConversation()
 	}
 
@@ -209,7 +210,7 @@ func (h *eventDeleteHandler) handleConfirmation(b *gotgbot.Bot, ctx *ext.Context
 			),
 			nil,
 		)
-		log.Printf("EventDeleteHandler: Invalid event ID type: %v", eventIDVal)
+		log.Printf("%s: Invalid event ID type: %v", utils.GetCurrentTypeName(), eventIDVal)
 		return handlers.EndConversation()
 	}
 
@@ -225,7 +226,7 @@ func (h *eventDeleteHandler) handleConfirmation(b *gotgbot.Bot, ctx *ext.Context
 	err := h.eventRepository.DeleteEvent(eventID)
 	if err != nil {
 		h.messageSenderService.Reply(b, msg, "Произошла ошибка при удалении мероприятия.", nil)
-		log.Printf("EventDeleteHandler: Error during event deletion: %v", err)
+		log.Printf("%s: Error during event deletion: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 

@@ -10,6 +10,7 @@ import (
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/repositories"
+	"evo-bot-go/internal/formatters"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
@@ -98,7 +99,7 @@ func (h *topicAddHandler) startTopicAdd(b *gotgbot.Bot, ctx *ext.Context) error 
 	}
 
 	// Format and display event list for selection
-	formattedEvents := utils.FormatEventListForUsers(
+	formattedEvents := formatters.FormatEventListForUsers(
 		events,
 		fmt.Sprintf("Выбери ID мероприятия, к которому ты хочешь закинуть темы или вопросы, либо жми /%s для отмены диалога", constants.CancelCommand),
 	)

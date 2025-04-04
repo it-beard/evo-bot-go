@@ -3,9 +3,6 @@ package utils
 import (
 	"log"
 	"math/rand"
-	"reflect"
-	"runtime"
-	"strings"
 	"time"
 
 	"evo-bot-go/internal/config"
@@ -123,76 +120,4 @@ func CheckAdminAndPrivateChat(b *gotgbot.Bot, ctx *ext.Context, superGroupChatID
 	}
 
 	return true
-}
-
-// GetHandlerName returns the name of the handler struct that a method belongs to.
-// It uses runtime reflection to get the full function name and extracts the handler part.
-//
-// Example usage:
-//
-//  1. For a method reference:
-//     ```go
-//     // Inside a handler method
-//     func (h *myHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
-//     handlerName := utils.GetHandlerName(h.handleCommand)
-//     // handlerName will be "myHandler"
-//     log.Printf("%s: Processing command", handlerName)
-//     // ...
-//     }
-//     ```
-//
-//  2. Alternatively, use GetCurrentHandlerName for the current function:
-//     ```go
-//     func (h *myHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
-//     handlerName := utils.GetCurrentHandlerName(0)
-//     // handlerName will be "myHandler"
-//     log.Printf("%s: Processing command", handlerName)
-//     // ...
-//     }
-//     ```
-func GetHandlerName(i interface{}) string {
-	// Get the full function name through reflection
-	fullName := runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
-
-	// Split the name by dot to get the components
-	parts := strings.Split(fullName, ".")
-
-	// The handler name should be the second-to-last part, typically in the form "(*handlerName)"
-	if len(parts) < 2 {
-		return ""
-	}
-
-	handlerPart := parts[len(parts)-2]
-
-	// Remove the pointer notation if present
-	handlerName := strings.TrimPrefix(strings.TrimSuffix(handlerPart, ")"), "(*")
-
-	return handlerName
-}
-
-// GetCurrentHandlerName returns the name of the handler for the current function.
-func GetCurrentHandlerName() string {
-	// Get the program counter and function data for the caller
-	pc, _, _, ok := runtime.Caller(1) // skip 1 for the current function
-	if !ok {
-		return ""
-	}
-
-	// Get the full function name
-	fullName := runtime.FuncForPC(pc).Name()
-
-	// Split the name by dot to get the components
-	parts := strings.Split(fullName, ".")
-
-	// The handler name should be the second-to-last part, typically in the form "(*handlerName)"
-	if len(parts) < 2 {
-		return ""
-	}
-
-	handlerPart := parts[len(parts)-2]
-
-	// Remove the pointer notation if present
-	handlerName := strings.TrimPrefix(strings.TrimSuffix(handlerPart, ")"), "(*")
-
-	return handlerName
 }

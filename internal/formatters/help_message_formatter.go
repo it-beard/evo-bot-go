@@ -1,4 +1,4 @@
-package utils
+package formatters
 
 // FormatHelpMessage generates the help message text with appropriate commands based on user permissions
 func FormatHelpMessage(isAdmin bool) string {

@@ -10,6 +10,7 @@ import (
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/repositories"
+	"evo-bot-go/internal/formatters"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
@@ -92,7 +93,7 @@ func (h *topicsHandler) startTopics(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	// Format and display event list for selection
-	formattedEvents := utils.FormatEventListForUsers(
+	formattedEvents := formatters.FormatEventListForUsers(
 		events,
 		fmt.Sprintf("Выбери ID мероприятия, для которого ты хочешь увидеть темы и вопросы, либо жми /%s для отмены диалога", constants.CancelCommand),
 	)
@@ -141,7 +142,7 @@ func (h *topicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Context) e
 	}
 
 	// Format and display topics
-	formattedTopics := utils.FormatTopicListForUsers(topics, event.Name, event.Type)
+	formattedTopics := formatters.FormatTopicListForUsers(topics, event.Name, event.Type)
 	h.messageSenderService.ReplyMarkdown(b, msg, formattedTopics, nil)
 
 	return handlers.EndConversation()

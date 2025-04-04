@@ -1,6 +1,7 @@
 package services
 
 import (
+	"evo-bot-go/internal/utils"
 	"log"
 	"strconv"
 
@@ -50,7 +51,7 @@ func (s *TelegramMessageSender) Send(chatId int64, text string, opts *gotgbot.Se
 	_, err := s.bot.SendMessage(chatId, text, opts)
 
 	if err != nil {
-		log.Printf("MessageSenderService: Send: Failed to send message: %v", err)
+		log.Printf("%s: Send: Failed to send message: %v", utils.GetCurrentTypeName(), err)
 	}
 
 	return err
@@ -79,7 +80,7 @@ func (s *TelegramMessageSender) SendMarkdown(chatId int64, text string, opts *go
 	_, err := s.bot.SendMessage(chatId, text, opts)
 
 	if err != nil {
-		log.Printf("MessageSenderService: SendMarkdown: Failed to send message: %v", err)
+		log.Printf("%s: SendMarkdown: Failed to send message: %v", utils.GetCurrentTypeName(), err)
 	}
 
 	return err
@@ -108,7 +109,7 @@ func (s *TelegramMessageSender) SendHtml(chatId int64, text string, opts *gotgbo
 	_, err := s.bot.SendMessage(chatId, text, opts)
 
 	if err != nil {
-		log.Printf("MessageSenderService: SendHtml: Failed to send message: %v", err)
+		log.Printf("%s: SendHtml: Failed to send message: %v", utils.GetCurrentTypeName(), err)
 	}
 
 	return err
@@ -132,7 +133,7 @@ func (s *TelegramMessageSender) Reply(b *gotgbot.Bot, msg *gotgbot.Message, repl
 	_, err := msg.Reply(b, replyText, opts)
 
 	if err != nil {
-		log.Printf("MessageSenderService: Reply: Failed to send message: %v", err)
+		log.Printf("%s: Reply: Failed to send message: %v", utils.GetCurrentTypeName(), err)
 	}
 
 	return err
@@ -161,7 +162,7 @@ func (s *TelegramMessageSender) ReplyMarkdown(b *gotgbot.Bot, msg *gotgbot.Messa
 	_, err := msg.Reply(b, replyText, opts)
 
 	if err != nil {
-		log.Printf("MessageSenderService: ReplyMarkdown: Failed to send message: %v", err)
+		log.Printf("%s: ReplyMarkdown: Failed to send message: %v", utils.GetCurrentTypeName(), err)
 	}
 
 	return err
@@ -190,7 +191,7 @@ func (s *TelegramMessageSender) ReplyHtml(b *gotgbot.Bot, msg *gotgbot.Message, 
 	_, err := msg.Reply(b, replyText, opts)
 
 	if err != nil {
-		log.Printf("MessageSenderService: ReplyHtml: Failed to send message: %v", err)
+		log.Printf("%s: ReplyHtml: Failed to send message: %v", utils.GetCurrentTypeName(), err)
 	}
 
 	return err
@@ -317,7 +318,7 @@ func (s *TelegramMessageSender) SendTypingAction(chatId int64) error {
 		"action":  "typing",
 	}, nil, nil)
 	if err != nil {
-		log.Printf("MessageSenderService: SendTypingAction: Failed to send typing action: %v", err)
+		log.Printf("%s: SendTypingAction: Failed to send typing action: %v", utils.GetCurrentTypeName(), err)
 	}
 	return err
 }

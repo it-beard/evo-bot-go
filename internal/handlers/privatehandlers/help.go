@@ -3,6 +3,7 @@ package privatehandlers
 import (
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
+	"evo-bot-go/internal/formatters"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
@@ -39,7 +40,7 @@ func (h *helpHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	isAdmin := utils.IsUserAdminOrCreator(b, msg.From.Id, h.config.SuperGroupChatID)
-	helpText := utils.FormatHelpMessage(isAdmin)
+	helpText := formatters.FormatHelpMessage(isAdmin)
 
 	h.messageSenderService.ReplyHtml(b, ctx.EffectiveMessage, helpText, nil)
 
