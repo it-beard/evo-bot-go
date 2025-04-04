@@ -16,13 +16,16 @@ import (
 )
 
 type CleanClosedThreadsHandler struct {
+	config               *config.Config
 	closedTopics         map[int]bool
 	messageSenderService services.MessageSenderService
-	config               *config.Config
 	botUsername          string
 }
 
-func NewCleanClosedThreadsHandler(messageSenderService services.MessageSenderService, config *config.Config) ext.Handler {
+func NewCleanClosedThreadsHandler(
+	config *config.Config,
+	messageSenderService services.MessageSenderService,
+) ext.Handler {
 	// Create map of closed topics
 	closedTopics := make(map[int]bool)
 	for _, id := range config.ClosedTopicsIDs {

@@ -131,30 +131,30 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 
 	// Register admin chat handlers
 	adminHandlers := []ext.Handler{
-		adminhandlers.NewCodeHandler(deps.AppConfig),
-		adminhandlers.NewTrySummarizeHandler(deps.SummarizationService, deps.MessageSenderService, deps.AppConfig),
-		adminhandlers.NewShowTopicsHandler(deps.TopicRepository, deps.EventRepository, deps.MessageSenderService, deps.AppConfig),
-		eventhandlers.NewEventEditHandler(deps.EventRepository, deps.AppConfig),
-		eventhandlers.NewEventSetupHandler(deps.EventRepository, deps.AppConfig),
-		eventhandlers.NewEventDeleteHandler(deps.EventRepository, deps.AppConfig),
-		eventhandlers.NewEventFinishHandler(deps.EventRepository, deps.AppConfig),
+		adminhandlers.NewCodeHandler(deps.AppConfig, deps.MessageSenderService),
+		adminhandlers.NewTrySummarizeHandler(deps.AppConfig, deps.SummarizationService, deps.MessageSenderService),
+		adminhandlers.NewShowTopicsHandler(deps.AppConfig, deps.TopicRepository, deps.EventRepository, deps.MessageSenderService),
+		eventhandlers.NewEventEditHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService),
+		eventhandlers.NewEventSetupHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService),
+		eventhandlers.NewEventDeleteHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService),
+		eventhandlers.NewEventFinishHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService),
 	}
 
 	// Register private chat handlers
 	privateHandlers := []ext.Handler{
 		privatehandlers.NewHelpHandler(deps.AppConfig),
-		privatehandlers.NewToolsHandler(deps.OpenAiClient, deps.MessageSenderService, deps.PromptingTemplateRepository, deps.AppConfig),
-		privatehandlers.NewContentHandler(deps.OpenAiClient, deps.MessageSenderService, deps.PromptingTemplateRepository, deps.AppConfig),
-		privatehandlers.NewEventsHandler(deps.EventRepository, deps.AppConfig),
-		topicshandlers.NewTopicsHandler(deps.TopicRepository, deps.EventRepository, deps.MessageSenderService, deps.AppConfig),
-		topicshandlers.NewTopicAddHandler(deps.TopicRepository, deps.EventRepository, deps.MessageSenderService, deps.AppConfig),
+		privatehandlers.NewToolsHandler(deps.AppConfig, deps.OpenAiClient, deps.MessageSenderService, deps.PromptingTemplateRepository),
+		privatehandlers.NewContentHandler(deps.AppConfig, deps.OpenAiClient, deps.MessageSenderService, deps.PromptingTemplateRepository),
+		privatehandlers.NewEventsHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService),
+		topicshandlers.NewTopicsHandler(deps.AppConfig, deps.TopicRepository, deps.EventRepository, deps.MessageSenderService),
+		topicshandlers.NewTopicAddHandler(deps.AppConfig, deps.TopicRepository, deps.EventRepository, deps.MessageSenderService),
 	}
 
 	// Register group chat handlers
 	groupHandlers := []ext.Handler{
 		grouphandlers.NewDeleteJoinLeftMessagesHandler(),
-		grouphandlers.NewRepliesFromClosedThreadsHandler(deps.MessageSenderService, deps.AppConfig),
-		grouphandlers.NewCleanClosedThreadsHandler(deps.MessageSenderService, deps.AppConfig),
+		grouphandlers.NewRepliesFromClosedThreadsHandler(deps.AppConfig, deps.MessageSenderService),
+		grouphandlers.NewCleanClosedThreadsHandler(deps.AppConfig, deps.MessageSenderService),
 	}
 
 	// Combine all handlers

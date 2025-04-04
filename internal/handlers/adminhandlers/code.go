@@ -8,6 +8,7 @@ import (
 	"evo-bot-go/internal/clients"
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
+	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -22,14 +23,19 @@ const (
 )
 
 type codeHandler struct {
-	config    *config.Config
-	userStore *utils.UserDataStore
+	config               *config.Config
+	messageSenderService services.MessageSenderService
+	userStore            *utils.UserDataStore
 }
 
-func NewCodeHandler(config *config.Config) ext.Handler {
+func NewCodeHandler(
+	config *config.Config,
+	messageSenderService services.MessageSenderService,
+) ext.Handler {
 	h := &codeHandler{
-		config:    config,
-		userStore: utils.NewUserDataStore(),
+		config:               config,
+		messageSenderService: messageSenderService,
+		userStore:            utils.NewUserDataStore(),
 	}
 
 	return handlers.NewConversation(
@@ -57,7 +63,7 @@ func (h *codeHandler) startCodeConversation(b *gotgbot.Bot, ctx *ext.Context) er
 	}
 
 	// Ask user to enter the code
-	utils.SendLoggedReply(b, msg, fmt.Sprintf("Пожалуйста, введите код или используйте /%s для отмены:", constants.CancelCommand), nil)
+	h.messageSenderService.Reply(b, msg, fmt.Sprintf("Пожалуйста, введите код или используйте /%s для отмены:", constants.CancelCommand), nil)
 
 	return handlers.NextConversationState(codeHandlerStateWaitForCode)
 }
@@ -69,7 +75,7 @@ func (h *codeHandler) processCode(b *gotgbot.Bot, ctx *ext.Context) error {
 	// Extract code from message
 	revertedCode := strings.TrimSpace(msg.Text)
 	if revertedCode == "" {
-		utils.SendLoggedReply(b, msg, fmt.Sprintf("Код не может быть пустым. Пожалуйста, введите код или используйте /%s для отмены:", constants.CancelCommand), nil)
+		h.messageSenderService.Reply(b, msg, fmt.Sprintf("Код не может быть пустым. Пожалуйста, введите код или используйте /%s для отмены:", constants.CancelCommand), nil)
 		return nil // Stay in the same state
 	}
 
@@ -80,9 +86,10 @@ func (h *codeHandler) processCode(b *gotgbot.Bot, ctx *ext.Context) error {
 	log.Print("Code stored")
 	err := clients.TgKeepSessionAlive() // Refresh session
 	if err == nil {
-		utils.SendLoggedReply(b, msg, "Код принят", nil)
+		h.messageSenderService.Reply(b, msg, "Код принят", nil)
 	} else {
-		utils.SendLoggedReply(b, msg, "Произошла ошибка при сохранении кода", err)
+		h.messageSenderService.Reply(b, msg, "Произошла ошибка при сохранении кода", nil)
+		log.Printf("CodeHandler: Error during code storage: %v", err)
 	}
 
 	// Clean up user data
@@ -95,7 +102,7 @@ func (h *codeHandler) processCode(b *gotgbot.Bot, ctx *ext.Context) error {
 func (h *codeHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
-	utils.SendLoggedReply(b, msg, "Операция ввода кода отменена.", nil)
+	h.messageSenderService.Reply(b, msg, "Операция ввода кода отменена.", nil)
 
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)

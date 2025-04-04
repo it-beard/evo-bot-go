@@ -181,7 +181,7 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 	}
 
 	// Send the summary to the target chat
-	s.messageSenderService.SendLoggedHtmlMessage(targetTopicID, finalSummary, nil)
+	s.messageSenderService.SendHtml(targetTopicID, finalSummary, nil)
 
 	log.Printf("Summarization Service: Summary sent successfully")
 	return nil

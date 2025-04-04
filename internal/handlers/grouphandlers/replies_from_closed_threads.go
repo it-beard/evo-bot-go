@@ -17,12 +17,15 @@ import (
 )
 
 type RepliesFromClosedThreadsHandler struct {
+	config               *config.Config
 	closedTopics         map[int]bool
 	messageSenderService services.MessageSenderService
-	config               *config.Config
 }
 
-func NewRepliesFromClosedThreadsHandler(messageSenderService services.MessageSenderService, config *config.Config) ext.Handler {
+func NewRepliesFromClosedThreadsHandler(
+	config *config.Config,
+	messageSenderService services.MessageSenderService,
+) ext.Handler {
 	// Create map of closed topics
 	closedTopics := make(map[int]bool)
 	for _, id := range config.ClosedTopicsIDs {

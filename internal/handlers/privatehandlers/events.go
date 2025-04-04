@@ -4,8 +4,10 @@ import (
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/repositories"
+	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 	"fmt"
+	"log"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -13,17 +15,20 @@ import (
 )
 
 type eventsHandler struct {
-	eventRepository *repositories.EventRepository
-	config          *config.Config
+	config               *config.Config
+	eventRepository      *repositories.EventRepository
+	messageSenderService services.MessageSenderService
 }
 
 func NewEventsHandler(
-	eventRepository *repositories.EventRepository,
 	config *config.Config,
+	eventRepository *repositories.EventRepository,
+	messageSenderService services.MessageSenderService,
 ) ext.Handler {
 	h := &eventsHandler{
-		eventRepository: eventRepository,
-		config:          config,
+		config:               config,
+		eventRepository:      eventRepository,
+		messageSenderService: messageSenderService,
 	}
 
 	return handlers.NewCommand(constants.EventsCommand, h.handleCommand)
@@ -45,12 +50,13 @@ func (h *eventsHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 	// Get actual events to show
 	events, err := h.eventRepository.GetLastActualEvents(10) // Fetch last 10 actual events
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Ошибка при получении списка мероприятий.", err)
+		h.messageSenderService.Reply(b, msg, "Ошибка при получении списка мероприятий.", nil)
+		log.Printf("EventsHandler: Error during events retrieval: %v", err)
 		return nil
 	}
 
 	if len(events) == 0 {
-		utils.SendLoggedReply(b, msg, "На данный момент нет актуальных мероприятий.", nil)
+		h.messageSenderService.Reply(b, msg, "На данный момент нет актуальных мероприятий.", nil)
 		return nil
 	}
 

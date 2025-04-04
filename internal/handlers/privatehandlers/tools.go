@@ -34,22 +34,22 @@ const (
 )
 
 type toolsHandler struct {
-	openaiClient                *clients.OpenAiClient
 	config                      *config.Config
+	openaiClient                *clients.OpenAiClient
 	promptingTemplateRepository *repositories.PromptingTemplateRepository
 	messageSenderService        services.MessageSenderService
 	userStore                   *utils.UserDataStore
 }
 
 func NewToolsHandler(
+	config *config.Config,
 	openaiClient *clients.OpenAiClient,
 	messageSenderService services.MessageSenderService,
 	promptingTemplateRepository *repositories.PromptingTemplateRepository,
-	config *config.Config,
 ) ext.Handler {
 	h := &toolsHandler{
-		openaiClient:                openaiClient,
 		config:                      config,
+		openaiClient:                openaiClient,
 		promptingTemplateRepository: promptingTemplateRepository,
 		messageSenderService:        messageSenderService,
 		userStore:                   utils.NewUserDataStore(),
@@ -85,7 +85,12 @@ func (h *toolsHandler) startToolSearch(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	// Ask user to enter search query
-	utils.SendLoggedReply(b, msg, fmt.Sprintf("Введите поисковый запрос по инструментам или используйте /%s для отмены:", constants.CancelCommand), nil)
+	h.messageSenderService.Reply(
+		b,
+		msg,
+		fmt.Sprintf("Введите поисковый запрос по инструментам или используйте /%s для отмены:", constants.CancelCommand),
+		nil,
+	)
 
 	return handlers.NextConversationState(stateProcessToolQuery)
 }
@@ -96,7 +101,7 @@ func (h *toolsHandler) processToolSearch(b *gotgbot.Bot, ctx *ext.Context) error
 
 	// Check if we're already processing a request for this user
 	if isProcessing, ok := h.userStore.Get(ctx.EffectiveUser.Id, userStoreKeyProcessing); ok && isProcessing.(bool) {
-		utils.SendLoggedReply(
+		h.messageSenderService.Reply(
 			b,
 			msg,
 			fmt.Sprintf("Пожалуйста, дождитесь окончания обработки предыдущего запроса, или используйте /%s для отмены:", constants.CancelCommand),
@@ -108,7 +113,7 @@ func (h *toolsHandler) processToolSearch(b *gotgbot.Bot, ctx *ext.Context) error
 	// Get query from user message
 	query := strings.TrimSpace(msg.Text)
 	if query == "" {
-		utils.SendLoggedReply(
+		h.messageSenderService.Reply(
 			b,
 			msg,
 			fmt.Sprintf("Поисковый запрос не может быть пустым. Пожалуйста, введите запрос или используйте /%s для отмены:", constants.CancelCommand),
@@ -133,7 +138,7 @@ func (h *toolsHandler) processToolSearch(b *gotgbot.Bot, ctx *ext.Context) error
 	}()
 
 	// Inform user that search has started
-	utils.SendLoggedReply(b, msg, fmt.Sprintf("Ищу информацию по запросу: \"%s\"...", query), nil)
+	h.messageSenderService.Reply(b, msg, fmt.Sprintf("Ищу информацию по запросу: \"%s\"...", query), nil)
 
 	// Send typing action using MessageSender.
 	h.messageSenderService.SendTypingAction(msg.Chat.Id)
@@ -141,13 +146,15 @@ func (h *toolsHandler) processToolSearch(b *gotgbot.Bot, ctx *ext.Context) error
 	// Get messages from chat
 	messages, err := clients.GetChatMessages(h.config.SuperGroupChatID, h.config.ToolTopicID)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Произошла ошибка при получении сообщений из чата.", err)
+		h.messageSenderService.Reply(b, msg, "Произошла ошибка при получении сообщений из чата.", nil)
+		log.Printf("ToolsHandler: Error during messages retrieval: %v", err)
 		return handlers.EndConversation()
 	}
 
 	dataMessages, err := h.prepareTelegramMessages(messages)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Произошла ошибка при подготовке сообщений для поиска.", err)
+		h.messageSenderService.Reply(b, msg, "Произошла ошибка при подготовке сообщений для поиска.", nil)
+		log.Printf("ToolsHandler: Error during messages preparation: %v", err)
 		return handlers.EndConversation()
 	}
 
@@ -155,7 +162,8 @@ func (h *toolsHandler) processToolSearch(b *gotgbot.Bot, ctx *ext.Context) error
 
 	templateText, err := h.promptingTemplateRepository.Get(prompts.GetToolPromptTemplateDbKey)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Произошла ошибка при получении шаблона для поиска инструментов.", err)
+		h.messageSenderService.Reply(b, msg, "Произошла ошибка при получении шаблона для поиска инструментов.", nil)
+		log.Printf("ToolsHandler: Error during template retrieval: %v", err)
 		return handlers.EndConversation()
 	}
 
@@ -198,7 +206,8 @@ func (h *toolsHandler) processToolSearch(b *gotgbot.Bot, ctx *ext.Context) error
 
 	// Continue only if no errors
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Произошла ошибка при получении ответа от OpenAI.", err)
+		h.messageSenderService.Reply(b, msg, "Произошла ошибка при получении ответа от OpenAI.", nil)
+		log.Printf("ToolsHandler: Error during OpenAI response retrieval: %v", err)
 		return handlers.EndConversation()
 	}
 
@@ -219,10 +228,10 @@ func (h *toolsHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 		// Call the cancel function to stop any ongoing API calls
 		if cf, ok := cancelFunc.(context.CancelFunc); ok {
 			cf()
-			utils.SendLoggedReply(b, msg, "Операция поиска инструментов отменена.", nil)
+			h.messageSenderService.Reply(b, msg, "Операция поиска инструментов отменена.", nil)
 		}
 	} else {
-		utils.SendLoggedReply(b, msg, "Операция поиска инструментов отменена.", nil)
+		h.messageSenderService.Reply(b, msg, "Операция поиска инструментов отменена.", nil)
 	}
 
 	// Clean up user data

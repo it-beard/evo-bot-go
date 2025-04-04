@@ -9,6 +9,7 @@ import (
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/repositories"
+	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -33,19 +34,22 @@ const (
 )
 
 type eventFinishHandler struct {
-	eventRepository *repositories.EventRepository
-	config          *config.Config
-	userStore       *utils.UserDataStore
+	config               *config.Config
+	eventRepository      *repositories.EventRepository
+	messageSenderService services.MessageSenderService
+	userStore            *utils.UserDataStore
 }
 
 func NewEventFinishHandler(
-	eventRepository *repositories.EventRepository,
 	config *config.Config,
+	eventRepository *repositories.EventRepository,
+	messageSenderService services.MessageSenderService,
 ) ext.Handler {
 	h := &eventFinishHandler{
-		eventRepository: eventRepository,
-		config:          config,
-		userStore:       utils.NewUserDataStore(),
+		config:               config,
+		eventRepository:      eventRepository,
+		messageSenderService: messageSenderService,
+		userStore:            utils.NewUserDataStore(),
 	}
 
 	return handlers.NewConversation(
@@ -78,12 +82,13 @@ func (h *eventFinishHandler) startFinish(b *gotgbot.Bot, ctx *ext.Context) error
 	// Get a list of active events
 	events, err := h.eventRepository.GetLastActualEvents(constants.EventEditGetLastLimit)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Произошла ошибка при получении списка актуальных мероприятий.", err)
+		h.messageSenderService.Reply(b, msg, "Произошла ошибка при получении списка актуальных мероприятий.", nil)
+		log.Printf("EventFinishHandler: Error during event retrieval: %v", err)
 		return handlers.EndConversation()
 	}
 
 	if len(events) == 0 {
-		utils.SendLoggedReply(b, msg, "Нет активных мероприятий для завершения.", nil)
+		h.messageSenderService.Reply(b, msg, "Нет активных мероприятий для завершения.", nil)
 		return handlers.EndConversation()
 	}
 
@@ -103,7 +108,7 @@ func (h *eventFinishHandler) handleSelectEvent(b *gotgbot.Bot, ctx *ext.Context)
 
 	eventID, err := strconv.Atoi(eventIDStr)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, fmt.Sprintf("Неверный ID. Пожалуйста, введи числовой ID или /%s для отмены.", constants.CancelCommand), nil)
+		h.messageSenderService.Reply(b, msg, fmt.Sprintf("Неверный ID. Пожалуйста, введи числовой ID или /%s для отмены.", constants.CancelCommand), nil)
 		return nil // Stay in the same state
 	}
 
@@ -111,7 +116,7 @@ func (h *eventFinishHandler) handleSelectEvent(b *gotgbot.Bot, ctx *ext.Context)
 	h.userStore.Set(ctx.EffectiveUser.Id, eventFinishCtxDataKeySelectedEventID, eventID)
 
 	// Ask for confirmation
-	utils.SendLoggedReply(b, msg, fmt.Sprintf(
+	h.messageSenderService.Reply(b, msg, fmt.Sprintf(
 		"Ты действительно хочешь завершить это мероприятие? Это пометит его как неактуальное.\n\nВведи 'да' для подтверждения или 'нет' для отмены (или используй /%s):",
 		constants.CancelCommand,
 	), nil)
@@ -126,7 +131,7 @@ func (h *eventFinishHandler) handleConfirmation(b *gotgbot.Bot, ctx *ext.Context
 
 	// Check the confirmation
 	if confirmationText != eventFinishConfirmYes && confirmationText != eventFinishConfirmNo {
-		utils.SendLoggedReply(b, msg, fmt.Sprintf(
+		h.messageSenderService.Reply(b, msg, fmt.Sprintf(
 			"Пожалуйста, введи 'да' для подтверждения или 'нет' для отмены (или используй /%s):",
 			constants.CancelCommand,
 		), nil)
@@ -135,7 +140,7 @@ func (h *eventFinishHandler) handleConfirmation(b *gotgbot.Bot, ctx *ext.Context
 
 	// If user said "no", cancel the operation
 	if confirmationText == eventFinishConfirmNo {
-		utils.SendLoggedReply(b, msg, "Операция завершения мероприятия отменена.", nil)
+		h.messageSenderService.Reply(b, msg, "Операция завершения мероприятия отменена.", nil)
 		h.userStore.Clear(ctx.EffectiveUser.Id)
 		return handlers.EndConversation()
 	}
@@ -143,39 +148,43 @@ func (h *eventFinishHandler) handleConfirmation(b *gotgbot.Bot, ctx *ext.Context
 	// Get the selected event ID
 	eventIDVal, ok := h.userStore.Get(ctx.EffectiveUser.Id, eventFinishCtxDataKeySelectedEventID)
 	if !ok {
-		utils.SendLoggedReply(b, msg, fmt.Sprintf(
+		h.messageSenderService.Reply(b, msg, fmt.Sprintf(
 			"Произошла ошибка при получении выбранного мероприятия. Пожалуйста, начни заново с /%s",
 			constants.EventFinishCommand,
 		), nil)
+		log.Printf("EventFinishHandler: Error during event retrieval.")
 		return handlers.EndConversation()
 	}
 
 	eventID, ok := eventIDVal.(int)
 	if !ok {
 		log.Println("Invalid event ID type:", eventIDVal)
-		utils.SendLoggedReply(b, msg, fmt.Sprintf(
+		h.messageSenderService.Reply(b, msg, fmt.Sprintf(
 			"Произошла внутренняя ошибка (неверный тип ID). Пожалуйста, начни заново с /%s",
 			constants.EventFinishCommand,
 		), nil)
+		log.Printf("EventFinishHandler: Invalid event ID type: %v", eventIDVal)
 		return handlers.EndConversation()
 	}
 
 	// Get the event details for the success message
 	event, err := h.eventRepository.GetEventByID(eventID)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, fmt.Sprintf("Ошибка при получении мероприятия с ID %d", eventID), err)
+		h.messageSenderService.Reply(b, msg, fmt.Sprintf("Ошибка при получении мероприятия с ID %d", eventID), nil)
+		log.Printf("EventFinishHandler: Error during event retrieval: %v", err)
 		return handlers.EndConversation()
 	}
 
 	// Update the event status to finished
 	err = h.eventRepository.UpdateEventStatus(eventID, constants.EventStatusFinished)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Произошла ошибка при обновлении статуса мероприятия.", err)
+		h.messageSenderService.Reply(b, msg, "Произошла ошибка при обновлении статуса мероприятия.", nil)
+		log.Printf("EventFinishHandler: Error during event update: %v", err)
 		return handlers.EndConversation()
 	}
 
 	// Confirmation message
-	utils.SendLoggedReply(b, msg, fmt.Sprintf("Мероприятие '%s' (ID: %d) успешно завершено.", event.Name, event.ID), nil)
+	h.messageSenderService.Reply(b, msg, fmt.Sprintf("Мероприятие '%s' (ID: %d) успешно завершено.", event.Name, event.ID), nil)
 
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)
@@ -186,7 +195,7 @@ func (h *eventFinishHandler) handleConfirmation(b *gotgbot.Bot, ctx *ext.Context
 // 4. handleCancel handles the /cancel command
 func (h *eventFinishHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
-	utils.SendLoggedReply(b, msg, "Операция завершения мероприятия отменена.", nil)
+	h.messageSenderService.Reply(b, msg, "Операция завершения мероприятия отменена.", nil)
 
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)

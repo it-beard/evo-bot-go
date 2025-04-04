@@ -34,24 +34,24 @@ const (
 )
 
 type contentHandler struct {
+	config                      *config.Config
 	openaiClient                *clients.OpenAiClient
 	promptingTemplateRepository *repositories.PromptingTemplateRepository
 	messageSenderService        services.MessageSenderService
-	config                      *config.Config
 	userStore                   *utils.UserDataStore
 }
 
 func NewContentHandler(
+	config *config.Config,
 	openaiClient *clients.OpenAiClient,
 	messageSenderService services.MessageSenderService,
 	promptingTemplateRepository *repositories.PromptingTemplateRepository,
-	config *config.Config,
 ) ext.Handler {
 	h := &contentHandler{
+		config:                      config,
 		openaiClient:                openaiClient,
 		promptingTemplateRepository: promptingTemplateRepository,
 		messageSenderService:        messageSenderService,
-		config:                      config,
 		userStore:                   utils.NewUserDataStore(),
 	}
 
@@ -85,7 +85,12 @@ func (h *contentHandler) startContentSearch(b *gotgbot.Bot, ctx *ext.Context) er
 	}
 
 	// Ask user to enter search query
-	utils.SendLoggedReply(b, msg, fmt.Sprintf("Введите поисковый запрос по контенту или используйте /%s для отмены:", constants.CancelCommand), nil)
+	h.messageSenderService.Reply(
+		b,
+		msg,
+		fmt.Sprintf("Введите поисковый запрос по контенту или используйте /%s для отмены:", constants.CancelCommand),
+		nil,
+	)
 
 	return handlers.NextConversationState(stateProcessQuery)
 }
@@ -96,7 +101,7 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 
 	// Check if we're already processing a request for this user
 	if isProcessing, ok := h.userStore.Get(ctx.EffectiveUser.Id, contentUserStoreKeyProcessing); ok && isProcessing.(bool) {
-		utils.SendLoggedReply(
+		h.messageSenderService.Reply(
 			b,
 			msg,
 			fmt.Sprintf("Пожалуйста, дождитесь окончания обработки предыдущего запроса, или используйте /%s для отмены:", constants.CancelCommand),
@@ -108,7 +113,7 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 	// Get query from user message
 	query := strings.TrimSpace(msg.Text)
 	if query == "" {
-		utils.SendLoggedReply(
+		h.messageSenderService.Reply(
 			b,
 			msg,
 			fmt.Sprintf("Поисковый запрос не может быть пустым. Пожалуйста, введите запрос или используйте /%s для отмены:", constants.CancelCommand),
@@ -133,7 +138,7 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 	}()
 
 	// Inform user that search has started
-	utils.SendLoggedReply(b, msg, fmt.Sprintf("Ищу информацию по запросу: \"%s\"...", query), nil)
+	h.messageSenderService.Reply(b, msg, fmt.Sprintf("Ищу информацию по запросу: \"%s\"...", query), nil)
 
 	// Send typing action using MessageSender.
 	h.messageSenderService.SendTypingAction(msg.Chat.Id)
@@ -141,13 +146,15 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 	// Get messages from chat
 	messages, err := clients.GetChatMessages(h.config.SuperGroupChatID, h.config.ContentTopicID)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Произошла ошибка при получении сообщений из чата.", err)
+		h.messageSenderService.Reply(b, msg, "Произошла ошибка при получении сообщений из чата.", nil)
+		log.Printf("ContentHandler: Error during messages retrieval: %v", err)
 		return handlers.EndConversation()
 	}
 
 	dataMessages, err := h.prepareTelegramMessages(messages)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Произошла ошибка при подготовке сообщений для поиска.", err)
+		h.messageSenderService.Reply(b, msg, "Произошла ошибка при подготовке сообщений для поиска.", nil)
+		log.Printf("ContentHandler: Error during messages preparation: %v", err)
 		return handlers.EndConversation()
 	}
 
@@ -156,7 +163,8 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 	// Get the prompt template from the database
 	templateText, err := h.promptingTemplateRepository.Get(prompts.GetContentPromptTemplateDbKey)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Произошла ошибка при получении шаблона для поиска контента.", err)
+		h.messageSenderService.Reply(b, msg, "Произошла ошибка при получении шаблона для поиска контента.", nil)
+		log.Printf("ContentHandler: Error during template retrieval: %v", err)
 		return handlers.EndConversation()
 	}
 
@@ -199,7 +207,8 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 
 	// Continue only if no errors
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Произошла ошибка при получении ответа от OpenAI.", err)
+		h.messageSenderService.Reply(b, msg, "Произошла ошибка при получении ответа от OpenAI.", nil)
+		log.Printf("ContentHandler: Error during OpenAI response retrieval: %v", err)
 		return handlers.EndConversation()
 	}
 
@@ -220,10 +229,10 @@ func (h *contentHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 		// Call the cancel function to stop any ongoing API calls
 		if cf, ok := cancelFunc.(context.CancelFunc); ok {
 			cf()
-			utils.SendLoggedReply(b, msg, "Операция поиска контента отменена.", nil)
+			h.messageSenderService.Reply(b, msg, "Операция поиска контента отменена.", nil)
 		}
 	} else {
-		utils.SendLoggedReply(b, msg, "Операция поиска контента отменена.", nil)
+		h.messageSenderService.Reply(b, msg, "Операция поиска контента отменена.", nil)
 	}
 
 	// Clean up user data

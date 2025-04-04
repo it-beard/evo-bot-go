@@ -8,8 +8,10 @@ import (
 )
 
 type MessageSenderService interface {
-	SendLoggedMarkdownMessage(chatId int64, text string, err error)
-	SendLoggedHtmlMessage(chatId int64, text string, err error)
+	Send(chatId int64, text string, opts *gotgbot.SendMessageOpts) error
+	SendMarkdown(chatId int64, text string, opts *gotgbot.SendMessageOpts) error
+	SendHtml(chatId int64, text string, opts *gotgbot.SendMessageOpts) error
+	Reply(b *gotgbot.Bot, msg *gotgbot.Message, replyText string, opts *gotgbot.SendMessageOpts) error
 	SendCopy(
 		chatId int64,
 		topicId *int,
@@ -18,11 +20,6 @@ type MessageSenderService interface {
 		originalMessage *gotgbot.Message,
 	) (*gotgbot.Message, error)
 	SendTypingAction(chatId int64) error
-	SendMessageToUser(
-		userId int64,
-		text string,
-		opts *gotgbot.SendMessageOpts,
-	) (*gotgbot.Message, error)
 }
 
 type TelegramMessageSender struct {
@@ -33,34 +30,110 @@ func NewMessageSenderService(bot *gotgbot.Bot) MessageSenderService {
 	return &TelegramMessageSender{bot: bot}
 }
 
-// SendLoggedReply sends a reply to the user with proper logging
-func (s *TelegramMessageSender) SendLoggedMarkdownMessage(chatId int64, text string, err error) {
-	if _, replyErr := s.bot.SendMessage(chatId, text, &gotgbot.SendMessageOpts{
-		ParseMode: "Markdown",
-		LinkPreviewOptions: &gotgbot.LinkPreviewOptions{
+// Send message to chat
+func (s *TelegramMessageSender) Send(chatId int64, text string, opts *gotgbot.SendMessageOpts) error {
+	// default link preview options are disabled
+	if opts == nil {
+		opts = &gotgbot.SendMessageOpts{
+			LinkPreviewOptions: &gotgbot.LinkPreviewOptions{
+				IsDisabled: true,
+			},
+		}
+	} else if opts.LinkPreviewOptions == nil {
+		opts.LinkPreviewOptions = &gotgbot.LinkPreviewOptions{
 			IsDisabled: true,
-		},
-	}); replyErr != nil {
-		log.Printf("Failed to send error message: %v", replyErr)
+		}
 	}
+
+	_, err := s.bot.SendMessage(chatId, text, opts)
+
 	if err != nil {
-		log.Printf("Error: %v", err)
+		log.Printf("MessageSenderService: Send: Failed to send message: %v", err)
 	}
+
+	return err
 }
 
-// SendLoggedReply sends a reply to the user with proper logging
-func (s *TelegramMessageSender) SendLoggedHtmlMessage(chatId int64, text string, err error) {
-	if _, replyErr := s.bot.SendMessage(chatId, text, &gotgbot.SendMessageOpts{
-		ParseMode: "HTML",
-		LinkPreviewOptions: &gotgbot.LinkPreviewOptions{
-			IsDisabled: true,
-		},
-	}); replyErr != nil {
-		log.Printf("Failed to send error message: %v", replyErr)
+// Send markdown message to chat
+func (s *TelegramMessageSender) SendMarkdown(chatId int64, text string, opts *gotgbot.SendMessageOpts) error {
+	// default options for markdown messages
+	if opts == nil {
+		opts = &gotgbot.SendMessageOpts{
+			ParseMode: "Markdown",
+			LinkPreviewOptions: &gotgbot.LinkPreviewOptions{
+				IsDisabled: true,
+			},
+		}
+	} else {
+		opts.ParseMode = "Markdown"
+		// default link preview options are disabled
+		if opts.LinkPreviewOptions == nil {
+			opts.LinkPreviewOptions = &gotgbot.LinkPreviewOptions{
+				IsDisabled: true,
+			}
+		}
 	}
+
+	_, err := s.bot.SendMessage(chatId, text, opts)
+
 	if err != nil {
-		log.Printf("Error: %v", err)
+		log.Printf("MessageSenderService: SendMarkdown: Failed to send message: %v", err)
 	}
+
+	return err
+}
+
+// Send html message to chat
+func (s *TelegramMessageSender) SendHtml(chatId int64, text string, opts *gotgbot.SendMessageOpts) error {
+	// default options for html messages
+	if opts == nil {
+		opts = &gotgbot.SendMessageOpts{
+			ParseMode: "HTML",
+			LinkPreviewOptions: &gotgbot.LinkPreviewOptions{
+				IsDisabled: true,
+			},
+		}
+	} else {
+		opts.ParseMode = "HTML"
+		// default link preview options are disabled
+		if opts.LinkPreviewOptions == nil {
+			opts.LinkPreviewOptions = &gotgbot.LinkPreviewOptions{
+				IsDisabled: true,
+			}
+		}
+	}
+
+	_, err := s.bot.SendMessage(chatId, text, opts)
+
+	if err != nil {
+		log.Printf("MessageSenderService: SendHtml: Failed to send message: %v", err)
+	}
+
+	return err
+}
+
+// Reply to a message
+func (s *TelegramMessageSender) Reply(b *gotgbot.Bot, msg *gotgbot.Message, replyText string, opts *gotgbot.SendMessageOpts) error {
+	// default link preview options are disabled
+	if opts == nil {
+		opts = &gotgbot.SendMessageOpts{
+			LinkPreviewOptions: &gotgbot.LinkPreviewOptions{
+				IsDisabled: true,
+			},
+		}
+	} else if opts.LinkPreviewOptions == nil {
+		opts.LinkPreviewOptions = &gotgbot.LinkPreviewOptions{
+			IsDisabled: true,
+		}
+	}
+
+	_, err := msg.Reply(b, replyText, opts)
+
+	if err != nil {
+		log.Printf("MessageSenderService: Reply: Failed to send message: %v", err)
+	}
+
+	return err
 }
 
 // Sends a copy of the original message to the chat
@@ -82,7 +155,7 @@ func (s *TelegramMessageSender) SendCopy(
 	var trimmedPartOfCaptionEntities []gotgbot.MessageEntity
 	if originalMessage != nil {
 		if utf16CodeUnitCount(text) > 1000 {
-			caption = CutStringByUTF16Units(text, 996)
+			caption = cutStringByUTF16Units(text, 996)
 			trimmedPartOfCaption = "..." + text[len(caption):]
 
 			// Adjust entities for the caption
@@ -177,9 +250,21 @@ func (s *TelegramMessageSender) SendCopy(
 	return sentMessage, nil
 }
 
+// SendTypingAction sends a typing action to the specified chat.
+func (s *TelegramMessageSender) SendTypingAction(chatId int64) error {
+	_, err := s.bot.Request("sendChatAction", map[string]string{
+		"chat_id": strconv.FormatInt(chatId, 10),
+		"action":  "typing",
+	}, nil, nil)
+	if err != nil {
+		log.Printf("MessageSenderService: SendTypingAction: Failed to send typing action: %v", err)
+	}
+	return err
+}
+
 // CutStringByUTF16Units cuts the string s so that its length in UTF-16 code units is at most limit.
 // It returns the prefix of s that satisfies this condition.
-func CutStringByUTF16Units(s string, limit int) string {
+func cutStringByUTF16Units(s string, limit int) string {
 	var cuCount int   // Cumulative UTF-16 code units
 	var byteIndex int // Byte index in the string
 	for i, r := range s {
@@ -213,37 +298,4 @@ func utf16CodeUnitCount(s string) int {
 		}
 	}
 	return count
-}
-
-// SendTypingAction sends a typing action to the specified chat.
-func (s *TelegramMessageSender) SendTypingAction(chatId int64) error {
-	_, err := s.bot.Request("sendChatAction", map[string]string{
-		"chat_id": strconv.FormatInt(chatId, 10),
-		"action":  "typing",
-	}, nil, nil)
-	if err != nil {
-		log.Printf("failed to send typing action: %v", err)
-	}
-	return err
-}
-
-// SendMessageToUser sends a text message to a specific user by their user ID
-func (s *TelegramMessageSender) SendMessageToUser(
-	userId int64,
-	text string,
-	opts *gotgbot.SendMessageOpts,
-) (*gotgbot.Message, error) {
-	if opts == nil {
-		opts = &gotgbot.SendMessageOpts{
-			ParseMode: "Markdown",
-		}
-	}
-
-	sentMessage, err := s.bot.SendMessage(userId, text, opts)
-	if err != nil {
-		log.Printf("failed to send message to user %d: %v", userId, err)
-		return nil, err
-	}
-
-	return sentMessage, nil
 }

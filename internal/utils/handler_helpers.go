@@ -3,6 +3,9 @@ package utils
 import (
 	"log"
 	"math/rand"
+	"reflect"
+	"runtime"
+	"strings"
 	"time"
 
 	"evo-bot-go/internal/config"
@@ -49,28 +52,6 @@ func CheckPrivateChatType(b *gotgbot.Bot, ctx *ext.Context) bool {
 	}
 
 	return true
-}
-
-// SendAndDeleteAfterDelay sends a message and then deletes it after the specified delay in seconds
-// Returns the sent message and any error that occurred during sending
-func SendAndDeleteAfterDelay(b *gotgbot.Bot, chatID int64, text string, delaySeconds int, opts *gotgbot.SendMessageOpts) (*gotgbot.Message, error) {
-	// Send the message
-	sentMsg, err := b.SendMessage(chatID, text, opts)
-	if err != nil {
-		log.Printf("Failed to send message: %v", err)
-		return nil, err
-	}
-
-	// Start a goroutine to delete the message after the delay
-	go func() {
-		time.Sleep(time.Duration(delaySeconds) * time.Second)
-		_, err := sentMsg.Delete(b, nil)
-		if err != nil {
-			log.Printf("Failed to delete message after delay: %v", err)
-		}
-	}()
-
-	return sentMsg, nil
 }
 
 // ReplyAndDeleteAfterDelay replies to a message and then deletes the reply after the specified delay in seconds
@@ -152,16 +133,6 @@ func CheckClubMemberPermissions(b *gotgbot.Bot, msg *gotgbot.Message, config *co
 	return true
 }
 
-// SendLoggedReply sends a reply to the user with proper logging
-func SendLoggedReply(b *gotgbot.Bot, msg *gotgbot.Message, text string, err error) {
-	if _, replyErr := msg.Reply(b, text, nil); replyErr != nil {
-		log.Printf("Failed to send error message: %v", replyErr)
-	}
-	if err != nil {
-		log.Printf("Error: %v", err)
-	}
-}
-
 // SendLoggedReplyWithOptions sends a reply to the user with proper logging
 func SendLoggedReplyWithOptions(b *gotgbot.Bot, msg *gotgbot.Message, text string, opts *gotgbot.SendMessageOpts, err error) {
 	if _, replyErr := msg.Reply(b, text, opts); replyErr != nil {
@@ -211,4 +182,76 @@ func CheckAdminAndPrivateChat(b *gotgbot.Bot, ctx *ext.Context, superGroupChatID
 	}
 
 	return true
+}
+
+// GetHandlerName returns the name of the handler struct that a method belongs to.
+// It uses runtime reflection to get the full function name and extracts the handler part.
+//
+// Example usage:
+//
+//  1. For a method reference:
+//     ```go
+//     // Inside a handler method
+//     func (h *myHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
+//     handlerName := utils.GetHandlerName(h.handleCommand)
+//     // handlerName will be "myHandler"
+//     log.Printf("%s: Processing command", handlerName)
+//     // ...
+//     }
+//     ```
+//
+//  2. Alternatively, use GetCurrentHandlerName for the current function:
+//     ```go
+//     func (h *myHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
+//     handlerName := utils.GetCurrentHandlerName(0)
+//     // handlerName will be "myHandler"
+//     log.Printf("%s: Processing command", handlerName)
+//     // ...
+//     }
+//     ```
+func GetHandlerName(i interface{}) string {
+	// Get the full function name through reflection
+	fullName := runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
+
+	// Split the name by dot to get the components
+	parts := strings.Split(fullName, ".")
+
+	// The handler name should be the second-to-last part, typically in the form "(*handlerName)"
+	if len(parts) < 2 {
+		return ""
+	}
+
+	handlerPart := parts[len(parts)-2]
+
+	// Remove the pointer notation if present
+	handlerName := strings.TrimPrefix(strings.TrimSuffix(handlerPart, ")"), "(*")
+
+	return handlerName
+}
+
+// GetCurrentHandlerName returns the name of the handler for the current function.
+func GetCurrentHandlerName() string {
+	// Get the program counter and function data for the caller
+	pc, _, _, ok := runtime.Caller(0) // skip 0 for the current function
+	if !ok {
+		return ""
+	}
+
+	// Get the full function name
+	fullName := runtime.FuncForPC(pc).Name()
+
+	// Split the name by dot to get the components
+	parts := strings.Split(fullName, ".")
+
+	// The handler name should be the second-to-last part, typically in the form "(*handlerName)"
+	if len(parts) < 2 {
+		return ""
+	}
+
+	handlerPart := parts[len(parts)-2]
+
+	// Remove the pointer notation if present
+	handlerName := strings.TrimPrefix(strings.TrimSuffix(handlerPart, ")"), "(*")
+
+	return handlerName
 }
