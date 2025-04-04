@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"time"
 
 	"evo-bot-go/internal/clients"
@@ -131,14 +132,15 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 	}
 
 	dateNow := time.Now().Format("02.01.2006")
+	topicIDStr := strconv.Itoa(topicID)
 	// Generate summary using OpenAI with the prompt from the database
 	prompt := fmt.Sprintf(
 		templateText,
 		dateNow,
-		topicID,
-		topicID,
-		topicID,
-		topicID,
+		topicIDStr,
+		topicIDStr,
+		topicIDStr,
+		topicIDStr,
 		dateNow,
 		context,
 	)
@@ -155,8 +157,8 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 	}
 
 	// Format the final summary message using the title format from the prompts package
-	titleFormat := "Сводка чата %s"
-	title := fmt.Sprintf(titleFormat, topicName)
+	dateNowWithMonth := time.Now().Format("01.02.2006")
+	title := fmt.Sprintf("📋 Сводка чата **\"%s\"** за %s", topicName, dateNowWithMonth)
 	finalSummary := fmt.Sprintf("%s\n\n%s", title, summary)
 
 	// Determine the target topic ID
