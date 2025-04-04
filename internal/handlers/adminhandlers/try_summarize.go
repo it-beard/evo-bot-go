@@ -127,7 +127,7 @@ func (h *trySummarizeHandler) handleCallbackCancel(b *gotgbot.Bot, ctx *ext.Cont
 // startSummarization starts the summarization process
 func (h *trySummarizeHandler) startSummarization(b *gotgbot.Bot, ctx *ext.Context) error {
 	// Get the chat ID from either the message or callback query
-	var chatId int64
+	chatId := ctx.EffectiveMessage.Chat.Id
 
 	utils.SendLoggedReply(b, ctx.EffectiveMessage, "Запуск процесса саммаризации...", nil)
 
