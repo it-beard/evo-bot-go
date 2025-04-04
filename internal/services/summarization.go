@@ -132,14 +132,22 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 	}
 
 	dateNow := time.Now().Format("02.01.2006")
+	superGroupChatIDStr := strconv.Itoa(int(s.config.SuperGroupChatID))
 	topicIDStr := strconv.Itoa(topicID)
+	if topicID == 0 {
+		topicIDStr = "1" // Hack for non main topic (id = 0)
+	}
 	// Generate summary using OpenAI with the prompt from the database
 	prompt := fmt.Sprintf(
 		templateText,
 		dateNow,
+		superGroupChatIDStr,
 		topicIDStr,
+		superGroupChatIDStr,
 		topicIDStr,
+		superGroupChatIDStr,
 		topicIDStr,
+		superGroupChatIDStr,
 		topicIDStr,
 		dateNow,
 		context,

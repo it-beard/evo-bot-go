@@ -2,6 +2,7 @@ package adminhandlers
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"evo-bot-go/internal/config"
@@ -13,6 +14,7 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/callbackquery"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/message"
 )
 
 const (
@@ -51,6 +53,7 @@ func NewTrySummarizeHandler(
 			trySummarizeHandlerStateConfirmation: {
 				handlers.NewCallback(callbackquery.Equal(trySummarizeCallbackConfirmYes), h.handleCallbackConfirmation),
 				handlers.NewCallback(callbackquery.Equal(trySummarizeCallbackConfirmCancel), h.handleCallbackCancel),
+				handlers.NewMessage(message.All, h.handleTextDuringConfirmation),
 			},
 		},
 		&handlers.ConversationOpts{
@@ -182,4 +185,15 @@ func (h *trySummarizeHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) err
 	h.userStore.Clear(ctx.EffectiveUser.Id)
 
 	return handlers.EndConversation()
+}
+
+// handleTextDuringConfirmation handles text messages during the confirmation state
+func (h *trySummarizeHandler) handleTextDuringConfirmation(b *gotgbot.Bot, ctx *ext.Context) error {
+	utils.SendLoggedReply(
+		b,
+		ctx.EffectiveMessage,
+		fmt.Sprintf("Пожалуйста, нажмите на одну из кнопок выше, или используйте /%s для отмены.", constants.CancelCommand),
+		nil,
+	)
+	return nil // Stay in the same state
 }
