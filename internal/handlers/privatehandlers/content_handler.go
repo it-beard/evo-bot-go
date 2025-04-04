@@ -14,23 +14,30 @@ import (
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/prompts"
 	"evo-bot-go/internal/database/repositories"
+	"evo-bot-go/internal/formatters"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/callbackquery"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/message"
 	"github.com/gotd/td/tg"
 )
 
 const (
-	// Conversation states
-	stateProcessQuery = "process_query"
+	// Conversation states names
+	contentStateProcessQuery = "content_state_process_query"
 
 	// UserStore keys
-	contentUserStoreKeyProcessing = "content_is_processing"
-	contentUserStoreKeyCancelFunc = "content_cancel_func"
+	contentCtxDataKeyProcessing        = "content_ctx_data_processing"
+	contentCtxDataKeyCancelFunc        = "content_ctx_data_cancel_func"
+	contentCtxDataKeyPreviousMessageID = "content_ctx_data_previous_message_id"
+	contentCtxDataKeyPreviousChatID    = "content_ctx_data_previous_chat_id"
+
+	// Callback data
+	contentCallbackConfirmCancel = "content_callback_confirm_cancel"
 )
 
 type contentHandler struct {
@@ -63,8 +70,9 @@ func NewContentHandler(
 			handlers.NewCommand(constants.ContentCommand, h.startContentSearch),
 		},
 		map[string][]ext.Handler{
-			stateProcessQuery: {
+			contentStateProcessQuery: {
 				handlers.NewMessage(message.All, h.processContentSearch),
+				handlers.NewCallback(callbackquery.Equal(contentCallbackConfirmCancel), h.handleCallbackCancel),
 			},
 		},
 		&handlers.ConversationOpts{
@@ -88,13 +96,16 @@ func (h *contentHandler) startContentSearch(b *gotgbot.Bot, ctx *ext.Context) er
 	}
 
 	// Ask user to enter search query
-	h.messageSenderService.Reply(
+	sentMsg, _ := h.messageSenderService.ReplyWithReturnMessage(
 		msg,
-		fmt.Sprintf("Введите поисковый запрос по контенту или используйте /%s для отмены:", constants.CancelCommand),
-		nil,
+		fmt.Sprintf("Введите поисковый запрос по контенту:"),
+		&gotgbot.SendMessageOpts{
+			ReplyMarkup: formatters.CancelButton(contentCallbackConfirmCancel),
+		},
 	)
 
-	return handlers.NextConversationState(stateProcessQuery)
+	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
+	return handlers.NextConversationState(contentStateProcessQuery)
 }
 
 // 2. processContentSearch handles the actual content search
@@ -102,10 +113,10 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 	msg := ctx.EffectiveMessage
 
 	// Check if we're already processing a request for this user
-	if isProcessing, ok := h.userStore.Get(ctx.EffectiveUser.Id, contentUserStoreKeyProcessing); ok && isProcessing.(bool) {
+	if isProcessing, ok := h.userStore.Get(ctx.EffectiveUser.Id, contentCtxDataKeyProcessing); ok && isProcessing.(bool) {
 		h.messageSenderService.Reply(
 			msg,
-			fmt.Sprintf("Пожалуйста, дождитесь окончания обработки предыдущего запроса, или используйте /%s для отмены:", constants.CancelCommand),
+			fmt.Sprintf("Пожалуйста, дождитесь окончания обработки предыдущего запроса, или используйте /%s для отмены.", constants.CancelCommand),
 			nil,
 		)
 		return nil // Stay in the same state
@@ -116,29 +127,33 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 	if query == "" {
 		h.messageSenderService.Reply(
 			msg,
-			fmt.Sprintf("Поисковый запрос не может быть пустым. Пожалуйста, введите запрос или используйте /%s для отмены:", constants.CancelCommand),
+			fmt.Sprintf("Поисковый запрос не может быть пустым. Пожалуйста, введите запрос или используйте /%s для отмены.", constants.CancelCommand),
 			nil,
 		)
 		return nil // Stay in the same state
 	}
 
 	// Mark as processing
-	h.userStore.Set(ctx.EffectiveUser.Id, contentUserStoreKeyProcessing, true)
+	h.userStore.Set(ctx.EffectiveUser.Id, contentCtxDataKeyProcessing, true)
 
 	// Create a cancellable context for this operation
 	typingCtx, cancelTyping := context.WithCancel(context.Background())
 
 	// Store cancel function in user store so it can be called from handleCancel
-	h.userStore.Set(ctx.EffectiveUser.Id, contentUserStoreKeyCancelFunc, cancelTyping)
+	h.userStore.Set(ctx.EffectiveUser.Id, contentCtxDataKeyCancelFunc, cancelTyping)
 
 	// Make sure we clean up the processing flag in all exit paths
 	defer func() {
-		h.userStore.Set(ctx.EffectiveUser.Id, contentUserStoreKeyProcessing, false)
-		h.userStore.Set(ctx.EffectiveUser.Id, contentUserStoreKeyCancelFunc, nil)
+		h.userStore.Set(ctx.EffectiveUser.Id, contentCtxDataKeyProcessing, false)
+		h.userStore.Set(ctx.EffectiveUser.Id, contentCtxDataKeyCancelFunc, nil)
 	}()
 
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 	// Inform user that search has started
-	h.messageSenderService.Reply(msg, fmt.Sprintf("Ищу информацию по запросу: \"%s\"...", query), nil)
+	sentMsg, _ := h.messageSenderService.ReplyWithReturnMessage(msg, fmt.Sprintf("Ищу информацию по запросу: \"%s\"...", query), &gotgbot.SendMessageOpts{
+		ReplyMarkup: formatters.CancelButton(contentCallbackConfirmCancel),
+	})
+	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
 
 	// Send typing action using MessageSender.
 	h.messageSenderService.SendTypingAction(msg.Chat.Id)
@@ -214,10 +229,20 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 
 	h.messageSenderService.ReplyMarkdown(msg, responseOpenAi, nil)
 
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)
 
 	return handlers.EndConversation()
+}
+
+// handleCallbackCancel processes the cancel button click
+func (h *contentHandler) handleCallbackCancel(b *gotgbot.Bot, ctx *ext.Context) error {
+	// Answer the callback query to remove the loading state on the button
+	cb := ctx.Update.CallbackQuery
+	_, _ = cb.Answer(b, nil)
+
+	return h.handleCancel(b, ctx)
 }
 
 // 3. handleCancel handles the /cancel command
@@ -225,7 +250,7 @@ func (h *contentHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
 	// Check if there's an ongoing operation to cancel
-	if cancelFunc, ok := h.userStore.Get(ctx.EffectiveUser.Id, contentUserStoreKeyCancelFunc); ok {
+	if cancelFunc, ok := h.userStore.Get(ctx.EffectiveUser.Id, contentCtxDataKeyCancelFunc); ok {
 		// Call the cancel function to stop any ongoing API calls
 		if cf, ok := cancelFunc.(context.CancelFunc); ok {
 			cf()
@@ -234,6 +259,8 @@ func (h *contentHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	} else {
 		h.messageSenderService.Reply(msg, "Операция поиска контента отменена.", nil)
 	}
+
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)
@@ -283,4 +310,37 @@ func (h *contentHandler) prepareTelegramMessages(messages []tg.Message) ([]byte,
 	}
 
 	return dataMessages, nil
+}
+
+func (h *contentHandler) MessageRemoveInlineKeyboard(b *gotgbot.Bot, userID *int64) {
+	var chatID, messageID int64
+
+	// If userID provided, try to get stored message info
+	if userID != nil {
+		if val, ok := h.userStore.Get(*userID, contentCtxDataKeyPreviousMessageID); ok {
+			messageID = val.(int64)
+		}
+		if val, ok := h.userStore.Get(*userID, contentCtxDataKeyPreviousChatID); ok {
+			chatID = val.(int64)
+		}
+	}
+
+	// Skip if we don't have valid chat and message IDs
+	if chatID == 0 || messageID == 0 {
+		return
+	}
+
+	// Remove the inline keyboard
+	if _, _, err := b.EditMessageReplyMarkup(&gotgbot.EditMessageReplyMarkupOpts{
+		ChatId:      chatID,
+		MessageId:   messageID,
+		ReplyMarkup: gotgbot.InlineKeyboardMarkup{},
+	}); err != nil {
+		log.Printf("%s: Error removing inline keyboard: %v", utils.GetCurrentTypeName(), err)
+	}
+}
+
+func (h *contentHandler) SavePreviousMessageInfo(userID int64, sentMsg *gotgbot.Message) {
+	h.userStore.Set(userID, contentCtxDataKeyPreviousMessageID, sentMsg.MessageId)
+	h.userStore.Set(userID, contentCtxDataKeyPreviousChatID, sentMsg.Chat.Id)
 }

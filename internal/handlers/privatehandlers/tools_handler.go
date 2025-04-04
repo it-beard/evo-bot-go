@@ -116,7 +116,7 @@ func (h *toolsHandler) processToolSearch(b *gotgbot.Bot, ctx *ext.Context) error
 	if isProcessing, ok := h.userStore.Get(ctx.EffectiveUser.Id, toolsUserCtxDataKeyProcessing); ok && isProcessing.(bool) {
 		h.messageSenderService.Reply(
 			msg,
-			fmt.Sprintf("Пожалуйста, дождитесь окончания обработки предыдущего запроса, или используйте /%s для отмены:", constants.CancelCommand),
+			fmt.Sprintf("Пожалуйста, дождитесь окончания обработки предыдущего запроса, или используйте /%s для отмены.", constants.CancelCommand),
 			nil,
 		)
 		return nil // Stay in the same state
@@ -127,7 +127,7 @@ func (h *toolsHandler) processToolSearch(b *gotgbot.Bot, ctx *ext.Context) error
 	if query == "" {
 		h.messageSenderService.Reply(
 			msg,
-			fmt.Sprintf("Поисковый запрос не может быть пустым. Пожалуйста, введите запрос или используйте /%s для отмены:", constants.CancelCommand),
+			fmt.Sprintf("Поисковый запрос не может быть пустым. Пожалуйста, введите запрос или используйте /%s для отмены.", constants.CancelCommand),
 			nil,
 		)
 		return nil // Stay in the same state
