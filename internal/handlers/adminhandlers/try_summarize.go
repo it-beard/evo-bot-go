@@ -78,7 +78,7 @@ func (h *trySummarizeHandler) startSummarizeConversation(b *gotgbot.Bot, ctx *ex
 					CallbackData: trySummarizeCallbackConfirmYes,
 				},
 				{
-					Text:         "❌Отмена",
+					Text:         "❌ Отмена",
 					CallbackData: trySummarizeCallbackConfirmCancel,
 				},
 			},
