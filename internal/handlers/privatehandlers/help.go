@@ -15,12 +15,18 @@ import (
 type helpHandler struct {
 	config               *config.Config
 	messageSenderService services.MessageSenderService
+	permissionsService   *services.PermissionsService
 }
 
-func NewHelpHandler(config *config.Config, messageSenderService services.MessageSenderService) ext.Handler {
+func NewHelpHandler(
+	config *config.Config,
+	messageSenderService services.MessageSenderService,
+	permissionsService *services.PermissionsService,
+) ext.Handler {
 	h := &helpHandler{
 		config:               config,
 		messageSenderService: messageSenderService,
+		permissionsService:   permissionsService,
 	}
 
 	return handlers.NewCommand(constants.HelpCommand, h.handleCommand)
@@ -30,16 +36,17 @@ func (h *helpHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
 	// Only proceed if this is a private chat
-	if !utils.CheckPrivateChatType(b, ctx) {
+	if !h.permissionsService.CheckPrivateChatType(b, ctx) {
 		return nil
 	}
 
 	// Check if user is a club member
-	if !utils.CheckClubMemberPermissions(b, msg, h.config, constants.HelpCommand) {
+	if !h.permissionsService.CheckClubMemberPermissions(b, msg, constants.HelpCommand) {
 		return nil
 	}
 
-	isAdmin := utils.IsUserAdminOrCreator(b, msg.From.Id, h.config.SuperGroupChatID)
+	user := ctx.EffectiveUser
+	isAdmin := utils.IsUserAdminOrCreator(b, user.Id, h.config)
 	helpText := formatters.FormatHelpMessage(isAdmin)
 
 	h.messageSenderService.ReplyHtml(b, ctx.EffectiveMessage, helpText, nil)

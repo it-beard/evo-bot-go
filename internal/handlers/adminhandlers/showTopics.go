@@ -36,6 +36,7 @@ type showTopicsHandler struct {
 	eventRepository      *repositories.EventRepository
 	messageSenderService services.MessageSenderService
 	userStore            *utils.UserDataStore
+	permissionsService   *services.PermissionsService
 }
 
 func NewShowTopicsHandler(
@@ -43,6 +44,7 @@ func NewShowTopicsHandler(
 	topicRepository *repositories.TopicRepository,
 	eventRepository *repositories.EventRepository,
 	messageSenderService services.MessageSenderService,
+	permissionsService *services.PermissionsService,
 ) ext.Handler {
 	h := &showTopicsHandler{
 		config:               config,
@@ -50,6 +52,7 @@ func NewShowTopicsHandler(
 		eventRepository:      eventRepository,
 		messageSenderService: messageSenderService,
 		userStore:            utils.NewUserDataStore(),
+		permissionsService:   permissionsService,
 	}
 
 	return handlers.NewConversation(
@@ -74,14 +77,8 @@ func NewShowTopicsHandler(
 func (h *showTopicsHandler) startShowTopics(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
-	// Only proceed if this is a private chat
-	if !utils.CheckPrivateChatType(b, ctx) {
-		return handlers.EndConversation()
-	}
-
-	// Check if user is an admin
-	superGroupChatID := h.config.SuperGroupChatID
-	if !utils.CheckAdminPermissions(b, ctx, superGroupChatID, constants.ShowTopicsCommand) {
+	// Check if user has admin permissions and is in a private chat
+	if !h.permissionsService.CheckAdminAndPrivateChat(b, ctx, constants.ShowTopicsCommand) {
 		return handlers.EndConversation()
 	}
 

@@ -26,16 +26,19 @@ type codeHandler struct {
 	config               *config.Config
 	messageSenderService services.MessageSenderService
 	userStore            *utils.UserDataStore
+	permissionsService   *services.PermissionsService
 }
 
 func NewCodeHandler(
 	config *config.Config,
 	messageSenderService services.MessageSenderService,
+	permissionsService *services.PermissionsService,
 ) ext.Handler {
 	h := &codeHandler{
 		config:               config,
 		messageSenderService: messageSenderService,
 		userStore:            utils.NewUserDataStore(),
+		permissionsService:   permissionsService,
 	}
 
 	return handlers.NewConversation(
@@ -57,8 +60,8 @@ func NewCodeHandler(
 func (h *codeHandler) startCodeConversation(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
-	// Check admin permissions and private chat
-	if !utils.CheckAdminAndPrivateChat(b, ctx, h.config.SuperGroupChatID, constants.CodeCommand) {
+	// Check if user has admin permissions and is in a private chat
+	if !h.permissionsService.CheckAdminAndPrivateChat(b, ctx, constants.ShowTopicsCommand) {
 		return handlers.EndConversation()
 	}
 

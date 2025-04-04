@@ -39,6 +39,7 @@ type contentHandler struct {
 	promptingTemplateRepository *repositories.PromptingTemplateRepository
 	messageSenderService        services.MessageSenderService
 	userStore                   *utils.UserDataStore
+	permissionsService          *services.PermissionsService
 }
 
 func NewContentHandler(
@@ -46,6 +47,7 @@ func NewContentHandler(
 	openaiClient *clients.OpenAiClient,
 	messageSenderService services.MessageSenderService,
 	promptingTemplateRepository *repositories.PromptingTemplateRepository,
+	permissionsService *services.PermissionsService,
 ) ext.Handler {
 	h := &contentHandler{
 		config:                      config,
@@ -53,6 +55,7 @@ func NewContentHandler(
 		promptingTemplateRepository: promptingTemplateRepository,
 		messageSenderService:        messageSenderService,
 		userStore:                   utils.NewUserDataStore(),
+		permissionsService:          permissionsService,
 	}
 
 	return handlers.NewConversation(
@@ -75,12 +78,12 @@ func (h *contentHandler) startContentSearch(b *gotgbot.Bot, ctx *ext.Context) er
 	msg := ctx.EffectiveMessage
 
 	// Only proceed if this is a private chat
-	if !utils.CheckPrivateChatType(b, ctx) {
+	if !h.permissionsService.CheckPrivateChatType(b, ctx) {
 		return handlers.EndConversation()
 	}
 
 	// Check if user is a club member
-	if !utils.CheckClubMemberPermissions(b, msg, h.config, constants.ContentCommand) {
+	if !h.permissionsService.CheckClubMemberPermissions(b, msg, constants.ContentCommand) {
 		return handlers.EndConversation()
 	}
 

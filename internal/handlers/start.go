@@ -23,12 +23,18 @@ const (
 type startHandler struct {
 	config               *config.Config
 	messageSenderService services.MessageSenderService
+	permissionsService   *services.PermissionsService
 }
 
-func NewStartHandler(config *config.Config, messageSenderService services.MessageSenderService) ext.Handler {
+func NewStartHandler(
+	config *config.Config,
+	messageSenderService services.MessageSenderService,
+	permissionsService *services.PermissionsService,
+) ext.Handler {
 	h := &startHandler{
 		config:               config,
 		messageSenderService: messageSenderService,
+		permissionsService:   permissionsService,
 	}
 	return handlers.NewConversation(
 		[]ext.Handler{
@@ -44,14 +50,15 @@ func NewStartHandler(config *config.Config, messageSenderService services.Messag
 }
 
 func (h *startHandler) handleStart(b *gotgbot.Bot, ctx *ext.Context) error {
+	user := ctx.EffectiveUser
 	// Only proceed if this is a private chat
-	if !utils.CheckPrivateChatType(b, ctx) {
+	if !h.permissionsService.CheckPrivateChatType(b, ctx) {
 		return handlers.EndConversation()
 	}
 
 	userName := ""
-	if ctx.EffectiveUser.FirstName != "" {
-		userName = ctx.EffectiveUser.FirstName
+	if user.FirstName != "" {
+		userName = user.FirstName
 	}
 
 	greeting := "Приветствую"
@@ -61,7 +68,7 @@ func (h *startHandler) handleStart(b *gotgbot.Bot, ctx *ext.Context) error {
 	greeting += "! 🎩"
 
 	// Check if user is a member of the club
-	isClubMember := utils.IsUserClubMember(b, ctx.EffectiveMessage, h.config)
+	isClubMember := utils.IsUserClubMember(b, user.Id, h.config)
 
 	var message string
 	var inlineKeyboard gotgbot.InlineKeyboardMarkup
@@ -116,7 +123,8 @@ func (h *startHandler) handleCallbackHelp(b *gotgbot.Bot, ctx *ext.Context) erro
 	cb := ctx.Update.CallbackQuery
 	_, _ = cb.Answer(b, nil)
 
-	isAdmin := utils.IsUserAdminOrCreator(b, ctx.EffectiveMessage.From.Id, h.config.SuperGroupChatID)
+	user := ctx.EffectiveUser
+	isAdmin := utils.IsUserAdminOrCreator(b, user.Id, h.config)
 	helpText := formatters.FormatHelpMessage(isAdmin)
 
 	h.messageSenderService.ReplyHtml(b, ctx.EffectiveMessage, helpText, nil)

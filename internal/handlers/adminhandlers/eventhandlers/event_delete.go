@@ -40,18 +40,21 @@ type eventDeleteHandler struct {
 	eventRepository      *repositories.EventRepository
 	messageSenderService services.MessageSenderService
 	userStore            *utils.UserDataStore
+	permissionsService   *services.PermissionsService
 }
 
 func NewEventDeleteHandler(
 	config *config.Config,
 	eventRepository *repositories.EventRepository,
 	messageSenderService services.MessageSenderService,
+	permissionsService *services.PermissionsService,
 ) ext.Handler {
 	h := &eventDeleteHandler{
 		config:               config,
 		eventRepository:      eventRepository,
 		messageSenderService: messageSenderService,
 		userStore:            utils.NewUserDataStore(),
+		permissionsService:   permissionsService,
 	}
 
 	return handlers.NewConversation(
@@ -76,8 +79,8 @@ func NewEventDeleteHandler(
 func (h *eventDeleteHandler) startDelete(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
-	// Check admin permissions and private chat
-	if !utils.CheckAdminAndPrivateChat(b, ctx, h.config.SuperGroupChatID, constants.EventDeleteCommand) {
+	// Check if user has admin permissions and is in a private chat
+	if !h.permissionsService.CheckAdminAndPrivateChat(b, ctx, constants.ShowTopicsCommand) {
 		return handlers.EndConversation()
 	}
 

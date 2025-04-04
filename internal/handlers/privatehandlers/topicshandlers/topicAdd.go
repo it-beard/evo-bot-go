@@ -37,6 +37,7 @@ type topicAddHandler struct {
 	eventRepository      *repositories.EventRepository
 	messageSenderService services.MessageSenderService
 	userStore            *utils.UserDataStore
+	permissionsService   *services.PermissionsService
 }
 
 func NewTopicAddHandler(
@@ -44,6 +45,7 @@ func NewTopicAddHandler(
 	topicRepository *repositories.TopicRepository,
 	eventRepository *repositories.EventRepository,
 	messageSenderService services.MessageSenderService,
+	permissionsService *services.PermissionsService,
 ) ext.Handler {
 	h := &topicAddHandler{
 		config:               config,
@@ -51,6 +53,7 @@ func NewTopicAddHandler(
 		eventRepository:      eventRepository,
 		messageSenderService: messageSenderService,
 		userStore:            utils.NewUserDataStore(),
+		permissionsService:   permissionsService,
 	}
 
 	return handlers.NewConversation(
@@ -76,12 +79,12 @@ func (h *topicAddHandler) startTopicAdd(b *gotgbot.Bot, ctx *ext.Context) error 
 	msg := ctx.EffectiveMessage
 
 	// Only proceed if this is a private chat
-	if !utils.CheckPrivateChatType(b, ctx) {
+	if !h.permissionsService.CheckPrivateChatType(b, ctx) {
 		return handlers.EndConversation()
 	}
 
 	// Check if user is a club member
-	if !utils.CheckClubMemberPermissions(b, msg, h.config, constants.TopicAddCommand) {
+	if !h.permissionsService.CheckClubMemberPermissions(b, msg, constants.TopicAddCommand) {
 		return handlers.EndConversation()
 	}
 

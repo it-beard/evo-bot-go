@@ -6,7 +6,6 @@ import (
 	"evo-bot-go/internal/database/repositories"
 	"evo-bot-go/internal/formatters"
 	"evo-bot-go/internal/services"
-	"evo-bot-go/internal/utils"
 	"fmt"
 	"log"
 
@@ -19,17 +18,20 @@ type eventsHandler struct {
 	config               *config.Config
 	eventRepository      *repositories.EventRepository
 	messageSenderService services.MessageSenderService
+	permissionsService   *services.PermissionsService
 }
 
 func NewEventsHandler(
 	config *config.Config,
 	eventRepository *repositories.EventRepository,
 	messageSenderService services.MessageSenderService,
+	permissionsService *services.PermissionsService,
 ) ext.Handler {
 	h := &eventsHandler{
 		config:               config,
 		eventRepository:      eventRepository,
 		messageSenderService: messageSenderService,
+		permissionsService:   permissionsService,
 	}
 
 	return handlers.NewCommand(constants.EventsCommand, h.handleCommand)
@@ -39,12 +41,12 @@ func (h *eventsHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
 	// Only proceed if this is a private chat
-	if !utils.CheckPrivateChatType(b, ctx) {
+	if !h.permissionsService.CheckPrivateChatType(b, ctx) {
 		return nil
 	}
 
 	// Check if user is a club member
-	if !utils.CheckClubMemberPermissions(b, msg, h.config, constants.EventsCommand) {
+	if !h.permissionsService.CheckClubMemberPermissions(b, msg, constants.EventsCommand) {
 		return nil
 	}
 

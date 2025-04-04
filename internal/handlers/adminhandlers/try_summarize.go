@@ -31,18 +31,21 @@ type trySummarizeHandler struct {
 	summarizationService *services.SummarizationService
 	messageSenderService services.MessageSenderService
 	userStore            *utils.UserDataStore
+	permissionsService   *services.PermissionsService
 }
 
 func NewTrySummarizeHandler(
 	config *config.Config,
 	summarizationService *services.SummarizationService,
 	messageSenderService services.MessageSenderService,
+	permissionsService *services.PermissionsService,
 ) ext.Handler {
 	h := &trySummarizeHandler{
 		config:               config,
 		summarizationService: summarizationService,
 		messageSenderService: messageSenderService,
 		userStore:            utils.NewUserDataStore(),
+		permissionsService:   permissionsService,
 	}
 
 	return handlers.NewConversation(
@@ -65,10 +68,16 @@ func NewTrySummarizeHandler(
 // startSummarizeConversation initiates the summarize conversation
 func (h *trySummarizeHandler) startSummarizeConversation(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
+
+	// Check if user has admin permissions and is in a private chat
+	if !h.permissionsService.CheckAdminAndPrivateChat(b, ctx, constants.ShowTopicsCommand) {
+		return handlers.EndConversation()
+	}
+
 	log.Printf("%s: User %d initiated summarization", utils.GetCurrentTypeName(), msg.From.Id)
 
 	// Check if the user is an admin
-	if !utils.IsUserAdminOrCreator(b, msg.From.Id, h.config.SuperGroupChatID) {
+	if !utils.IsUserAdminOrCreator(b, msg.From.Id, h.config) {
 		msg.Reply(b, "Эта команда доступна только администраторам.", nil)
 		return handlers.EndConversation()
 	}

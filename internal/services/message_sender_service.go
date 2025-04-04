@@ -3,7 +3,9 @@ package services
 import (
 	"evo-bot-go/internal/utils"
 	"log"
+	"math/rand"
 	"strconv"
+	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 )
@@ -15,6 +17,13 @@ type MessageSenderService interface {
 	Reply(b *gotgbot.Bot, msg *gotgbot.Message, replyText string, opts *gotgbot.SendMessageOpts) error
 	ReplyMarkdown(b *gotgbot.Bot, msg *gotgbot.Message, replyText string, opts *gotgbot.SendMessageOpts) error
 	ReplyHtml(b *gotgbot.Bot, msg *gotgbot.Message, replyText string, opts *gotgbot.SendMessageOpts) error
+	ReplyWithCleanupAfterDelayWithPing(
+		b *gotgbot.Bot,
+		msg *gotgbot.Message,
+		text string,
+		delaySeconds int,
+		opts *gotgbot.SendMessageOpts,
+	) error
 	SendCopy(
 		chatId int64,
 		topicId *int,
@@ -193,6 +202,56 @@ func (s *TelegramMessageSender) ReplyHtml(b *gotgbot.Bot, msg *gotgbot.Message, 
 	if err != nil {
 		log.Printf("%s: ReplyHtml: Failed to send message: %v", utils.GetCurrentTypeName(), err)
 	}
+
+	return err
+}
+
+// ReplyWithCleanupAfterDelay replies to a message and then deletes both the reply and the original message after the specified delay
+// Returns the sent message and any error that occurred during sending
+func (s *TelegramMessageSender) ReplyWithCleanupAfterDelayWithPing(
+	b *gotgbot.Bot,
+	msg *gotgbot.Message,
+	text string,
+	delaySeconds int,
+	opts *gotgbot.SendMessageOpts,
+) error {
+	sentMsg, err := msg.Reply(b, text, opts)
+	if err != nil {
+		log.Printf("Failed to send reply: %v", err)
+		return err
+	}
+
+	// Send a random greeting message
+	greetings := []string{
+		"Ping!",
+		"Hi!",
+		"Ку!",
+		"Приветы!",
+		"Дзень добры!",
+		"Пинг!",
+	}
+	randomGreeting := greetings[rand.Intn(len(greetings))]
+	_, err = b.SendMessage(msg.From.Id, randomGreeting, nil)
+	if err != nil {
+		log.Printf("Failed to send greeting message: %v", err)
+	}
+
+	// Start a goroutine to delete both messages after the delay
+	go func() {
+		time.Sleep(time.Duration(delaySeconds) * time.Second)
+
+		// Delete the reply message
+		_, replyErr := sentMsg.Delete(b, nil)
+		if replyErr != nil {
+			log.Printf("Failed to delete reply message after delay: %v", replyErr)
+		}
+
+		// Delete the original message
+		_, origErr := msg.Delete(b, nil)
+		if origErr != nil {
+			log.Printf("Failed to delete original message after delay: %v", origErr)
+		}
+	}()
 
 	return err
 }
