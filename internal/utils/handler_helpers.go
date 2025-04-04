@@ -162,6 +162,16 @@ func SendLoggedReply(b *gotgbot.Bot, msg *gotgbot.Message, text string, err erro
 	}
 }
 
+// SendLoggedReplyWithOptions sends a reply to the user with proper logging
+func SendLoggedReplyWithOptions(b *gotgbot.Bot, msg *gotgbot.Message, text string, opts *gotgbot.SendMessageOpts, err error) {
+	if _, replyErr := msg.Reply(b, text, opts); replyErr != nil {
+		log.Printf("Failed to send error message: %v", replyErr)
+	}
+	if err != nil {
+		log.Printf("Error: %v", err)
+	}
+}
+
 // SendLoggedMarkdownReply	LoggedReply sends a reply to the user with proper logging
 func SendLoggedMarkdownReply(b *gotgbot.Bot, msg *gotgbot.Message, text string, err error) {
 	if _, replyErr := msg.Reply(b, text, &gotgbot.SendMessageOpts{
