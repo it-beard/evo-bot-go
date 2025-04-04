@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"evo-bot-go/internal/clients"
@@ -12,7 +13,6 @@ import (
 	"evo-bot-go/internal/database/repositories"
 	"evo-bot-go/internal/utils"
 
-	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/gotd/td/tg"
 )
 
@@ -90,18 +90,38 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 		msgTime := time.Unix(int64(msg.Date), 0)
 
 		// Extract username/first name from the message
-		username := "Unknown"
+		userID := int64(0)
 		if msg.FromID != nil {
-			if userID, ok := msg.FromID.(*tg.PeerUser); ok && userID != nil {
+			if user, ok := msg.FromID.(*tg.PeerUser); ok && user != nil {
 				// Just use the user ID as a placeholder since we don't have easy access to username
-				username = fmt.Sprintf("User %d", userID.UserID)
+				userID = user.UserID
 			}
 		}
 
-		context += fmt.Sprintf("[%s] %s: %s\n",
+		replyToMessageId := 0
+		if msg.ReplyTo != nil {
+			reply, ok := msg.ReplyTo.(*tg.MessageReplyHeader)
+			if ok {
+				if reply.ReplyToTopID == 0 && topicID != 0 { // Hack for non main topic messages (id = 0)
+					replyToMessageId = 0
+				} else {
+					replyToMessageId = reply.ReplyToMsgID
+				}
+			}
+		}
+
+		replyToMessage := ""
+
+		if replyToMessageId != 0 {
+			replyToMessage = fmt.Sprintf("ReplyID: %d\n", replyToMessageId)
+		}
+		context += fmt.Sprintf("\n---\nMessageID: %d\n%sUserID: user_%d\nTimestamp: %s\nText: %s",
+			msg.ID,
+			replyToMessage,
+			userID,
 			msgTime.Format("2006-01-02 15:04:05"),
-			username,
 			msg.Message)
+
 	}
 
 	// Get the prompt template from the database with fallback to default
@@ -110,8 +130,24 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 		return fmt.Errorf("Summarization Service: failed to get prompt template: %w", err)
 	}
 
+	dateNow := time.Now().Format("02.01.2006")
 	// Generate summary using OpenAI with the prompt from the database
-	prompt := fmt.Sprintf(templateText, topicName, context)
+	prompt := fmt.Sprintf(
+		templateText,
+		dateNow,
+		topicID,
+		topicID,
+		topicID,
+		topicID,
+		dateNow,
+		context,
+	)
+
+	// Save the prompt into a temporary file for logging purposes.
+	err = os.WriteFile("last-prompt-log.txt", []byte(prompt), 0644)
+	if err != nil {
+		log.Printf("Summarization Service: Error writing prompt to file: %v", err)
+	}
 
 	summary, err := s.openaiClient.GetCompletion(ctx, prompt)
 	if err != nil {
@@ -135,22 +171,7 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 	}
 
 	// Send the summary to the target chat
-	_, err = s.messageSenderService.SendCopy(
-		targetTopicID,
-		nil,
-		finalSummary,
-		[]gotgbot.MessageEntity{
-			{
-				Type:   "bold",
-				Offset: 0,
-				Length: int64(len(title)),
-			},
-		},
-		nil,
-	)
-	if err != nil {
-		return fmt.Errorf("Summarization Service: failed to send summary: %w", err)
-	}
+	s.messageSenderService.SendLoggedMarkdownMessage(targetTopicID, finalSummary, nil)
 
 	log.Printf("Summarization Service: Summary sent successfully")
 	return nil
