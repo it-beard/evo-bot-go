@@ -2,12 +2,12 @@ package adminhandlers
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"time"
 
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
+	"evo-bot-go/internal/formatters"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
@@ -20,8 +20,13 @@ import (
 
 const (
 	// Conversation states names
-	trySummarizeHandlerStateProcessCallbacks = "try_summarize_handler_state_process_callbacks"
-	// Callbacks names
+	trySummarizeStateProcessCallbacks = "try_summarize_state_process_callbacks"
+
+	// Context data keys
+	trySummarizeCtxDataKeyPreviousMessageID = "try_summarize_ctx_data_previous_message_id"
+	trySummarizeCtxDataKeyPreviousChatID    = "try_summarize_ctx_data_previous_chat_id"
+
+	// Callback data
 	trySummarizeCallbackConfirmYes    = "try_summarize_callback_confirm_yes"
 	trySummarizeCallbackConfirmCancel = "try_summarize_callback_confirm_cancel"
 )
@@ -53,7 +58,7 @@ func NewTrySummarizeHandler(
 			handlers.NewCommand(constants.TrySummarizeCommand, h.startSummarizeConversation),
 		},
 		map[string][]ext.Handler{
-			trySummarizeHandlerStateProcessCallbacks: {
+			trySummarizeStateProcessCallbacks: {
 				handlers.NewCallback(callbackquery.Equal(trySummarizeCallbackConfirmYes), h.handleCallbackConfirmation),
 				handlers.NewCallback(callbackquery.Equal(trySummarizeCallbackConfirmCancel), h.handleCallbackCancel),
 				handlers.NewMessage(message.All, h.handleTextDuringConfirmation),
@@ -82,32 +87,17 @@ func (h *trySummarizeHandler) startSummarizeConversation(b *gotgbot.Bot, ctx *ex
 		return handlers.EndConversation()
 	}
 
-	// Create an inline keyboard with "Да" and "Отмена" buttons
-	inlineKeyboard := gotgbot.InlineKeyboardMarkup{
-		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
-			{
-				{
-					Text:         "✅ Да",
-					CallbackData: trySummarizeCallbackConfirmYes,
-				},
-				{
-					Text:         "❌ Отмена",
-					CallbackData: trySummarizeCallbackConfirmCancel,
-				},
-			},
-		},
-	}
-
 	// Ask user to confirm with inline keyboard
-	h.messageSenderService.Reply(
+	sentMsg, _ := h.messageSenderService.ReplyWithReturnMessage(
 		msg,
 		"Вы собираетесь запустить процесс тестирования саммаризации общения в клубе. Саммаризация будет отправлена в личные сообщения.\n\nПодтвердите действие, нажав одну из кнопок ниже:",
 		&gotgbot.SendMessageOpts{
-			ReplyMarkup: inlineKeyboard,
+			ReplyMarkup: formatters.ConfirmAndCancelButton(trySummarizeCallbackConfirmYes, trySummarizeCallbackConfirmCancel),
 		},
 	)
 
-	return handlers.NextConversationState(trySummarizeHandlerStateProcessCallbacks)
+	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
+	return handlers.NextConversationState(trySummarizeStateProcessCallbacks)
 }
 
 // handleCallbackConfirmation processes the user's callback confirmation
@@ -126,6 +116,7 @@ func (h *trySummarizeHandler) handleCallbackCancel(b *gotgbot.Bot, ctx *ext.Cont
 	cb := ctx.Update.CallbackQuery
 	_, _ = cb.Answer(b, nil)
 
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 	h.messageSenderService.Reply(ctx.EffectiveMessage, "Операция саммаризации отменена.", nil)
 	log.Printf("%s: Summarization canceled", utils.GetCurrentTypeName())
 
@@ -187,6 +178,7 @@ func (h *trySummarizeHandler) startSummarization(b *gotgbot.Bot, ctx *ext.Contex
 
 	}()
 
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)
 
@@ -198,6 +190,7 @@ func (h *trySummarizeHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) err
 	msg := ctx.EffectiveMessage
 	log.Printf("%s: User %d canceled using /cancel command", utils.GetCurrentTypeName(), msg.From.Id)
 
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 	h.messageSenderService.Reply(msg, "Операция саммаризации отменена.", nil)
 	log.Printf("%s: Summarization canceled", utils.GetCurrentTypeName())
 
@@ -213,8 +206,41 @@ func (h *trySummarizeHandler) handleTextDuringConfirmation(b *gotgbot.Bot, ctx *
 
 	h.messageSenderService.Reply(
 		ctx.EffectiveMessage,
-		fmt.Sprintf("Пожалуйста, нажмите на одну из кнопок выше, или используйте /%s для отмены.", constants.CancelCommand),
+		"Пожалуйста, нажмите на одну из кнопок выше, или используйте кнопку отмены.",
 		nil,
 	)
 	return nil // Stay in the same state
+}
+
+func (h *trySummarizeHandler) MessageRemoveInlineKeyboard(b *gotgbot.Bot, userID *int64) {
+	var chatID, messageID int64
+
+	// If userID provided, try to get stored message info
+	if userID != nil {
+		if val, ok := h.userStore.Get(*userID, trySummarizeCtxDataKeyPreviousMessageID); ok {
+			messageID = val.(int64)
+		}
+		if val, ok := h.userStore.Get(*userID, trySummarizeCtxDataKeyPreviousChatID); ok {
+			chatID = val.(int64)
+		}
+	}
+
+	// Skip if we don't have valid chat and message IDs
+	if chatID == 0 || messageID == 0 {
+		return
+	}
+
+	// Remove the inline keyboard
+	if _, _, err := b.EditMessageReplyMarkup(&gotgbot.EditMessageReplyMarkupOpts{
+		ChatId:      chatID,
+		MessageId:   messageID,
+		ReplyMarkup: gotgbot.InlineKeyboardMarkup{},
+	}); err != nil {
+		log.Printf("%s: Error removing inline keyboard: %v", utils.GetCurrentTypeName(), err)
+	}
+}
+
+func (h *trySummarizeHandler) SavePreviousMessageInfo(userID int64, sentMsg *gotgbot.Message) {
+	h.userStore.Set(userID, trySummarizeCtxDataKeyPreviousMessageID, sentMsg.MessageId)
+	h.userStore.Set(userID, trySummarizeCtxDataKeyPreviousChatID, sentMsg.Chat.Id)
 }

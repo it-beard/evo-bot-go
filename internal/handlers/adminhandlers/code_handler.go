@@ -8,18 +8,27 @@ import (
 	"evo-bot-go/internal/clients"
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
+	"evo-bot-go/internal/formatters"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/callbackquery"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/message"
 )
 
 const (
-	// Conversation states
-	codeHandlerStateWaitForCode = "code_handler_wait_for_code"
+	// Conversation states names
+	codeHandlerStateWaitForCode = "code_handler_state_wait_for_code"
+
+	// Context data keys
+	codeHandlerCtxDataKeyPreviousMessageID = "code_handler_ctx_data_previous_message_id"
+	codeHandlerCtxDataKeyPreviousChatID    = "code_handler_ctx_data_previous_chat_id"
+
+	// Callback data
+	codeHandlerCallbackConfirmCancel = "code_handler_callback_confirm_cancel"
 )
 
 type codeHandler struct {
@@ -48,6 +57,7 @@ func NewCodeHandler(
 		map[string][]ext.Handler{
 			codeHandlerStateWaitForCode: {
 				handlers.NewMessage(message.All, h.processCode),
+				handlers.NewCallback(callbackquery.Equal(codeHandlerCallbackConfirmCancel), h.handleCallbackCancel),
 			},
 		},
 		&handlers.ConversationOpts{
@@ -66,8 +76,15 @@ func (h *codeHandler) startCodeConversation(b *gotgbot.Bot, ctx *ext.Context) er
 	}
 
 	// Ask user to enter the code
-	h.messageSenderService.Reply(msg, fmt.Sprintf("Пожалуйста, введите код или используйте /%s для отмены:", constants.CancelCommand), nil)
+	sentMsg, _ := h.messageSenderService.ReplyWithReturnMessage(
+		msg,
+		fmt.Sprintf("Пожалуйста, введите код:"),
+		&gotgbot.SendMessageOpts{
+			ReplyMarkup: formatters.CancelButton(codeHandlerCallbackConfirmCancel),
+		},
+	)
 
+	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
 	return handlers.NextConversationState(codeHandlerStateWaitForCode)
 }
 
@@ -78,9 +95,15 @@ func (h *codeHandler) processCode(b *gotgbot.Bot, ctx *ext.Context) error {
 	// Extract code from message
 	revertedCode := strings.TrimSpace(msg.Text)
 	if revertedCode == "" {
-		h.messageSenderService.Reply(msg, fmt.Sprintf("Код не может быть пустым. Пожалуйста, введите код или используйте /%s для отмены:", constants.CancelCommand), nil)
+		h.messageSenderService.Reply(
+			msg,
+			fmt.Sprintf("Код не может быть пустым. Пожалуйста, введите код или используйте кнопку для отмены."),
+			nil,
+		)
 		return nil // Stay in the same state
 	}
+
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 
 	code := reverseString(revertedCode)
 
@@ -101,16 +124,59 @@ func (h *codeHandler) processCode(b *gotgbot.Bot, ctx *ext.Context) error {
 	return handlers.EndConversation()
 }
 
+// handleCallbackCancel processes the cancel button click
+func (h *codeHandler) handleCallbackCancel(b *gotgbot.Bot, ctx *ext.Context) error {
+	// Answer the callback query to remove the loading state on the button
+	cb := ctx.Update.CallbackQuery
+	_, _ = cb.Answer(b, nil)
+
+	return h.handleCancel(b, ctx)
+}
+
 // handleCancel handles the /cancel command
 func (h *codeHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
 	h.messageSenderService.Reply(msg, "Операция ввода кода отменена.", nil)
 
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)
 
 	return handlers.EndConversation()
+}
+
+func (h *codeHandler) MessageRemoveInlineKeyboard(b *gotgbot.Bot, userID *int64) {
+	var chatID, messageID int64
+
+	// If userID provided, try to get stored message info
+	if userID != nil {
+		if val, ok := h.userStore.Get(*userID, codeHandlerCtxDataKeyPreviousMessageID); ok {
+			messageID = val.(int64)
+		}
+		if val, ok := h.userStore.Get(*userID, codeHandlerCtxDataKeyPreviousChatID); ok {
+			chatID = val.(int64)
+		}
+	}
+
+	// Skip if we don't have valid chat and message IDs
+	if chatID == 0 || messageID == 0 {
+		return
+	}
+
+	// Remove the inline keyboard
+	if _, _, err := b.EditMessageReplyMarkup(&gotgbot.EditMessageReplyMarkupOpts{
+		ChatId:      chatID,
+		MessageId:   messageID,
+		ReplyMarkup: gotgbot.InlineKeyboardMarkup{},
+	}); err != nil {
+		log.Printf("%s: Error removing inline keyboard: %v", utils.GetCurrentTypeName(), err)
+	}
+}
+
+func (h *codeHandler) SavePreviousMessageInfo(userID int64, sentMsg *gotgbot.Message) {
+	h.userStore.Set(userID, codeHandlerCtxDataKeyPreviousMessageID, sentMsg.MessageId)
+	h.userStore.Set(userID, codeHandlerCtxDataKeyPreviousChatID, sentMsg.Chat.Id)
 }
 
 func reverseString(s string) string {
