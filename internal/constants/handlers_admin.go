@@ -1,7 +1,7 @@
 package constants
 
 const CodeCommand = "code"
-const SummarizeCommand = "summarize"
+const TrySummarizeCommand = "trySummarize"
 const SummarizeDmFlag = "-dm"
 
 // Event Handlers

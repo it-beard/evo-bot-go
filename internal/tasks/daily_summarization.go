@@ -28,16 +28,16 @@ func NewDailySummarizationTask(config *config.Config, summarizationService *serv
 // Start starts the daily summarization task
 func (s *DailySummarizationTask) Start() {
 	if !s.config.SummarizationTaskEnabled {
-		log.Println("Daily summarization task is disabled")
+		log.Println("Summarization Task: Daily summarization task is disabled")
 		return
 	}
-	log.Println("Starting daily summarization task with time ", s.config.SummaryTime)
+	log.Println("Summarization Task: Starting daily summarization task with time ", s.config.SummaryTime)
 	go s.run()
 }
 
 // Stop stops the daily summarization task
 func (s *DailySummarizationTask) Stop() {
-	log.Println("Stopping daily summarization task")
+	log.Println("Summarization Task: Stopping daily summarization task")
 	close(s.stop)
 }
 
@@ -45,7 +45,7 @@ func (s *DailySummarizationTask) Stop() {
 func (s *DailySummarizationTask) run() {
 	// Calculate time until next run
 	nextRun := s.calculateNextRun()
-	log.Printf("Next summarization scheduled for: %v", nextRun)
+	log.Printf("Summarization Task: Next summarization scheduled for: %v", nextRun)
 
 	ticker := time.NewTicker(time.Minute) // Check every minute
 	defer ticker.Stop()
@@ -57,7 +57,7 @@ func (s *DailySummarizationTask) run() {
 		case now := <-ticker.C:
 			// Check if it's time to run
 			if now.After(nextRun) {
-				log.Println("Running scheduled summarization")
+				log.Println("Summarization Task: Running scheduled summarization")
 
 				// Run summarization in a separate goroutine
 				go func() {
@@ -66,13 +66,13 @@ func (s *DailySummarizationTask) run() {
 
 					// For scheduled tasks, always send to the chat (not to DM)
 					if err := s.summarizationService.RunDailySummarization(ctx, false); err != nil {
-						log.Printf("Error running daily summarization: %v", err)
+						log.Printf("Summarization Task: Error running daily summarization: %v", err)
 					}
 				}()
 
 				// Calculate next run time
 				nextRun = s.calculateNextRun()
-				log.Printf("Next summarization scheduled for: %v", nextRun)
+				log.Printf("Summarization Task: Next summarization scheduled for: %v", nextRun)
 			}
 		}
 	}

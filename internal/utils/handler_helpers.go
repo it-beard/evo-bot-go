@@ -162,7 +162,7 @@ func SendLoggedReply(b *gotgbot.Bot, msg *gotgbot.Message, text string, err erro
 	}
 }
 
-// SendLoggedReply sends a reply to the user with proper logging
+// SendLoggedMarkdownReply	LoggedReply sends a reply to the user with proper logging
 func SendLoggedMarkdownReply(b *gotgbot.Bot, msg *gotgbot.Message, text string, err error) {
 	if _, replyErr := msg.Reply(b, text, &gotgbot.SendMessageOpts{
 		ParseMode: "Markdown",

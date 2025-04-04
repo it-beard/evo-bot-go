@@ -56,7 +56,8 @@ func (h *helpHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 			"• /eventDelete - Удалить мероприятие\n" +
 			"• /eventFinish - Отметить мероприятие как завершенное\n" +
 			"• /showTopics - Просмотреть темы и вопросы к предстоящим мероприятиям с возможностью удаления\n" +
-			"• /code - Ввести код для авторизации TG-клиента (задом наперед)\n"
+			"• /code - Ввести код для авторизации TG-клиента (задом наперед)\n" +
+			"• /trySummarize - Тестирование саммаризации общения в клубе\n"
 
 		helpText += adminHelpText
 	}

@@ -8,6 +8,7 @@ import (
 )
 
 type MessageSenderService interface {
+	SendLoggedMarkdownMessage(chatId int64, text string, err error)
 	SendCopy(
 		chatId int64,
 		topicId *int,
@@ -29,6 +30,21 @@ type TelegramMessageSender struct {
 
 func NewMessageSenderService(bot *gotgbot.Bot) MessageSenderService {
 	return &TelegramMessageSender{bot: bot}
+}
+
+// SendLoggedReply sends a reply to the user with proper logging
+func (s *TelegramMessageSender) SendLoggedMarkdownMessage(chatId int64, text string, err error) {
+	if _, replyErr := s.bot.SendMessage(chatId, text, &gotgbot.SendMessageOpts{
+		ParseMode: "Markdown",
+		LinkPreviewOptions: &gotgbot.LinkPreviewOptions{
+			IsDisabled: true,
+		},
+	}); replyErr != nil {
+		log.Printf("Failed to send error message: %v", replyErr)
+	}
+	if err != nil {
+		log.Printf("Error: %v", err)
+	}
 }
 
 // Sends a copy of the original message to the chat

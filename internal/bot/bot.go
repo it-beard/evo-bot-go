@@ -132,7 +132,7 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 	// Register admin chat handlers
 	adminHandlers := []ext.Handler{
 		adminhandlers.NewCodeHandler(deps.AppConfig),
-		adminhandlers.NewSummarizeHandler(deps.SummarizationService, deps.MessageSenderService, deps.AppConfig),
+		adminhandlers.NewTrySummarizeHandler(deps.SummarizationService, deps.MessageSenderService, deps.AppConfig),
 		adminhandlers.NewShowTopicsHandler(deps.TopicRepository, deps.EventRepository, deps.MessageSenderService, deps.AppConfig),
 		eventhandlers.NewEventEditHandler(deps.EventRepository, deps.AppConfig),
 		eventhandlers.NewEventSetupHandler(deps.EventRepository, deps.AppConfig),
@@ -183,10 +183,10 @@ func (b *TgBotClient) Start() {
 	}
 
 	if err := b.updater.StartPolling(b.bot, pollingOpts); err != nil {
-		log.Fatal("Failed to start polling: " + err.Error())
+		log.Fatal("Bot Runner: Failed to start polling: " + err.Error())
 	}
 
-	log.Printf("Bot @%s has been started successfully\n", b.bot.User.Username)
+	log.Printf("Bot Runner: Bot @%s has been started successfully\n", b.bot.User.Username)
 	b.updater.Idle()
 }
 

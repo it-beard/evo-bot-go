@@ -23,13 +23,13 @@ func NewSessionKeepAliveTask(interval time.Duration) *SessionKeepAliveTask {
 
 // Start starts the session keep-alive task
 func (s *SessionKeepAliveTask) Start() {
-	log.Printf("Starting session keep-alive task with interval %s", s.interval)
+	log.Printf("Session Keep-Alive Task: Starting session keep-alive task with interval %s", s.interval)
 
 	// First time refresh
 	if err := clients.TgKeepSessionAlive(); err != nil {
-		log.Printf("Failed to keep session alive: %v", err)
+		log.Printf("Session Keep-Alive Task: Failed to keep session alive: %v", err)
 	} else {
-		log.Printf("Session refresh successful")
+		log.Printf("Session Keep-Alive Task: Session refresh successful")
 	}
 
 	go s.run()
@@ -37,7 +37,7 @@ func (s *SessionKeepAliveTask) Start() {
 
 // Stop stops the session keep-alive task
 func (s *SessionKeepAliveTask) Stop() {
-	log.Println("Stopping session keep-alive task")
+	log.Println("Session Keep-Alive Task: Stopping session keep-alive task")
 	close(s.stop)
 }
 
@@ -51,14 +51,14 @@ func (s *SessionKeepAliveTask) run() {
 		case <-s.stop:
 			return
 		case <-ticker.C:
-			log.Println("Running scheduled session keep-alive")
+			log.Println("Session Keep-Alive Task: Running scheduled session keep-alive")
 
 			// Run keep-alive in a separate goroutine
 			go func() {
 				if err := clients.TgKeepSessionAlive(); err != nil {
-					log.Printf("Failed to keep session alive: %v", err)
+					log.Printf("Session Keep-Alive Task: Failed to keep session alive: %v", err)
 				} else {
-					log.Printf("Session refresh successful")
+					log.Printf("Session Keep-Alive Task: Session refresh successful")
 				}
 			}()
 		}
