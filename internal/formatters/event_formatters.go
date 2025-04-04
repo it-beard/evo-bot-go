@@ -30,7 +30,7 @@ func FormatEventListForUsers(events []repositories.Event, title string) string {
 		}
 
 		response.WriteString(fmt.Sprintf("\n%s _%s_: *%s*\n", typeEmoji, event.Type, event.Name))
-		response.WriteString(fmt.Sprintf("└ _ID_ `%d`, _дата проведения_: %s\n",
+		response.WriteString(fmt.Sprintf("└ _ID_ /%d, _дата проведения_: %s\n",
 			event.ID, startedAtStr))
 	}
 
