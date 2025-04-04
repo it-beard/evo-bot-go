@@ -119,7 +119,7 @@ func (h *eventEditHandler) startEdit(b *gotgbot.Bot, ctx *ext.Context) error {
 // 2. handleSelectEvent processes the user's selection of an event to edit
 func (h *eventEditHandler) handleSelectEvent(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
-	eventIDStr := strings.TrimSpace(msg.Text)
+	eventIDStr := strings.TrimSpace(strings.Replace(msg.Text, "/", "", 1))
 
 	eventID, err := strconv.Atoi(eventIDStr)
 	if err != nil {

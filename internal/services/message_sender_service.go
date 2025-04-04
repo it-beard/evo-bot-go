@@ -20,6 +20,12 @@ func NewMessageSenderService(bot *gotgbot.Bot) *MessageSenderService {
 
 // Send message to chat
 func (s *MessageSenderService) Send(chatId int64, text string, opts *gotgbot.SendMessageOpts) error {
+	_, err := s.SendWithReturnMessage(chatId, text, opts)
+	return err
+}
+
+// Send message to chat
+func (s *MessageSenderService) SendWithReturnMessage(chatId int64, text string, opts *gotgbot.SendMessageOpts) (*gotgbot.Message, error) {
 	// default link preview options are disabled
 	if opts == nil {
 		opts = &gotgbot.SendMessageOpts{
@@ -33,13 +39,13 @@ func (s *MessageSenderService) Send(chatId int64, text string, opts *gotgbot.Sen
 		}
 	}
 
-	_, err := s.bot.SendMessage(chatId, text, opts)
+	sentMsg, err := s.bot.SendMessage(chatId, text, opts)
 
 	if err != nil {
 		log.Printf("%s: Send: Failed to send message: %v", utils.GetCurrentTypeName(), err)
 	}
 
-	return err
+	return sentMsg, err
 }
 
 // Send markdown message to chat

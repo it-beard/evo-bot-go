@@ -109,7 +109,7 @@ func (h *eventDeleteHandler) startDelete(b *gotgbot.Bot, ctx *ext.Context) error
 // 2. handleSelectEvent processes the user's selection of an event to delete
 func (h *eventDeleteHandler) handleSelectEvent(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
-	eventIDStr := strings.TrimSpace(msg.Text)
+	eventIDStr := strings.TrimSpace(strings.Replace(msg.Text, "/", "", 1))
 	eventID, err := strconv.Atoi(eventIDStr)
 	if err != nil {
 		h.messageSenderService.Reply(msg, fmt.Sprintf("Некорректный ID. Пожалуйста, введи числовой ID или /%s для отмены.", constants.CancelCommand), nil)

@@ -123,7 +123,6 @@ func (h *topicsHandler) startTopics(b *gotgbot.Bot, ctx *ext.Context) error {
 // 2. handleEventSelection processes the user's event selection
 func (h *topicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
-	// replace "/" with ""
 	userInput := strings.TrimSpace(strings.Replace(msg.Text, "/", "", 1))
 
 	// Check if the input is a valid event ID

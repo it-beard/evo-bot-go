@@ -17,17 +17,23 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/callbackquery"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/message"
 )
 
 const (
-	// Conversation states
-	showTopicsStateSelectEvent = "admin_show_topics_select_event"
-	showTopicsStateDeleteTopic = "admin_show_topics_delete_topic"
+	// Conversation states names
+	showTopicsStateSelectEvent = "admin_show_topics_state_select_event"
+	showTopicsStateDeleteTopic = "admin_show_topics_state_delete_topic"
 
-	// UserStore keys
-	showTopicsUserStoreKeyCancelFunc = "admin_show_topics_cancel_func"
-	showTopicsUserStoreEventID       = "admin_show_topics_event_id"
+	// Context data keys
+	showTopicsCtxDataKeyCancelFunc        = "admin_show_topics_ctx_data_cancel_func"
+	showTopicsCtxDataKeyEventID           = "admin_show_topics_ctx_data_event_id"
+	showTopicsCtxDataKeyPreviousMessageID = "admin_show_topics_ctx_data_previous_message_id"
+	showTopicsCtxDataKeyPreviousChatID    = "admin_show_topics_ctx_data_previous_chat_id"
+
+	// Callback data
+	showTopicsCallbackConfirmCancel = "admin_show_topics_callback_confirm_cancel"
 )
 
 type showTopicsHandler struct {
@@ -62,9 +68,11 @@ func NewShowTopicsHandler(
 		map[string][]ext.Handler{
 			showTopicsStateSelectEvent: {
 				handlers.NewMessage(message.All, h.handleEventSelection),
+				handlers.NewCallback(callbackquery.Equal(showTopicsCallbackConfirmCancel), h.handleCallbackCancel),
 			},
 			showTopicsStateDeleteTopic: {
 				handlers.NewMessage(message.All, h.handleTopicDeletion),
+				handlers.NewCallback(callbackquery.Equal(showTopicsCallbackConfirmCancel), h.handleCallbackCancel),
 			},
 		},
 		&handlers.ConversationOpts{
@@ -103,22 +111,29 @@ func (h *showTopicsHandler) startShowTopics(b *gotgbot.Bot, ctx *ext.Context) er
 		"для которого ты хочешь увидеть темы и вопросы",
 	)
 
-	h.messageSenderService.ReplyMarkdown(msg, formattedEvents, nil)
+	sentMsg, _ := h.messageSenderService.ReplyMarkdownWithReturnMessage(
+		msg,
+		formattedEvents,
+		&gotgbot.SendMessageOpts{
+			ReplyMarkup: formatters.CancelButton(showTopicsCallbackConfirmCancel),
+		},
+	)
 
+	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
 	return handlers.NextConversationState(showTopicsStateSelectEvent)
 }
 
 // 2. handleEventSelection processes the admin's event selection
 func (h *showTopicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
-	userInput := strings.TrimSpace(msg.Text)
+	userInput := strings.TrimSpace(strings.Replace(msg.Text, "/", "", 1))
 
 	// Check if the input is a valid event ID
 	eventID, err := strconv.Atoi(userInput)
 	if err != nil {
 		h.messageSenderService.Reply(
 			msg,
-			fmt.Sprintf("Пожалуйста, отправь корректный ID мероприятия или /%s для отмены.", constants.CancelCommand),
+			fmt.Sprintf("Пожалуйста, отправь корректный ID мероприятия или используй /%s для отмены.", constants.CancelCommand),
 			nil,
 		)
 		return nil // Stay in the same state
@@ -145,16 +160,23 @@ func (h *showTopicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Contex
 	}
 
 	// Store the event ID for use in topic deletion
-	h.userStore.Set(ctx.EffectiveUser.Id, showTopicsUserStoreEventID, eventID)
+	h.userStore.Set(ctx.EffectiveUser.Id, showTopicsCtxDataKeyEventID, eventID)
 
 	// Format and display topics for admin
 	formattedTopics := formatters.FormatTopicListForAdmin(topics, event.Name, event.Type)
 	h.messageSenderService.ReplyMarkdown(msg, formattedTopics, nil)
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 
 	// If there are topics, suggest deletion option
 	if len(topics) > 0 {
-		suggestionMsg := fmt.Sprintf("\nДля удаления темы отправь ID темы, которую нужно удалить, или /%s для отмены.", constants.CancelCommand)
-		h.messageSenderService.Reply(msg, suggestionMsg, nil)
+		sentMsg, _ := h.messageSenderService.SendWithReturnMessage(
+			msg.Chat.Id,
+			fmt.Sprintf("\nДля удаления темы отправь ID темы, которую нужно удалить:"),
+			&gotgbot.SendMessageOpts{
+				ReplyMarkup: formatters.CancelButton(showTopicsCallbackConfirmCancel),
+			},
+		)
+		h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
 		return handlers.NextConversationState(showTopicsStateDeleteTopic)
 	}
 
@@ -171,14 +193,14 @@ func (h *showTopicsHandler) handleTopicDeletion(b *gotgbot.Bot, ctx *ext.Context
 	if err != nil {
 		h.messageSenderService.Reply(
 			msg,
-			fmt.Sprintf("Пожалуйста, отправь корректный ID темы или /%s для отмены.", constants.CancelCommand),
+			fmt.Sprintf("Пожалуйста, отправь корректный ID темы или используй /%s для отмены.", constants.CancelCommand),
 			nil,
 		)
 		return nil // Stay in the same state
 	}
 
 	// Get the event ID from user store
-	eventIDVal, ok := h.userStore.Get(ctx.EffectiveUser.Id, showTopicsUserStoreEventID)
+	eventIDVal, ok := h.userStore.Get(ctx.EffectiveUser.Id, showTopicsCtxDataKeyEventID)
 	if !ok {
 		h.messageSenderService.Reply(msg, "Ошибка: не найден ID мероприятия в сессии. Попробуй начать сначала.", nil)
 		return handlers.EndConversation()
@@ -206,13 +228,15 @@ func (h *showTopicsHandler) handleTopicDeletion(b *gotgbot.Bot, ctx *ext.Context
 		h.messageSenderService.Reply(
 			msg,
 			fmt.Sprintf(
-				"Тема с ID %d относится к другому мероприятию (ID: %d), а не к выбранному (ID: %d).\nПожалуйста, выбери корректный ID темы или /%s для отмены.",
+				"Тема с ID %d относится к другому мероприятию (ID: %d), а не к выбранному (ID: %d).\nПожалуйста, выбери корректный ID темы или используй /%s для отмены.",
 				topicID, topic.EventID, eventID, constants.CancelCommand,
 			),
 			nil,
 		)
 		return nil // Stay in the same state
 	}
+
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 
 	// Delete the topic
 	err = h.topicRepository.DeleteTopic(topicID)
@@ -247,14 +271,30 @@ func (h *showTopicsHandler) handleTopicDeletion(b *gotgbot.Bot, ctx *ext.Context
 
 	// If there are still topics, allow for more deletions
 	if len(topics) > 0 {
-		suggestionMsg := fmt.Sprintf("\nДля удаления еще одной темы отправь ID темы, или /%s для завершения.", constants.CancelCommand)
-		h.messageSenderService.Reply(msg, suggestionMsg, nil)
+		sentMsg, _ := h.messageSenderService.SendWithReturnMessage(
+			msg.Chat.Id,
+			fmt.Sprintf("\nДля удаления еще одной темы отправь ID темы:"),
+			&gotgbot.SendMessageOpts{
+				ReplyMarkup: formatters.CancelButton(showTopicsCallbackConfirmCancel),
+			},
+		)
+		h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
 		return nil // Stay in the same state to allow more deletions
 	}
 
 	// No more topics to delete
 	h.messageSenderService.Reply(msg, "Все темы удалены.", nil)
+	h.userStore.Clear(ctx.EffectiveUser.Id)
 	return handlers.EndConversation()
+}
+
+// handleCallbackCancel processes the cancel button click
+func (h *showTopicsHandler) handleCallbackCancel(b *gotgbot.Bot, ctx *ext.Context) error {
+	// Answer the callback query to remove the loading state on the button
+	cb := ctx.Update.CallbackQuery
+	_, _ = cb.Answer(b, nil)
+
+	return h.handleCancel(b, ctx)
 }
 
 // 4. handleCancel handles the /cancel command
@@ -262,7 +302,7 @@ func (h *showTopicsHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error
 	msg := ctx.EffectiveMessage
 
 	// Check if there's an ongoing operation to cancel
-	if cancelFunc, ok := h.userStore.Get(ctx.EffectiveUser.Id, showTopicsUserStoreKeyCancelFunc); ok {
+	if cancelFunc, ok := h.userStore.Get(ctx.EffectiveUser.Id, showTopicsCtxDataKeyCancelFunc); ok {
 		// Call the cancel function to stop any ongoing API calls
 		if cf, ok := cancelFunc.(context.CancelFunc); ok {
 			cf()
@@ -272,8 +312,43 @@ func (h *showTopicsHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error
 		h.messageSenderService.Reply(msg, "Операция просмотра/удаления тем отменена.", nil)
 	}
 
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
+
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)
 
 	return handlers.EndConversation()
+}
+
+func (h *showTopicsHandler) MessageRemoveInlineKeyboard(b *gotgbot.Bot, userID *int64) {
+	var chatID, messageID int64
+
+	// If userID provided, try to get stored message info
+	if userID != nil {
+		if val, ok := h.userStore.Get(*userID, showTopicsCtxDataKeyPreviousMessageID); ok {
+			messageID = val.(int64)
+		}
+		if val, ok := h.userStore.Get(*userID, showTopicsCtxDataKeyPreviousChatID); ok {
+			chatID = val.(int64)
+		}
+	}
+
+	// Skip if we don't have valid chat and message IDs
+	if chatID == 0 || messageID == 0 {
+		return
+	}
+
+	// Remove the inline keyboard
+	if _, _, err := b.EditMessageReplyMarkup(&gotgbot.EditMessageReplyMarkupOpts{
+		ChatId:      chatID,
+		MessageId:   messageID,
+		ReplyMarkup: gotgbot.InlineKeyboardMarkup{},
+	}); err != nil {
+		log.Printf("%s: Error removing inline keyboard: %v", utils.GetCurrentTypeName(), err)
+	}
+}
+
+func (h *showTopicsHandler) SavePreviousMessageInfo(userID int64, sentMsg *gotgbot.Message) {
+	h.userStore.Set(userID, showTopicsCtxDataKeyPreviousMessageID, sentMsg.MessageId)
+	h.userStore.Set(userID, showTopicsCtxDataKeyPreviousChatID, sentMsg.Chat.Id)
 }
