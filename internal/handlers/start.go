@@ -3,6 +3,7 @@ package handlers
 import (
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
+	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -19,12 +20,14 @@ const (
 )
 
 type startHandler struct {
-	config *config.Config
+	config               *config.Config
+	messageSenderService services.MessageSenderService
 }
 
-func NewStartHandler(config *config.Config) ext.Handler {
+func NewStartHandler(config *config.Config, messageSenderService services.MessageSenderService) ext.Handler {
 	h := &startHandler{
-		config: config,
+		config:               config,
+		messageSenderService: messageSenderService,
 	}
 	return handlers.NewConversation(
 		[]ext.Handler{
@@ -86,18 +89,14 @@ func (h *startHandler) handleStart(b *gotgbot.Bot, ctx *ext.Context) error {
 		},
 	}
 
-	utils.SendLoggedReplyWithOptions(
+	h.messageSenderService.ReplyMarkdown(
 		b,
 		ctx.EffectiveMessage,
 		message,
 		&gotgbot.SendMessageOpts{
-			ParseMode: "Markdown",
-			LinkPreviewOptions: &gotgbot.LinkPreviewOptions{
-				IsDisabled: true,
-			},
 			ReplyMarkup: inlineKeyboard,
 		},
-		nil)
+	)
 
 	return handlers.NextConversationState(startHandlerStateProcessCallback)
 }
@@ -109,7 +108,7 @@ func (h *startHandler) handleCallbackHelp(b *gotgbot.Bot, ctx *ext.Context) erro
 	isAdmin := utils.IsUserAdminOrCreator(b, ctx.EffectiveMessage.From.Id, h.config.SuperGroupChatID)
 	helpText := utils.FormatHelpMessage(isAdmin)
 
-	utils.SendLoggedHtmlReply(b, ctx.EffectiveMessage, helpText, nil)
+	h.messageSenderService.ReplyHtml(b, ctx.EffectiveMessage, helpText, nil)
 
 	return handlers.EndConversation()
 }

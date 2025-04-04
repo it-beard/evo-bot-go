@@ -212,7 +212,7 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 		return handlers.EndConversation()
 	}
 
-	utils.SendLoggedMarkdownReply(b, msg, responseOpenAi, nil)
+	h.messageSenderService.ReplyMarkdown(b, msg, responseOpenAi, nil)
 
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)

@@ -67,7 +67,7 @@ func (h *eventsHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 	)
 	formattedEvents += fmt.Sprintf("\nИспользуй команду /%s, если хочешь предложить темы и вопросы к этим мероприятиям, либо команду /%s для просмотра уже добавленных тем и вопросов.", constants.TopicAddCommand, constants.TopicsCommand)
 	formattedEvents += "\n\nА вот ссылка на [клубный календарь](https://itbeard.com/s/evo-calendar), который можно добавить к себе и удобно следить всеми мероприятиями клуба."
-	utils.SendLoggedMarkdownReply(b, msg, formattedEvents, nil)
+	h.messageSenderService.ReplyMarkdown(b, msg, formattedEvents, nil)
 
 	return nil
 }

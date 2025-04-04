@@ -3,6 +3,7 @@ package privatehandlers
 import (
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
+	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -11,12 +12,14 @@ import (
 )
 
 type helpHandler struct {
-	config *config.Config
+	config               *config.Config
+	messageSenderService services.MessageSenderService
 }
 
-func NewHelpHandler(config *config.Config) ext.Handler {
+func NewHelpHandler(config *config.Config, messageSenderService services.MessageSenderService) ext.Handler {
 	h := &helpHandler{
-		config: config,
+		config:               config,
+		messageSenderService: messageSenderService,
 	}
 
 	return handlers.NewCommand(constants.HelpCommand, h.handleCommand)
@@ -38,7 +41,7 @@ func (h *helpHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 	isAdmin := utils.IsUserAdminOrCreator(b, msg.From.Id, h.config.SuperGroupChatID)
 	helpText := utils.FormatHelpMessage(isAdmin)
 
-	utils.SendLoggedHtmlReply(b, ctx.EffectiveMessage, helpText, nil)
+	h.messageSenderService.ReplyHtml(b, ctx.EffectiveMessage, helpText, nil)
 
 	return nil
 }

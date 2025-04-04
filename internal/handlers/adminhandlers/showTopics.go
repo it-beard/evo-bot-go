@@ -105,7 +105,7 @@ func (h *showTopicsHandler) startShowTopics(b *gotgbot.Bot, ctx *ext.Context) er
 		"для которого ты хочешь увидеть темы и вопросы",
 	)
 
-	utils.SendLoggedMarkdownReply(b, msg, formattedEvents, nil)
+	h.messageSenderService.ReplyMarkdown(b, msg, formattedEvents, nil)
 
 	return handlers.NextConversationState(showTopicsStateSelectEvent)
 }
@@ -153,7 +153,7 @@ func (h *showTopicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Contex
 
 	// Format and display topics for admin
 	formattedTopics := utils.FormatTopicListForAdmin(topics, event.Name, event.Type)
-	utils.SendLoggedMarkdownReply(b, msg, formattedTopics, nil)
+	h.messageSenderService.ReplyMarkdown(b, msg, formattedTopics, nil)
 
 	// If there are topics, suggest deletion option
 	if len(topics) > 0 {
@@ -250,7 +250,7 @@ func (h *showTopicsHandler) handleTopicDeletion(b *gotgbot.Bot, ctx *ext.Context
 
 	// Show updated list of topics
 	formattedTopics := utils.FormatTopicListForAdmin(topics, event.Name, event.Type)
-	utils.SendLoggedMarkdownReply(b, msg, formattedTopics, nil)
+	h.messageSenderService.ReplyMarkdown(b, msg, formattedTopics, nil)
 
 	// If there are still topics, allow for more deletions
 	if len(topics) > 0 {

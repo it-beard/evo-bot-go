@@ -103,7 +103,7 @@ func (h *topicAddHandler) startTopicAdd(b *gotgbot.Bot, ctx *ext.Context) error 
 		fmt.Sprintf("Выбери ID мероприятия, к которому ты хочешь закинуть темы или вопросы, либо жми /%s для отмены диалога", constants.CancelCommand),
 	)
 
-	utils.SendLoggedMarkdownReply(b, msg, formattedEvents, nil)
+	h.messageSenderService.ReplyMarkdown(b, msg, formattedEvents, nil)
 
 	return handlers.NextConversationState(topicAddStateSelectEvent)
 }
@@ -143,7 +143,7 @@ func (h *topicAddHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Context)
 	h.userStore.Set(ctx.EffectiveUser.Id, topicAddUserStoreKeySelectedEventName, event.Name)
 
 	// Prompt user to enter a topic
-	utils.SendLoggedMarkdownReply(
+	h.messageSenderService.ReplyMarkdown(
 		b,
 		msg,
 		fmt.Sprintf("Отправь мне темы и вопросы к мероприятию *%s*, либо используй /%s для отмены диалога.", event.Name, constants.CancelCommand),

@@ -54,28 +54,6 @@ func CheckPrivateChatType(b *gotgbot.Bot, ctx *ext.Context) bool {
 	return true
 }
 
-// ReplyAndDeleteAfterDelay replies to a message and then deletes the reply after the specified delay in seconds
-// Returns the sent message and any error that occurred during sending
-func ReplyAndDeleteAfterDelay(b *gotgbot.Bot, msg *gotgbot.Message, text string, delaySeconds int, opts *gotgbot.SendMessageOpts) (*gotgbot.Message, error) {
-	// Reply to the message
-	sentMsg, err := msg.Reply(b, text, opts)
-	if err != nil {
-		log.Printf("Failed to send reply: %v", err)
-		return nil, err
-	}
-
-	// Start a goroutine to delete the message after the delay
-	go func() {
-		time.Sleep(time.Duration(delaySeconds) * time.Second)
-		_, err := sentMsg.Delete(b, nil)
-		if err != nil {
-			log.Printf("Failed to delete reply after delay: %v", err)
-		}
-	}()
-
-	return sentMsg, nil
-}
-
 // ReplyWithCleanupAfterDelay replies to a message and then deletes both the reply and the original message after the specified delay
 // Returns the sent message and any error that occurred during sending
 func ReplyWithCleanupAfterDelayWithPingMessage(b *gotgbot.Bot, msg *gotgbot.Message, text string, delaySeconds int, opts *gotgbot.SendMessageOpts) (*gotgbot.Message, error) {
@@ -131,43 +109,6 @@ func CheckClubMemberPermissions(b *gotgbot.Bot, msg *gotgbot.Message, config *co
 	}
 
 	return true
-}
-
-// SendLoggedReplyWithOptions sends a reply to the user with proper logging
-func SendLoggedReplyWithOptions(b *gotgbot.Bot, msg *gotgbot.Message, text string, opts *gotgbot.SendMessageOpts, err error) {
-	if _, replyErr := msg.Reply(b, text, opts); replyErr != nil {
-		log.Printf("Failed to send error message: %v", replyErr)
-	}
-	if err != nil {
-		log.Printf("Error: %v", err)
-	}
-}
-
-// SendLoggedMarkdownReply	LoggedReply sends a reply to the user with proper logging
-func SendLoggedMarkdownReply(b *gotgbot.Bot, msg *gotgbot.Message, text string, err error) {
-	if _, replyErr := msg.Reply(b, text, &gotgbot.SendMessageOpts{
-		ParseMode: "Markdown",
-		LinkPreviewOptions: &gotgbot.LinkPreviewOptions{
-			IsDisabled: true,
-		},
-	}); replyErr != nil {
-		log.Printf("Failed to send error message: %v", replyErr)
-	}
-	if err != nil {
-		log.Printf("Error: %v", err)
-	}
-}
-
-// SendLoggedReply sends a reply to the user with proper logging
-func SendLoggedHtmlReply(b *gotgbot.Bot, msg *gotgbot.Message, text string, err error) {
-	if _, replyErr := msg.Reply(b, text, &gotgbot.SendMessageOpts{
-		ParseMode: "HTML",
-	}); replyErr != nil {
-		log.Printf("Failed to send error message: %v", replyErr)
-	}
-	if err != nil {
-		log.Printf("Error: %v", err)
-	}
 }
 
 // CheckAdminAndPrivateChat combines permission and chat type checking for admin-only private commands

@@ -97,7 +97,7 @@ func (h *eventDeleteHandler) startDelete(b *gotgbot.Bot, ctx *ext.Context) error
 	actionDescription := "которое ты хочешь удалить"
 	formattedResponse := utils.FormatEventListForAdmin(events, title, constants.CancelCommand, actionDescription)
 
-	utils.SendLoggedMarkdownReply(b, msg, formattedResponse, nil)
+	h.messageSenderService.ReplyMarkdown(b, msg, formattedResponse, nil)
 
 	return handlers.NextConversationState(eventDeleteStateSelectEvent)
 }

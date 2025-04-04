@@ -97,7 +97,7 @@ func (h *topicsHandler) startTopics(b *gotgbot.Bot, ctx *ext.Context) error {
 		fmt.Sprintf("Выбери ID мероприятия, для которого ты хочешь увидеть темы и вопросы, либо жми /%s для отмены диалога", constants.CancelCommand),
 	)
 
-	utils.SendLoggedMarkdownReply(b, msg, formattedEvents, nil)
+	h.messageSenderService.ReplyMarkdown(b, msg, formattedEvents, nil)
 
 	return handlers.NextConversationState(topicsStateSelectEvent)
 }
@@ -142,7 +142,7 @@ func (h *topicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Context) e
 
 	// Format and display topics
 	formattedTopics := utils.FormatTopicListForUsers(topics, event.Name, event.Type)
-	utils.SendLoggedMarkdownReply(b, msg, formattedTopics, nil)
+	h.messageSenderService.ReplyMarkdown(b, msg, formattedTopics, nil)
 
 	return handlers.EndConversation()
 }

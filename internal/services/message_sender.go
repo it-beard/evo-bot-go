@@ -12,6 +12,8 @@ type MessageSenderService interface {
 	SendMarkdown(chatId int64, text string, opts *gotgbot.SendMessageOpts) error
 	SendHtml(chatId int64, text string, opts *gotgbot.SendMessageOpts) error
 	Reply(b *gotgbot.Bot, msg *gotgbot.Message, replyText string, opts *gotgbot.SendMessageOpts) error
+	ReplyMarkdown(b *gotgbot.Bot, msg *gotgbot.Message, replyText string, opts *gotgbot.SendMessageOpts) error
+	ReplyHtml(b *gotgbot.Bot, msg *gotgbot.Message, replyText string, opts *gotgbot.SendMessageOpts) error
 	SendCopy(
 		chatId int64,
 		topicId *int,
@@ -131,6 +133,64 @@ func (s *TelegramMessageSender) Reply(b *gotgbot.Bot, msg *gotgbot.Message, repl
 
 	if err != nil {
 		log.Printf("MessageSenderService: Reply: Failed to send message: %v", err)
+	}
+
+	return err
+}
+
+// Reply to a message with markdown
+func (s *TelegramMessageSender) ReplyMarkdown(b *gotgbot.Bot, msg *gotgbot.Message, replyText string, opts *gotgbot.SendMessageOpts) error {
+	// default options for markdown messages
+	if opts == nil {
+		opts = &gotgbot.SendMessageOpts{
+			ParseMode: "Markdown",
+			LinkPreviewOptions: &gotgbot.LinkPreviewOptions{
+				IsDisabled: true,
+			},
+		}
+	} else {
+		opts.ParseMode = "Markdown"
+		// default link preview options are disabled
+		if opts.LinkPreviewOptions == nil {
+			opts.LinkPreviewOptions = &gotgbot.LinkPreviewOptions{
+				IsDisabled: true,
+			}
+		}
+	}
+
+	_, err := msg.Reply(b, replyText, opts)
+
+	if err != nil {
+		log.Printf("MessageSenderService: ReplyMarkdown: Failed to send message: %v", err)
+	}
+
+	return err
+}
+
+// Reply to a message with html
+func (s *TelegramMessageSender) ReplyHtml(b *gotgbot.Bot, msg *gotgbot.Message, replyText string, opts *gotgbot.SendMessageOpts) error {
+	// default options for html messages
+	if opts == nil {
+		opts = &gotgbot.SendMessageOpts{
+			ParseMode: "HTML",
+			LinkPreviewOptions: &gotgbot.LinkPreviewOptions{
+				IsDisabled: true,
+			},
+		}
+	} else {
+		opts.ParseMode = "HTML"
+		// default link preview options are disabled
+		if opts.LinkPreviewOptions == nil {
+			opts.LinkPreviewOptions = &gotgbot.LinkPreviewOptions{
+				IsDisabled: true,
+			}
+		}
+	}
+
+	_, err := msg.Reply(b, replyText, opts)
+
+	if err != nil {
+		log.Printf("MessageSenderService: ReplyHtml: Failed to send message: %v", err)
 	}
 
 	return err

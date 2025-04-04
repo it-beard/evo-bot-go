@@ -127,7 +127,7 @@ func setupDatabase(connectionString string) (*database.DB, error) {
 // registerHandlers registers all bot handlers
 func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 	// Register start handler, that avaliable for all users
-	b.dispatcher.AddHandler(handlers.NewStartHandler(deps.AppConfig))
+	b.dispatcher.AddHandler(handlers.NewStartHandler(deps.AppConfig, deps.MessageSenderService))
 
 	// Register admin chat handlers
 	adminHandlers := []ext.Handler{
@@ -142,7 +142,7 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 
 	// Register private chat handlers
 	privateHandlers := []ext.Handler{
-		privatehandlers.NewHelpHandler(deps.AppConfig),
+		privatehandlers.NewHelpHandler(deps.AppConfig, deps.MessageSenderService),
 		privatehandlers.NewToolsHandler(deps.AppConfig, deps.OpenAiClient, deps.MessageSenderService, deps.PromptingTemplateRepository),
 		privatehandlers.NewContentHandler(deps.AppConfig, deps.OpenAiClient, deps.MessageSenderService, deps.PromptingTemplateRepository),
 		privatehandlers.NewEventsHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService),
