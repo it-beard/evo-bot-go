@@ -17,23 +17,27 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/callbackquery"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/message"
 )
 
 const (
-	// Conversation states
-	eventEditStateSelectEvent   = "event_edit_select_event"
-	eventEditStateAskEditType   = "event_edit_ask_edit_type"
-	eventEditStateEditName      = "event_edit_edit_name"
-	eventEditStateEditStartedAt = "event_edit_edit_started_at"
+	// Conversation states names
+	eventEditStateSelectEvent   = "event_edit_state_select_event"
+	eventEditStateAskEditType   = "event_edit_state_ask_edit_type"
+	eventEditStateEditName      = "event_edit_state_edit_name"
+	eventEditStateEditStartedAt = "event_edit_state_edit_started_at"
 
 	// Context data keys
-	eventEditCtxDataKeySelectedEventID = "event_edit_selected_event_id"
-	eventEditCtxDataKeyEditType        = "event_edit_edit_type"
-)
+	eventEditCtxDataKeySelectedEventID   = "event_edit_ctx_data_selected_event_id"
+	eventEditCtxDataKeyEditType          = "event_edit_ctx_data_edit_type"
+	eventEditCtxDataKeyPreviousMessageID = "event_edit_ctx_data_previous_message_id"
+	eventEditCtxDataKeyPreviousChatID    = "event_edit_ctx_data_previous_chat_id"
 
-// Edit types
-const (
+	// Callback data
+	eventEditCallbackConfirmCancel = "event_edit_callback_confirm_cancel"
+
+	// Edit types
 	eventEditTypeName      = "name"
 	eventEditTypeStartDate = "startDate"
 )
@@ -67,15 +71,19 @@ func NewEventEditHandler(
 		map[string][]ext.Handler{
 			eventEditStateSelectEvent: {
 				handlers.NewMessage(message.Text, h.handleSelectEvent),
+				handlers.NewCallback(callbackquery.Equal(eventEditCallbackConfirmCancel), h.handleCallbackCancel),
 			},
 			eventEditStateAskEditType: {
 				handlers.NewMessage(message.Text, h.handleSelectEditType),
+				handlers.NewCallback(callbackquery.Equal(eventEditCallbackConfirmCancel), h.handleCallbackCancel),
 			},
 			eventEditStateEditName: {
 				handlers.NewMessage(message.Text, h.handleEditName),
+				handlers.NewCallback(callbackquery.Equal(eventEditCallbackConfirmCancel), h.handleCallbackCancel),
 			},
 			eventEditStateEditStartedAt: {
 				handlers.NewMessage(message.Text, h.handleEditStartedAt),
+				handlers.NewCallback(callbackquery.Equal(eventEditCallbackConfirmCancel), h.handleCallbackCancel),
 			},
 		},
 		&handlers.ConversationOpts{
@@ -111,8 +119,15 @@ func (h *eventEditHandler) startEdit(b *gotgbot.Bot, ctx *ext.Context) error {
 	actionDescription := "которое ты хочешь отредактировать"
 	formattedResponse := formatters.FormatEventListForAdmin(events, title, constants.CancelCommand, actionDescription)
 
-	h.messageSenderService.ReplyMarkdown(msg, formattedResponse, nil)
+	sentMsg, _ := h.messageSenderService.ReplyMarkdownWithReturnMessage(
+		msg,
+		formattedResponse,
+		&gotgbot.SendMessageOpts{
+			ReplyMarkup: formatters.CancelButton(eventEditCallbackConfirmCancel),
+		},
+	)
 
+	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
 	return handlers.NextConversationState(eventEditStateSelectEvent)
 }
 
@@ -123,7 +138,7 @@ func (h *eventEditHandler) handleSelectEvent(b *gotgbot.Bot, ctx *ext.Context) e
 
 	eventID, err := strconv.Atoi(eventIDStr)
 	if err != nil {
-		h.messageSenderService.Reply(msg, fmt.Sprintf("Неверный ID. Пожалуйста, введи числовой ID или /%s для отмены.", constants.CancelCommand), nil)
+		h.messageSenderService.Reply(msg, fmt.Sprintf("Неверный ID. Пожалуйста, введи числовой ID или используй кнопку для отмены."), nil)
 		return nil // Stay in the same state
 	}
 
@@ -133,32 +148,34 @@ func (h *eventEditHandler) handleSelectEvent(b *gotgbot.Bot, ctx *ext.Context) e
 		log.Printf("Error checking content with ID %d: %v", eventID, err)
 		h.messageSenderService.Reply(
 			msg,
-			fmt.Sprintf("Мероприятие с ID %d не найдено. Пожалуйста, введи существующий ID или /%s для отмены.", eventID, constants.CancelCommand),
+			fmt.Sprintf("Мероприятие с ID %d не найдено. Пожалуйста, введи существующий ID или используй кнопку для отмены.", eventID),
 			nil,
 		)
 		return nil // Stay in the same state
 	}
 
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
+
 	// Store the selected event ID
 	h.userStore.Set(ctx.EffectiveUser.Id, eventEditCtxDataKeySelectedEventID, eventID)
 
 	// Ask what the user wants to edit
-	h.messageSenderService.Reply(
+	sentMsg, _ := h.messageSenderService.ReplyWithReturnMessage(
 		msg,
-		fmt.Sprintf(
-			"Что ты хочешь отредактировать?\n1. Название\n2. Дату начала\n\nВведи номер или используй /%s для отмены:",
-			constants.CancelCommand,
-		),
-		nil,
+		fmt.Sprintf("Что ты хочешь отредактировать?\n/1. Название\n/2. Дату начала\n\nВведи номер:"),
+		&gotgbot.SendMessageOpts{
+			ReplyMarkup: formatters.CancelButton(eventEditCallbackConfirmCancel),
+		},
 	)
 
+	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
 	return handlers.NextConversationState(eventEditStateAskEditType)
 }
 
 // 3. handleSelectEditType processes the user's selection of what to edit
 func (h *eventEditHandler) handleSelectEditType(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
-	selectionText := strings.TrimSpace(msg.Text)
+	selectionText := strings.TrimSpace(strings.Replace(msg.Text, "/", "", 1))
 
 	// Get the selected event ID
 	eventIDVal, ok := h.userStore.Get(ctx.EffectiveUser.Id, eventEditCtxDataKeySelectedEventID)
@@ -191,11 +208,12 @@ func (h *eventEditHandler) handleSelectEditType(b *gotgbot.Bot, ctx *ext.Context
 	selection, err := strconv.Atoi(selectionText)
 	if err != nil || selection < 1 || selection > 2 {
 		h.messageSenderService.Reply(msg, fmt.Sprintf(
-			"Неверный выбор. Пожалуйста, введи число от 1 до 2, или используй /%s для отмены",
-			constants.CancelCommand,
+			"Неверный выбор. Пожалуйста, введи число от 1 до 2, или используй кнопку для отмены",
 		), nil)
 		return nil // Stay in the same state
 	}
+
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 
 	var editType string
 	var nextState string
@@ -205,7 +223,7 @@ func (h *eventEditHandler) handleSelectEditType(b *gotgbot.Bot, ctx *ext.Context
 	case 1:
 		editType = eventEditTypeName
 		nextState = eventEditStateEditName
-		promptMessage = fmt.Sprintf("Текущее название: %s\nВведи новое название или используй /%s для отмены:", event.Name, constants.CancelCommand)
+		promptMessage = fmt.Sprintf("Текущее название: *%s*\n\nВведи новое название:", event.Name)
 	case 2:
 		editType = eventEditTypeStartDate
 		nextState = eventEditStateEditStartedAt
@@ -216,8 +234,8 @@ func (h *eventEditHandler) handleSelectEditType(b *gotgbot.Bot, ctx *ext.Context
 			currentStartedAt = "не задана"
 		}
 		promptMessage = fmt.Sprintf(
-			"Текущая дата старта: %s\nВведи новую дату и время в формате DD.MM.YYYY HH:MM или используй /%s для отмены:",
-			currentStartedAt, constants.CancelCommand,
+			"Текущая дата старта: %s\nВведи новую дату и время в формате DD.MM.YYYY HH:MM:",
+			currentStartedAt,
 		)
 	}
 
@@ -225,8 +243,15 @@ func (h *eventEditHandler) handleSelectEditType(b *gotgbot.Bot, ctx *ext.Context
 	h.userStore.Set(ctx.EffectiveUser.Id, eventEditCtxDataKeyEditType, editType)
 
 	// Prompt for the new value
-	h.messageSenderService.Reply(msg, promptMessage, nil)
+	sentMsg, _ := h.messageSenderService.ReplyMarkdownWithReturnMessage(
+		msg,
+		promptMessage,
+		&gotgbot.SendMessageOpts{
+			ReplyMarkup: formatters.CancelButton(eventEditCallbackConfirmCancel),
+		},
+	)
 
+	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
 	return handlers.NextConversationState(nextState)
 }
 
@@ -237,11 +262,12 @@ func (h *eventEditHandler) handleEditName(b *gotgbot.Bot, ctx *ext.Context) erro
 
 	if newName == "" {
 		h.messageSenderService.Reply(msg, fmt.Sprintf(
-			"Название не может быть пустым. Пожалуйста, введи новое название или используй /%s для отмены:",
-			constants.CancelCommand,
+			"Название не может быть пустым. Пожалуйста, введи новое название или используй кнопку для отмены:",
 		), nil)
 		return nil // Stay in the same state
 	}
+
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 
 	// Get the selected event ID
 	eventIDVal, ok := h.userStore.Get(ctx.EffectiveUser.Id, eventEditCtxDataKeySelectedEventID)
@@ -272,7 +298,14 @@ func (h *eventEditHandler) handleEditName(b *gotgbot.Bot, ctx *ext.Context) erro
 	}
 
 	// Confirmation message
-	h.messageSenderService.Reply(msg, fmt.Sprintf("Название мероприятия с ID %d успешно обновлено на '%s'", eventID, newName), nil)
+	h.messageSenderService.Reply(
+		msg,
+		fmt.Sprintf(
+			"Название мероприятия с ID %d успешно обновлено на *'%s'* \n\nДля продолжения редактирования мероприятия используй команду /%s.\nДля просмотра всех команд используй команду /%s",
+			eventID, newName, constants.EventEditCommand, constants.HelpCommand,
+		),
+		nil,
+	)
 
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)
@@ -289,11 +322,12 @@ func (h *eventEditHandler) handleEditStartedAt(b *gotgbot.Bot, ctx *ext.Context)
 	startedAt, err := time.Parse("02.01.2006 15:04", dateTimeStr)
 	if err != nil {
 		h.messageSenderService.Reply(msg, fmt.Sprintf(
-			"Неверный формат даты. Пожалуйста, введи дату и время в формате DD.MM.YYYY HH:MM или используй /%s для отмены.",
-			constants.CancelCommand,
+			"Неверный формат даты. Пожалуйста, введи дату и время в формате DD.MM.YYYY HH:MM или используй кнопку для отмены.",
 		), nil)
 		return nil // Stay in the same state
 	}
+
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 
 	// Get the selected event ID
 	eventIDVal, ok := h.userStore.Get(ctx.EffectiveUser.Id, eventEditCtxDataKeySelectedEventID)
@@ -325,8 +359,8 @@ func (h *eventEditHandler) handleEditStartedAt(b *gotgbot.Bot, ctx *ext.Context)
 
 	// Confirmation message
 	h.messageSenderService.Reply(msg, fmt.Sprintf(
-		"Дата начала мероприятия с ID %d успешно обновлена на %s",
-		eventID, startedAt.Format("02.01.2006 15:04"),
+		"Дата начала мероприятия с ID %d успешно обновлена на *%s* \n\nДля продолжения редактирования мероприятия используй команду /%s.\nДля просмотра всех команд используй команду /%s",
+		eventID, startedAt.Format("02.01.2006 15:04"), constants.EventEditCommand, constants.HelpCommand,
 	), nil)
 
 	// Clean up user data
@@ -335,13 +369,57 @@ func (h *eventEditHandler) handleEditStartedAt(b *gotgbot.Bot, ctx *ext.Context)
 	return handlers.EndConversation()
 }
 
+// handleCallbackCancel processes the cancel button click
+func (h *eventEditHandler) handleCallbackCancel(b *gotgbot.Bot, ctx *ext.Context) error {
+	// Answer the callback query to remove the loading state on the button
+	cb := ctx.Update.CallbackQuery
+	_, _ = cb.Answer(b, nil)
+
+	return h.handleCancel(b, ctx)
+}
+
 // 5. handleCancel handles the /cancel command
 func (h *eventEditHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
+
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 	h.messageSenderService.Reply(msg, "Операция редактирования мероприятия отменена.", nil)
 
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)
 
 	return handlers.EndConversation()
+}
+
+func (h *eventEditHandler) MessageRemoveInlineKeyboard(b *gotgbot.Bot, userID *int64) {
+	var chatID, messageID int64
+
+	// If userID provided, try to get stored message info
+	if userID != nil {
+		if val, ok := h.userStore.Get(*userID, eventEditCtxDataKeyPreviousMessageID); ok {
+			messageID = val.(int64)
+		}
+		if val, ok := h.userStore.Get(*userID, eventEditCtxDataKeyPreviousChatID); ok {
+			chatID = val.(int64)
+		}
+	}
+
+	// Skip if we don't have valid chat and message IDs
+	if chatID == 0 || messageID == 0 {
+		return
+	}
+
+	// Remove the inline keyboard
+	if _, _, err := b.EditMessageReplyMarkup(&gotgbot.EditMessageReplyMarkupOpts{
+		ChatId:      chatID,
+		MessageId:   messageID,
+		ReplyMarkup: gotgbot.InlineKeyboardMarkup{},
+	}); err != nil {
+		log.Printf("%s: Error removing inline keyboard: %v", utils.GetCurrentTypeName(), err)
+	}
+}
+
+func (h *eventEditHandler) SavePreviousMessageInfo(userID int64, sentMsg *gotgbot.Message) {
+	h.userStore.Set(userID, eventEditCtxDataKeyPreviousMessageID, sentMsg.MessageId)
+	h.userStore.Set(userID, eventEditCtxDataKeyPreviousChatID, sentMsg.Chat.Id)
 }
