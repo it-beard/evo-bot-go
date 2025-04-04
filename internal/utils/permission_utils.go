@@ -8,7 +8,13 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2"
 )
 
-func IsUserClubMember(b *gotgbot.Bot, userId int64, config *config.Config) bool {
+// ChatMemberGetter defines the interface for getting chat member information.
+// This allows for mocking in tests.
+type ChatMemberGetter interface {
+	GetChatMember(chatId, userId int64, opts *gotgbot.GetChatMemberOpts) (gotgbot.ChatMember, error)
+}
+
+func IsUserClubMember(b ChatMemberGetter, userId int64, config *config.Config) bool {
 	chatId := ChatIdToFullChatId(config.SuperGroupChatID)
 	// Check if user is member of target group
 	chatMember, err := b.GetChatMember(chatId, userId, nil)
@@ -25,7 +31,7 @@ func IsUserClubMember(b *gotgbot.Bot, userId int64, config *config.Config) bool 
 	return true
 }
 
-func IsUserAdminOrCreator(b *gotgbot.Bot, userId int64, config *config.Config) bool {
+func IsUserAdminOrCreator(b ChatMemberGetter, userId int64, config *config.Config) bool {
 	chatId := ChatIdToFullChatId(config.SuperGroupChatID)
 
 	// Check if user is member of target group
