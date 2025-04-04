@@ -34,8 +34,6 @@ func GetTopicName(topicId int) (string, error) {
 	topicName := message.Message
 	if topicName == "" {
 		topicName = "Topic"
-	} else if len(topicName) > 30 {
-		topicName = topicName[:27] + "..."
 	}
 
 	return topicName, nil

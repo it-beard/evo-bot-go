@@ -166,7 +166,7 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 
 	// Format the final summary message using the title format from the prompts package
 	dateNowWithMonth := time.Now().Format("01.02.2006")
-	title := fmt.Sprintf("📋 Сводка чата **\"%s\"** за %s", topicName, dateNowWithMonth)
+	title := fmt.Sprintf("📋 Сводка чата <b>\"%s\"</b> за %s", topicName, dateNowWithMonth)
 	finalSummary := fmt.Sprintf("%s\n\n%s", title, summary)
 
 	// Determine the target topic ID
@@ -181,7 +181,7 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 	}
 
 	// Send the summary to the target chat
-	s.messageSenderService.SendLoggedMarkdownMessage(targetTopicID, finalSummary, nil)
+	s.messageSenderService.SendLoggedHtmlMessage(targetTopicID, finalSummary, nil)
 
 	log.Printf("Summarization Service: Summary sent successfully")
 	return nil
