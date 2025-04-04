@@ -17,10 +17,11 @@ type Config struct {
 	AdminUserID      int64
 
 	// Topics Management
-	ClosedTopicsIDs   []int
-	ForwardingTopicID int
-	ToolTopicID       int
-	ContentTopicID    int
+	ClosedTopicsIDs     []int
+	ForwardingTopicID   int
+	ToolTopicID         int
+	ContentTopicID      int
+	AnnouncementTopicID int
 
 	// Telegram User Client
 	TGUserClientAppID       int
@@ -110,6 +111,15 @@ func LoadConfig() (*Config, error) {
 			return nil, fmt.Errorf("invalid content topic ID: %s", contentTopicIDStr)
 		}
 		config.ContentTopicID = contentTopicID
+	}
+
+	announcementTopicIDStr := os.Getenv("TG_EVO_BOT_ANNOUNCEMENT_TOPIC_ID")
+	if announcementTopicIDStr != "" {
+		announcementTopicID, err := strconv.Atoi(announcementTopicIDStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid announcement topic ID: %s", announcementTopicIDStr)
+		}
+		config.AnnouncementTopicID = announcementTopicID
 	}
 
 	// Telegram User Client

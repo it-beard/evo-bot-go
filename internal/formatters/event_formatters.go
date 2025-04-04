@@ -86,13 +86,12 @@ func FormatEventListForAdmin(events []repositories.Event, title string, cancelCo
 			statusEmoji = "🔄"
 		}
 
-		response.WriteString(fmt.Sprintf("\nID `%d`: *%s*\n", event.ID, event.Name))
+		response.WriteString(fmt.Sprintf("\nID /%d: *%s*\n", event.ID, event.Name))
 		response.WriteString(fmt.Sprintf("└ %s, тип: _%s_, старт: _%s_\n",
 			statusEmoji, event.Type, startedAtStr))
 	}
 
-	response.WriteString(fmt.Sprintf("\nПожалуйста, отправь ID мероприятия, %s, или /%s для отмены.",
-		actionDescription, cancelCommand))
+	response.WriteString(fmt.Sprintf("\nПожалуйста, отправь ID мероприятия, %s.", actionDescription))
 
 	return response.String()
 }

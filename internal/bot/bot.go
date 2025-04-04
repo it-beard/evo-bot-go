@@ -140,7 +140,7 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 		eventhandlers.NewEventEditHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
 		eventhandlers.NewEventSetupHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
 		eventhandlers.NewEventDeleteHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
-		eventhandlers.NewEventFinishHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
+		eventhandlers.NewEventStartHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
 	}
 
 	// Register private chat handlers

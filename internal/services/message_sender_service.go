@@ -126,6 +126,12 @@ func (s *MessageSenderService) Reply(msg *gotgbot.Message, replyText string, opt
 
 // Reply to a message with markdown
 func (s *MessageSenderService) ReplyMarkdown(msg *gotgbot.Message, replyText string, opts *gotgbot.SendMessageOpts) error {
+	_, err := s.ReplyMarkdownWithReturnMessage(msg, replyText, opts)
+	return err
+}
+
+// Reply to a message with markdown
+func (s *MessageSenderService) ReplyMarkdownWithReturnMessage(msg *gotgbot.Message, replyText string, opts *gotgbot.SendMessageOpts) (*gotgbot.Message, error) {
 	// default options for markdown messages
 	if opts == nil {
 		opts = &gotgbot.SendMessageOpts{
@@ -144,13 +150,13 @@ func (s *MessageSenderService) ReplyMarkdown(msg *gotgbot.Message, replyText str
 		}
 	}
 
-	_, err := msg.Reply(s.bot, replyText, opts)
+	sentMsg, err := msg.Reply(s.bot, replyText, opts)
 
 	if err != nil {
 		log.Printf("%s: ReplyMarkdown: Failed to send message: %v", utils.GetCurrentTypeName(), err)
 	}
 
-	return err
+	return sentMsg, err
 }
 
 // Reply to a message with html
