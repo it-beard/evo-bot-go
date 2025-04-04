@@ -10,40 +10,16 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2"
 )
 
-type MessageSenderService interface {
-	Send(chatId int64, text string, opts *gotgbot.SendMessageOpts) error
-	SendMarkdown(chatId int64, text string, opts *gotgbot.SendMessageOpts) error
-	SendHtml(chatId int64, text string, opts *gotgbot.SendMessageOpts) error
-	Reply(b *gotgbot.Bot, msg *gotgbot.Message, replyText string, opts *gotgbot.SendMessageOpts) error
-	ReplyMarkdown(b *gotgbot.Bot, msg *gotgbot.Message, replyText string, opts *gotgbot.SendMessageOpts) error
-	ReplyHtml(b *gotgbot.Bot, msg *gotgbot.Message, replyText string, opts *gotgbot.SendMessageOpts) error
-	ReplyWithCleanupAfterDelayWithPing(
-		b *gotgbot.Bot,
-		msg *gotgbot.Message,
-		text string,
-		delaySeconds int,
-		opts *gotgbot.SendMessageOpts,
-	) error
-	SendCopy(
-		chatId int64,
-		topicId *int,
-		text string,
-		entities []gotgbot.MessageEntity,
-		originalMessage *gotgbot.Message,
-	) (*gotgbot.Message, error)
-	SendTypingAction(chatId int64) error
-}
-
-type TelegramMessageSender struct {
+type MessageSenderService struct {
 	bot *gotgbot.Bot
 }
 
-func NewMessageSenderService(bot *gotgbot.Bot) MessageSenderService {
-	return &TelegramMessageSender{bot: bot}
+func NewMessageSenderService(bot *gotgbot.Bot) *MessageSenderService {
+	return &MessageSenderService{bot: bot}
 }
 
 // Send message to chat
-func (s *TelegramMessageSender) Send(chatId int64, text string, opts *gotgbot.SendMessageOpts) error {
+func (s *MessageSenderService) Send(chatId int64, text string, opts *gotgbot.SendMessageOpts) error {
 	// default link preview options are disabled
 	if opts == nil {
 		opts = &gotgbot.SendMessageOpts{
@@ -67,7 +43,7 @@ func (s *TelegramMessageSender) Send(chatId int64, text string, opts *gotgbot.Se
 }
 
 // Send markdown message to chat
-func (s *TelegramMessageSender) SendMarkdown(chatId int64, text string, opts *gotgbot.SendMessageOpts) error {
+func (s *MessageSenderService) SendMarkdown(chatId int64, text string, opts *gotgbot.SendMessageOpts) error {
 	// default options for markdown messages
 	if opts == nil {
 		opts = &gotgbot.SendMessageOpts{
@@ -96,7 +72,7 @@ func (s *TelegramMessageSender) SendMarkdown(chatId int64, text string, opts *go
 }
 
 // Send html message to chat
-func (s *TelegramMessageSender) SendHtml(chatId int64, text string, opts *gotgbot.SendMessageOpts) error {
+func (s *MessageSenderService) SendHtml(chatId int64, text string, opts *gotgbot.SendMessageOpts) error {
 	// default options for html messages
 	if opts == nil {
 		opts = &gotgbot.SendMessageOpts{
@@ -125,7 +101,7 @@ func (s *TelegramMessageSender) SendHtml(chatId int64, text string, opts *gotgbo
 }
 
 // Reply to a message
-func (s *TelegramMessageSender) Reply(b *gotgbot.Bot, msg *gotgbot.Message, replyText string, opts *gotgbot.SendMessageOpts) error {
+func (s *MessageSenderService) Reply(msg *gotgbot.Message, replyText string, opts *gotgbot.SendMessageOpts) error {
 	// default link preview options are disabled
 	if opts == nil {
 		opts = &gotgbot.SendMessageOpts{
@@ -139,7 +115,7 @@ func (s *TelegramMessageSender) Reply(b *gotgbot.Bot, msg *gotgbot.Message, repl
 		}
 	}
 
-	_, err := msg.Reply(b, replyText, opts)
+	_, err := msg.Reply(s.bot, replyText, opts)
 
 	if err != nil {
 		log.Printf("%s: Reply: Failed to send message: %v", utils.GetCurrentTypeName(), err)
@@ -149,7 +125,7 @@ func (s *TelegramMessageSender) Reply(b *gotgbot.Bot, msg *gotgbot.Message, repl
 }
 
 // Reply to a message with markdown
-func (s *TelegramMessageSender) ReplyMarkdown(b *gotgbot.Bot, msg *gotgbot.Message, replyText string, opts *gotgbot.SendMessageOpts) error {
+func (s *MessageSenderService) ReplyMarkdown(msg *gotgbot.Message, replyText string, opts *gotgbot.SendMessageOpts) error {
 	// default options for markdown messages
 	if opts == nil {
 		opts = &gotgbot.SendMessageOpts{
@@ -168,7 +144,7 @@ func (s *TelegramMessageSender) ReplyMarkdown(b *gotgbot.Bot, msg *gotgbot.Messa
 		}
 	}
 
-	_, err := msg.Reply(b, replyText, opts)
+	_, err := msg.Reply(s.bot, replyText, opts)
 
 	if err != nil {
 		log.Printf("%s: ReplyMarkdown: Failed to send message: %v", utils.GetCurrentTypeName(), err)
@@ -178,7 +154,7 @@ func (s *TelegramMessageSender) ReplyMarkdown(b *gotgbot.Bot, msg *gotgbot.Messa
 }
 
 // Reply to a message with html
-func (s *TelegramMessageSender) ReplyHtml(b *gotgbot.Bot, msg *gotgbot.Message, replyText string, opts *gotgbot.SendMessageOpts) error {
+func (s *MessageSenderService) ReplyHtml(msg *gotgbot.Message, replyText string, opts *gotgbot.SendMessageOpts) error {
 	// default options for html messages
 	if opts == nil {
 		opts = &gotgbot.SendMessageOpts{
@@ -197,7 +173,7 @@ func (s *TelegramMessageSender) ReplyHtml(b *gotgbot.Bot, msg *gotgbot.Message, 
 		}
 	}
 
-	_, err := msg.Reply(b, replyText, opts)
+	_, err := msg.Reply(s.bot, replyText, opts)
 
 	if err != nil {
 		log.Printf("%s: ReplyHtml: Failed to send message: %v", utils.GetCurrentTypeName(), err)
@@ -208,14 +184,13 @@ func (s *TelegramMessageSender) ReplyHtml(b *gotgbot.Bot, msg *gotgbot.Message, 
 
 // ReplyWithCleanupAfterDelay replies to a message and then deletes both the reply and the original message after the specified delay
 // Returns the sent message and any error that occurred during sending
-func (s *TelegramMessageSender) ReplyWithCleanupAfterDelayWithPing(
-	b *gotgbot.Bot,
+func (s *MessageSenderService) ReplyWithCleanupAfterDelayWithPing(
 	msg *gotgbot.Message,
 	text string,
 	delaySeconds int,
 	opts *gotgbot.SendMessageOpts,
 ) error {
-	sentMsg, err := msg.Reply(b, text, opts)
+	sentMsg, err := msg.Reply(s.bot, text, opts)
 	if err != nil {
 		log.Printf("Failed to send reply: %v", err)
 		return err
@@ -231,7 +206,7 @@ func (s *TelegramMessageSender) ReplyWithCleanupAfterDelayWithPing(
 		"Пинг!",
 	}
 	randomGreeting := greetings[rand.Intn(len(greetings))]
-	_, err = b.SendMessage(msg.From.Id, randomGreeting, nil)
+	_, err = s.bot.SendMessage(msg.From.Id, randomGreeting, nil)
 	if err != nil {
 		log.Printf("Failed to send greeting message: %v", err)
 	}
@@ -241,13 +216,13 @@ func (s *TelegramMessageSender) ReplyWithCleanupAfterDelayWithPing(
 		time.Sleep(time.Duration(delaySeconds) * time.Second)
 
 		// Delete the reply message
-		_, replyErr := sentMsg.Delete(b, nil)
+		_, replyErr := sentMsg.Delete(s.bot, nil)
 		if replyErr != nil {
 			log.Printf("Failed to delete reply message after delay: %v", replyErr)
 		}
 
 		// Delete the original message
-		_, origErr := msg.Delete(b, nil)
+		_, origErr := msg.Delete(s.bot, nil)
 		if origErr != nil {
 			log.Printf("Failed to delete original message after delay: %v", origErr)
 		}
@@ -257,7 +232,7 @@ func (s *TelegramMessageSender) ReplyWithCleanupAfterDelayWithPing(
 }
 
 // Sends a copy of the original message to the chat
-func (s *TelegramMessageSender) SendCopy(
+func (s *MessageSenderService) SendCopy(
 	chatId int64,
 	topicId *int,
 	text string,
@@ -371,7 +346,7 @@ func (s *TelegramMessageSender) SendCopy(
 }
 
 // SendTypingAction sends a typing action to the specified chat.
-func (s *TelegramMessageSender) SendTypingAction(chatId int64) error {
+func (s *MessageSenderService) SendTypingAction(chatId int64) error {
 	_, err := s.bot.Request("sendChatAction", map[string]string{
 		"chat_id": strconv.FormatInt(chatId, 10),
 		"action":  "typing",

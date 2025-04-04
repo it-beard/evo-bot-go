@@ -22,13 +22,13 @@ const (
 
 type startHandler struct {
 	config               *config.Config
-	messageSenderService services.MessageSenderService
+	messageSenderService *services.MessageSenderService
 	permissionsService   *services.PermissionsService
 }
 
 func NewStartHandler(
 	config *config.Config,
-	messageSenderService services.MessageSenderService,
+	messageSenderService *services.MessageSenderService,
 	permissionsService *services.PermissionsService,
 ) ext.Handler {
 	h := &startHandler{
@@ -51,8 +51,9 @@ func NewStartHandler(
 
 func (h *startHandler) handleStart(b *gotgbot.Bot, ctx *ext.Context) error {
 	user := ctx.EffectiveUser
+	msg := ctx.EffectiveMessage
 	// Only proceed if this is a private chat
-	if !h.permissionsService.CheckPrivateChatType(b, ctx) {
+	if !h.permissionsService.CheckPrivateChatType(msg) {
 		return handlers.EndConversation()
 	}
 
@@ -108,8 +109,7 @@ func (h *startHandler) handleStart(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	h.messageSenderService.ReplyMarkdown(
-		b,
-		ctx.EffectiveMessage,
+		msg,
 		message,
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: inlineKeyboard,
@@ -127,7 +127,7 @@ func (h *startHandler) handleCallbackHelp(b *gotgbot.Bot, ctx *ext.Context) erro
 	isAdmin := utils.IsUserAdminOrCreator(b, user.Id, h.config)
 	helpText := formatters.FormatHelpMessage(isAdmin)
 
-	h.messageSenderService.ReplyHtml(b, ctx.EffectiveMessage, helpText, nil)
+	h.messageSenderService.ReplyHtml(ctx.EffectiveMessage, helpText, nil)
 
 	return handlers.EndConversation()
 }

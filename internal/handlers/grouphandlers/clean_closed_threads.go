@@ -18,13 +18,13 @@ import (
 type CleanClosedThreadsHandler struct {
 	config               *config.Config
 	closedTopics         map[int]bool
-	messageSenderService services.MessageSenderService
+	messageSenderService *services.MessageSenderService
 	botUsername          string
 }
 
 func NewCleanClosedThreadsHandler(
 	config *config.Config,
-	messageSenderService services.MessageSenderService,
+	messageSenderService *services.MessageSenderService,
 ) ext.Handler {
 	// Create map of closed topics
 	closedTopics := make(map[int]bool)
@@ -117,7 +117,7 @@ func (h *CleanClosedThreadsHandler) handle(b *gotgbot.Bot, ctx *ext.Context) err
 	)
 
 	// Send message to user about deletion
-	err = h.messageSenderService.ReplyMarkdown(b, msg, messageText, nil)
+	err = h.messageSenderService.ReplyMarkdown(msg, messageText, nil)
 	if err != nil {
 		return fmt.Errorf(
 			"%s: error >> failed to send message about deletion: %w",

@@ -21,7 +21,7 @@ import (
 type SummarizationService struct {
 	config                      *config.Config
 	openaiClient                *clients.OpenAiClient
-	messageSenderService        MessageSenderService
+	messageSenderService        *MessageSenderService
 	promptingTemplateRepository *repositories.PromptingTemplateRepository
 }
 
@@ -29,7 +29,7 @@ type SummarizationService struct {
 func NewSummarizationService(
 	config *config.Config,
 	openaiClient *clients.OpenAiClient,
-	messageSenderService MessageSenderService,
+	messageSenderService *MessageSenderService,
 	promptingTemplateRepository *repositories.PromptingTemplateRepository,
 ) *SummarizationService {
 	return &SummarizationService{

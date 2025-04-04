@@ -24,14 +24,14 @@ const (
 
 type codeHandler struct {
 	config               *config.Config
-	messageSenderService services.MessageSenderService
+	messageSenderService *services.MessageSenderService
 	userStore            *utils.UserDataStore
 	permissionsService   *services.PermissionsService
 }
 
 func NewCodeHandler(
 	config *config.Config,
-	messageSenderService services.MessageSenderService,
+	messageSenderService *services.MessageSenderService,
 	permissionsService *services.PermissionsService,
 ) ext.Handler {
 	h := &codeHandler{
@@ -61,12 +61,12 @@ func (h *codeHandler) startCodeConversation(b *gotgbot.Bot, ctx *ext.Context) er
 	msg := ctx.EffectiveMessage
 
 	// Check if user has admin permissions and is in a private chat
-	if !h.permissionsService.CheckAdminAndPrivateChat(b, ctx, constants.ShowTopicsCommand) {
+	if !h.permissionsService.CheckAdminAndPrivateChat(msg, constants.ShowTopicsCommand) {
 		return handlers.EndConversation()
 	}
 
 	// Ask user to enter the code
-	h.messageSenderService.Reply(b, msg, fmt.Sprintf("Пожалуйста, введите код или используйте /%s для отмены:", constants.CancelCommand), nil)
+	h.messageSenderService.Reply(msg, fmt.Sprintf("Пожалуйста, введите код или используйте /%s для отмены:", constants.CancelCommand), nil)
 
 	return handlers.NextConversationState(codeHandlerStateWaitForCode)
 }
@@ -78,7 +78,7 @@ func (h *codeHandler) processCode(b *gotgbot.Bot, ctx *ext.Context) error {
 	// Extract code from message
 	revertedCode := strings.TrimSpace(msg.Text)
 	if revertedCode == "" {
-		h.messageSenderService.Reply(b, msg, fmt.Sprintf("Код не может быть пустым. Пожалуйста, введите код или используйте /%s для отмены:", constants.CancelCommand), nil)
+		h.messageSenderService.Reply(msg, fmt.Sprintf("Код не может быть пустым. Пожалуйста, введите код или используйте /%s для отмены:", constants.CancelCommand), nil)
 		return nil // Stay in the same state
 	}
 
@@ -89,9 +89,9 @@ func (h *codeHandler) processCode(b *gotgbot.Bot, ctx *ext.Context) error {
 	log.Print("Code stored")
 	err := clients.TgKeepSessionAlive() // Refresh session
 	if err == nil {
-		h.messageSenderService.Reply(b, msg, "Код принят", nil)
+		h.messageSenderService.Reply(msg, "Код принят", nil)
 	} else {
-		h.messageSenderService.Reply(b, msg, "Произошла ошибка при сохранении кода", nil)
+		h.messageSenderService.Reply(msg, "Произошла ошибка при сохранении кода", nil)
 		log.Printf("CodeHandler: Error during code storage: %v", err)
 	}
 
@@ -105,7 +105,7 @@ func (h *codeHandler) processCode(b *gotgbot.Bot, ctx *ext.Context) error {
 func (h *codeHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
-	h.messageSenderService.Reply(b, msg, "Операция ввода кода отменена.", nil)
+	h.messageSenderService.Reply(msg, "Операция ввода кода отменена.", nil)
 
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)

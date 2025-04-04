@@ -7,32 +7,31 @@ import (
 	"log"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
 type PermissionsService struct {
 	config               *config.Config
-	messageSenderService MessageSenderService
+	bot                  *gotgbot.Bot
+	messageSenderService *MessageSenderService
 }
 
 func NewPermissionsService(
 	config *config.Config,
-	messageSenderService MessageSenderService,
+	bot *gotgbot.Bot,
+	messageSenderService *MessageSenderService,
 ) *PermissionsService {
 	return &PermissionsService{
 		config:               config,
+		bot:                  bot,
 		messageSenderService: messageSenderService,
 	}
 }
 
 // CheckAdminPermissions checks if the user has admin permissions and returns an appropriate error response
 // Returns true if user has permission, false otherwise
-func (s *PermissionsService) CheckAdminPermissions(b *gotgbot.Bot, ctx *ext.Context, commandName string) bool {
-	msg := ctx.EffectiveMessage
-
-	if !utils.IsUserAdminOrCreator(b, msg.From.Id, s.config) {
+func (s *PermissionsService) CheckAdminPermissions(msg *gotgbot.Message, commandName string) bool {
+	if !utils.IsUserAdminOrCreator(s.bot, msg.From.Id, s.config) {
 		if err := s.messageSenderService.Reply(
-			b,
 			msg,
 			"Эта команда доступна только администраторам.",
 			nil,
@@ -48,12 +47,9 @@ func (s *PermissionsService) CheckAdminPermissions(b *gotgbot.Bot, ctx *ext.Cont
 
 // CheckPrivateChatType checks if the command is used in a private chat and returns an appropriate error response
 // Returns true if used in private chat, false otherwise
-func (s *PermissionsService) CheckPrivateChatType(b *gotgbot.Bot, ctx *ext.Context) bool {
-	msg := ctx.EffectiveMessage
-
+func (s *PermissionsService) CheckPrivateChatType(msg *gotgbot.Message) bool {
 	if msg.Chat.Type != constants.PrivateChatType {
 		if err := s.messageSenderService.ReplyWithCleanupAfterDelayWithPing(
-			b,
 			msg,
 			"*Прошу прощения* 🧐\n\nЭта команда работает только в _личной беседе_ со мной. "+
 				"Напишите мне в ЛС, и я с удовольствием помогу (я тебя там пинганул, если мы общались ранее)."+
@@ -69,10 +65,9 @@ func (s *PermissionsService) CheckPrivateChatType(b *gotgbot.Bot, ctx *ext.Conte
 	return true
 }
 
-func (s *PermissionsService) CheckClubMemberPermissions(b *gotgbot.Bot, msg *gotgbot.Message, commandName string) bool {
-	if !utils.IsUserClubMember(b, msg.From.Id, s.config) {
+func (s *PermissionsService) CheckClubMemberPermissions(msg *gotgbot.Message, commandName string) bool {
+	if !utils.IsUserClubMember(s.bot, msg.From.Id, s.config) {
 		if err := s.messageSenderService.Reply(
-			b,
 			msg,
 			"Эта команда доступна только участникам клуба.",
 			nil,
@@ -88,12 +83,12 @@ func (s *PermissionsService) CheckClubMemberPermissions(b *gotgbot.Bot, msg *got
 
 // CheckAdminAndPrivateChat combines permission and chat type checking for admin-only private commands
 // Returns true if all checks pass, false otherwise
-func (s *PermissionsService) CheckAdminAndPrivateChat(b *gotgbot.Bot, ctx *ext.Context, commandName string) bool {
-	if !s.CheckAdminPermissions(b, ctx, commandName) {
+func (s *PermissionsService) CheckAdminAndPrivateChat(msg *gotgbot.Message, commandName string) bool {
+	if !s.CheckAdminPermissions(msg, commandName) {
 		return false
 	}
 
-	if !s.CheckPrivateChatType(b, ctx) {
+	if !s.CheckPrivateChatType(msg) {
 		return false
 	}
 

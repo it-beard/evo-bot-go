@@ -26,7 +26,7 @@ type HandlerDependencies struct {
 	OpenAiClient                *clients.OpenAiClient
 	AppConfig                   *config.Config
 	SummarizationService        *services.SummarizationService
-	MessageSenderService        services.MessageSenderService
+	MessageSenderService        *services.MessageSenderService
 	PermissionsService          *services.PermissionsService
 	EventRepository             *repositories.EventRepository
 	TopicRepository             *repositories.TopicRepository
@@ -75,7 +75,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	promptingTemplateRepository := repositories.NewPromptingTemplateRepository(db.DB)
 	// Initialize services
 	messageSenderService := services.NewMessageSenderService(bot)
-	permissionsService := services.NewPermissionsService(appConfig, messageSenderService)
+	permissionsService := services.NewPermissionsService(appConfig, bot, messageSenderService)
 	summarizationService := services.NewSummarizationService(
 		appConfig, openaiClient, messageSenderService, promptingTemplateRepository,
 	)

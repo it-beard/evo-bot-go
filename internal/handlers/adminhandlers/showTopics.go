@@ -34,7 +34,7 @@ type showTopicsHandler struct {
 	config               *config.Config
 	topicRepository      *repositories.TopicRepository
 	eventRepository      *repositories.EventRepository
-	messageSenderService services.MessageSenderService
+	messageSenderService *services.MessageSenderService
 	userStore            *utils.UserDataStore
 	permissionsService   *services.PermissionsService
 }
@@ -43,7 +43,7 @@ func NewShowTopicsHandler(
 	config *config.Config,
 	topicRepository *repositories.TopicRepository,
 	eventRepository *repositories.EventRepository,
-	messageSenderService services.MessageSenderService,
+	messageSenderService *services.MessageSenderService,
 	permissionsService *services.PermissionsService,
 ) ext.Handler {
 	h := &showTopicsHandler{
@@ -78,20 +78,20 @@ func (h *showTopicsHandler) startShowTopics(b *gotgbot.Bot, ctx *ext.Context) er
 	msg := ctx.EffectiveMessage
 
 	// Check if user has admin permissions and is in a private chat
-	if !h.permissionsService.CheckAdminAndPrivateChat(b, ctx, constants.ShowTopicsCommand) {
+	if !h.permissionsService.CheckAdminAndPrivateChat(msg, constants.ShowTopicsCommand) {
 		return handlers.EndConversation()
 	}
 
 	// Get last events to show for selection
 	events, err := h.eventRepository.GetLastEvents(10)
 	if err != nil {
-		h.messageSenderService.Reply(b, msg, "Ошибка при получении списка мероприятий.", nil)
+		h.messageSenderService.Reply(msg, "Ошибка при получении списка мероприятий.", nil)
 		log.Printf("ShowTopicsHandler: Error during event retrieval: %v", err)
 		return handlers.EndConversation()
 	}
 
 	if len(events) == 0 {
-		h.messageSenderService.Reply(b, msg, "Нет доступных мероприятий для просмотра тем и вопросов.", nil)
+		h.messageSenderService.Reply(msg, "Нет доступных мероприятий для просмотра тем и вопросов.", nil)
 		return handlers.EndConversation()
 	}
 
@@ -103,7 +103,7 @@ func (h *showTopicsHandler) startShowTopics(b *gotgbot.Bot, ctx *ext.Context) er
 		"для которого ты хочешь увидеть темы и вопросы",
 	)
 
-	h.messageSenderService.ReplyMarkdown(b, msg, formattedEvents, nil)
+	h.messageSenderService.ReplyMarkdown(msg, formattedEvents, nil)
 
 	return handlers.NextConversationState(showTopicsStateSelectEvent)
 }
@@ -117,7 +117,6 @@ func (h *showTopicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Contex
 	eventID, err := strconv.Atoi(userInput)
 	if err != nil {
 		h.messageSenderService.Reply(
-			b,
 			msg,
 			fmt.Sprintf("Пожалуйста, отправь корректный ID мероприятия или /%s для отмены.", constants.CancelCommand),
 			nil,
@@ -129,7 +128,6 @@ func (h *showTopicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Contex
 	event, err := h.eventRepository.GetEventByID(eventID)
 	if err != nil {
 		h.messageSenderService.Reply(
-			b,
 			msg,
 			fmt.Sprintf("Не удалось найти мероприятие с ID %d. Пожалуйста, проверь ID.", eventID),
 			nil,
@@ -141,7 +139,7 @@ func (h *showTopicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Contex
 	// Get topics for this event
 	topics, err := h.topicRepository.GetTopicsByEventID(eventID)
 	if err != nil {
-		h.messageSenderService.Reply(b, msg, "Ошибка при получении тем для выбранного мероприятия.", nil)
+		h.messageSenderService.Reply(msg, "Ошибка при получении тем для выбранного мероприятия.", nil)
 		log.Printf("ShowTopicsHandler: Error during topic retrieval: %v", err)
 		return handlers.EndConversation()
 	}
@@ -151,12 +149,12 @@ func (h *showTopicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Contex
 
 	// Format and display topics for admin
 	formattedTopics := formatters.FormatTopicListForAdmin(topics, event.Name, event.Type)
-	h.messageSenderService.ReplyMarkdown(b, msg, formattedTopics, nil)
+	h.messageSenderService.ReplyMarkdown(msg, formattedTopics, nil)
 
 	// If there are topics, suggest deletion option
 	if len(topics) > 0 {
 		suggestionMsg := fmt.Sprintf("\nДля удаления темы отправь ID темы, которую нужно удалить, или /%s для отмены.", constants.CancelCommand)
-		h.messageSenderService.Reply(b, msg, suggestionMsg, nil)
+		h.messageSenderService.Reply(msg, suggestionMsg, nil)
 		return handlers.NextConversationState(showTopicsStateDeleteTopic)
 	}
 
@@ -172,7 +170,6 @@ func (h *showTopicsHandler) handleTopicDeletion(b *gotgbot.Bot, ctx *ext.Context
 	topicID, err := strconv.Atoi(userInput)
 	if err != nil {
 		h.messageSenderService.Reply(
-			b,
 			msg,
 			fmt.Sprintf("Пожалуйста, отправь корректный ID темы или /%s для отмены.", constants.CancelCommand),
 			nil,
@@ -183,12 +180,12 @@ func (h *showTopicsHandler) handleTopicDeletion(b *gotgbot.Bot, ctx *ext.Context
 	// Get the event ID from user store
 	eventIDVal, ok := h.userStore.Get(ctx.EffectiveUser.Id, showTopicsUserStoreEventID)
 	if !ok {
-		h.messageSenderService.Reply(b, msg, "Ошибка: не найден ID мероприятия в сессии. Попробуй начать сначала.", nil)
+		h.messageSenderService.Reply(msg, "Ошибка: не найден ID мероприятия в сессии. Попробуй начать сначала.", nil)
 		return handlers.EndConversation()
 	}
 	eventID, ok := eventIDVal.(int)
 	if !ok {
-		h.messageSenderService.Reply(b, msg, "Ошибка при получении ID мероприятия из сессии. Попробуй начать сначала.", nil)
+		h.messageSenderService.Reply(msg, "Ошибка при получении ID мероприятия из сессии. Попробуй начать сначала.", nil)
 		return handlers.EndConversation()
 	}
 
@@ -196,7 +193,6 @@ func (h *showTopicsHandler) handleTopicDeletion(b *gotgbot.Bot, ctx *ext.Context
 	topic, err := h.topicRepository.GetTopicByID(topicID)
 	if err != nil {
 		h.messageSenderService.Reply(
-			b,
 			msg,
 			fmt.Sprintf("Не удалось найти тему с ID %d. Пожалуйста, проверь ID.", topicID),
 			nil,
@@ -208,7 +204,6 @@ func (h *showTopicsHandler) handleTopicDeletion(b *gotgbot.Bot, ctx *ext.Context
 	// Check if the topic belongs to the selected event
 	if topic.EventID != eventID {
 		h.messageSenderService.Reply(
-			b,
 			msg,
 			fmt.Sprintf(
 				"Тема с ID %d относится к другому мероприятию (ID: %d), а не к выбранному (ID: %d).\nПожалуйста, выбери корректный ID темы или /%s для отмены.",
@@ -222,18 +217,18 @@ func (h *showTopicsHandler) handleTopicDeletion(b *gotgbot.Bot, ctx *ext.Context
 	// Delete the topic
 	err = h.topicRepository.DeleteTopic(topicID)
 	if err != nil {
-		h.messageSenderService.Reply(b, msg, fmt.Sprintf("Ошибка при удалении темы с ID %d.", topicID), nil)
+		h.messageSenderService.Reply(msg, fmt.Sprintf("Ошибка при удалении темы с ID %d.", topicID), nil)
 		log.Printf("ShowTopicsHandler: Error during topic deletion: %v", err)
 		return handlers.EndConversation()
 	}
 
 	// Confirmation message
-	h.messageSenderService.Reply(b, msg, fmt.Sprintf("✅ Тема с ID %d успешно удалена.", topicID), nil)
+	h.messageSenderService.Reply(msg, fmt.Sprintf("✅ Тема с ID %d успешно удалена.", topicID), nil)
 
 	// Get updated list of topics for this event
 	topics, err := h.topicRepository.GetTopicsByEventID(eventID)
 	if err != nil {
-		h.messageSenderService.Reply(b, msg, "Ошибка при получении обновленного списка тем.", nil)
+		h.messageSenderService.Reply(msg, "Ошибка при получении обновленного списка тем.", nil)
 		log.Printf("ShowTopicsHandler: Error during topic retrieval: %v", err)
 		return handlers.EndConversation()
 	}
@@ -241,24 +236,24 @@ func (h *showTopicsHandler) handleTopicDeletion(b *gotgbot.Bot, ctx *ext.Context
 	// Get the event information for displaying in the updated list
 	event, err := h.eventRepository.GetEventByID(eventID)
 	if err != nil {
-		h.messageSenderService.Reply(b, msg, "Ошибка при получении информации о мероприятии.", nil)
+		h.messageSenderService.Reply(msg, "Ошибка при получении информации о мероприятии.", nil)
 		log.Printf("ShowTopicsHandler: Error during event retrieval: %v", err)
 		return handlers.EndConversation()
 	}
 
 	// Show updated list of topics
 	formattedTopics := formatters.FormatTopicListForAdmin(topics, event.Name, event.Type)
-	h.messageSenderService.ReplyMarkdown(b, msg, formattedTopics, nil)
+	h.messageSenderService.ReplyMarkdown(msg, formattedTopics, nil)
 
 	// If there are still topics, allow for more deletions
 	if len(topics) > 0 {
 		suggestionMsg := fmt.Sprintf("\nДля удаления еще одной темы отправь ID темы, или /%s для завершения.", constants.CancelCommand)
-		h.messageSenderService.Reply(b, msg, suggestionMsg, nil)
+		h.messageSenderService.Reply(msg, suggestionMsg, nil)
 		return nil // Stay in the same state to allow more deletions
 	}
 
 	// No more topics to delete
-	h.messageSenderService.Reply(b, msg, "Все темы удалены.", nil)
+	h.messageSenderService.Reply(msg, "Все темы удалены.", nil)
 	return handlers.EndConversation()
 }
 
@@ -271,10 +266,10 @@ func (h *showTopicsHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error
 		// Call the cancel function to stop any ongoing API calls
 		if cf, ok := cancelFunc.(context.CancelFunc); ok {
 			cf()
-			h.messageSenderService.Reply(b, msg, "Операция просмотра/удаления тем отменена.", nil)
+			h.messageSenderService.Reply(msg, "Операция просмотра/удаления тем отменена.", nil)
 		}
 	} else {
-		h.messageSenderService.Reply(b, msg, "Операция просмотра/удаления тем отменена.", nil)
+		h.messageSenderService.Reply(msg, "Операция просмотра/удаления тем отменена.", nil)
 	}
 
 	// Clean up user data

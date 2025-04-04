@@ -32,7 +32,7 @@ type topicsHandler struct {
 	config               *config.Config
 	topicRepository      *repositories.TopicRepository
 	eventRepository      *repositories.EventRepository
-	messageSenderService services.MessageSenderService
+	messageSenderService *services.MessageSenderService
 	userStore            *utils.UserDataStore
 	permissionsService   *services.PermissionsService
 }
@@ -41,7 +41,7 @@ func NewTopicsHandler(
 	config *config.Config,
 	topicRepository *repositories.TopicRepository,
 	eventRepository *repositories.EventRepository,
-	messageSenderService services.MessageSenderService,
+	messageSenderService *services.MessageSenderService,
 	permissionsService *services.PermissionsService,
 ) ext.Handler {
 	h := &topicsHandler{
@@ -73,25 +73,25 @@ func (h *topicsHandler) startTopics(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
 	// Only proceed if this is a private chat
-	if !h.permissionsService.CheckPrivateChatType(b, ctx) {
+	if !h.permissionsService.CheckPrivateChatType(msg) {
 		return handlers.EndConversation()
 	}
 
 	// Check if user is a club member
-	if !h.permissionsService.CheckClubMemberPermissions(b, msg, constants.TopicsCommand) {
+	if !h.permissionsService.CheckClubMemberPermissions(msg, constants.TopicsCommand) {
 		return handlers.EndConversation()
 	}
 
 	// Get last actual events to show for selection
 	events, err := h.eventRepository.GetLastActualEvents(10)
 	if err != nil {
-		h.messageSenderService.Reply(b, msg, "Ошибка при получении списка мероприятий.", nil)
+		h.messageSenderService.Reply(msg, "Ошибка при получении списка мероприятий.", nil)
 		log.Printf("TopicsHandler: Error during events retrieval: %v", err)
 		return handlers.EndConversation()
 	}
 
 	if len(events) == 0 {
-		h.messageSenderService.Reply(b, msg, "Нет доступных мероприятий для просмотра тем и вопросов.", nil)
+		h.messageSenderService.Reply(msg, "Нет доступных мероприятий для просмотра тем и вопросов.", nil)
 		return handlers.EndConversation()
 	}
 
@@ -101,7 +101,7 @@ func (h *topicsHandler) startTopics(b *gotgbot.Bot, ctx *ext.Context) error {
 		fmt.Sprintf("Выбери ID мероприятия, для которого ты хочешь увидеть темы и вопросы, либо жми /%s для отмены диалога", constants.CancelCommand),
 	)
 
-	h.messageSenderService.ReplyMarkdown(b, msg, formattedEvents, nil)
+	h.messageSenderService.ReplyMarkdown(msg, formattedEvents, nil)
 
 	return handlers.NextConversationState(topicsStateSelectEvent)
 }
@@ -115,7 +115,6 @@ func (h *topicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Context) e
 	eventID, err := strconv.Atoi(userInput)
 	if err != nil {
 		h.messageSenderService.Reply(
-			b,
 			msg,
 			fmt.Sprintf("Пожалуйста, отправь корректный ID мероприятия или /%s для отмены.", constants.CancelCommand),
 			nil,
@@ -127,7 +126,6 @@ func (h *topicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Context) e
 	event, err := h.eventRepository.GetEventByID(eventID)
 	if err != nil {
 		h.messageSenderService.Reply(
-			b,
 			msg,
 			fmt.Sprintf("Не удалось найти мероприятие с ID %d. Пожалуйста, проверь ID.", eventID),
 			nil,
@@ -139,14 +137,14 @@ func (h *topicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Context) e
 	// Get topics for this event
 	topics, err := h.topicRepository.GetTopicsByEventID(eventID)
 	if err != nil {
-		h.messageSenderService.Reply(b, msg, "Ошибка при получении тем и вопросов для выбранного мероприятия.", nil)
+		h.messageSenderService.Reply(msg, "Ошибка при получении тем и вопросов для выбранного мероприятия.", nil)
 		log.Printf("TopicsHandler: Error during topics retrieval: %v", err)
 		return handlers.EndConversation()
 	}
 
 	// Format and display topics
 	formattedTopics := formatters.FormatTopicListForUsers(topics, event.Name, event.Type)
-	h.messageSenderService.ReplyMarkdown(b, msg, formattedTopics, nil)
+	h.messageSenderService.ReplyMarkdown(msg, formattedTopics, nil)
 
 	return handlers.EndConversation()
 }
@@ -160,10 +158,10 @@ func (h *topicsHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 		// Call the cancel function to stop any ongoing API calls
 		if cf, ok := cancelFunc.(context.CancelFunc); ok {
 			cf()
-			h.messageSenderService.Reply(b, msg, "Операция просмотра тем отменена.", nil)
+			h.messageSenderService.Reply(msg, "Операция просмотра тем отменена.", nil)
 		}
 	} else {
-		h.messageSenderService.Reply(b, msg, "Операция просмотра тем отменена.", nil)
+		h.messageSenderService.Reply(msg, "Операция просмотра тем отменена.", nil)
 	}
 
 	// Clean up user data

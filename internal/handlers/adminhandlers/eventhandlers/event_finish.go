@@ -37,7 +37,7 @@ const (
 type eventFinishHandler struct {
 	config               *config.Config
 	eventRepository      *repositories.EventRepository
-	messageSenderService services.MessageSenderService
+	messageSenderService *services.MessageSenderService
 	userStore            *utils.UserDataStore
 	permissionsService   *services.PermissionsService
 }
@@ -45,7 +45,7 @@ type eventFinishHandler struct {
 func NewEventFinishHandler(
 	config *config.Config,
 	eventRepository *repositories.EventRepository,
-	messageSenderService services.MessageSenderService,
+	messageSenderService *services.MessageSenderService,
 	permissionsService *services.PermissionsService,
 ) ext.Handler {
 	h := &eventFinishHandler{
@@ -79,20 +79,20 @@ func (h *eventFinishHandler) startFinish(b *gotgbot.Bot, ctx *ext.Context) error
 	msg := ctx.EffectiveMessage
 
 	// Check if user has admin permissions and is in a private chat
-	if !h.permissionsService.CheckAdminAndPrivateChat(b, ctx, constants.ShowTopicsCommand) {
+	if !h.permissionsService.CheckAdminAndPrivateChat(msg, constants.ShowTopicsCommand) {
 		return handlers.EndConversation()
 	}
 
 	// Get a list of active events
 	events, err := h.eventRepository.GetLastActualEvents(constants.EventEditGetLastLimit)
 	if err != nil {
-		h.messageSenderService.Reply(b, msg, "Произошла ошибка при получении списка актуальных мероприятий.", nil)
+		h.messageSenderService.Reply(msg, "Произошла ошибка при получении списка актуальных мероприятий.", nil)
 		log.Printf("EventFinishHandler: Error during event retrieval: %v", err)
 		return handlers.EndConversation()
 	}
 
 	if len(events) == 0 {
-		h.messageSenderService.Reply(b, msg, "Нет активных мероприятий для завершения.", nil)
+		h.messageSenderService.Reply(msg, "Нет активных мероприятий для завершения.", nil)
 		return handlers.EndConversation()
 	}
 
@@ -100,7 +100,7 @@ func (h *eventFinishHandler) startFinish(b *gotgbot.Bot, ctx *ext.Context) error
 	actionDescription := "которое ты хочешь завершить"
 	formattedResponse := formatters.FormatEventListForAdmin(events, title, constants.CancelCommand, actionDescription)
 
-	h.messageSenderService.ReplyMarkdown(b, msg, formattedResponse, nil)
+	h.messageSenderService.ReplyMarkdown(msg, formattedResponse, nil)
 
 	return handlers.NextConversationState(eventFinishStateSelectEvent)
 }
@@ -112,7 +112,7 @@ func (h *eventFinishHandler) handleSelectEvent(b *gotgbot.Bot, ctx *ext.Context)
 
 	eventID, err := strconv.Atoi(eventIDStr)
 	if err != nil {
-		h.messageSenderService.Reply(b, msg, fmt.Sprintf("Неверный ID. Пожалуйста, введи числовой ID или /%s для отмены.", constants.CancelCommand), nil)
+		h.messageSenderService.Reply(msg, fmt.Sprintf("Неверный ID. Пожалуйста, введи числовой ID или /%s для отмены.", constants.CancelCommand), nil)
 		return nil // Stay in the same state
 	}
 
@@ -120,7 +120,7 @@ func (h *eventFinishHandler) handleSelectEvent(b *gotgbot.Bot, ctx *ext.Context)
 	h.userStore.Set(ctx.EffectiveUser.Id, eventFinishCtxDataKeySelectedEventID, eventID)
 
 	// Ask for confirmation
-	h.messageSenderService.Reply(b, msg, fmt.Sprintf(
+	h.messageSenderService.Reply(msg, fmt.Sprintf(
 		"Ты действительно хочешь завершить это мероприятие? Это пометит его как неактуальное.\n\nВведи 'да' для подтверждения или 'нет' для отмены (или используй /%s):",
 		constants.CancelCommand,
 	), nil)
@@ -135,7 +135,7 @@ func (h *eventFinishHandler) handleConfirmation(b *gotgbot.Bot, ctx *ext.Context
 
 	// Check the confirmation
 	if confirmationText != eventFinishConfirmYes && confirmationText != eventFinishConfirmNo {
-		h.messageSenderService.Reply(b, msg, fmt.Sprintf(
+		h.messageSenderService.Reply(msg, fmt.Sprintf(
 			"Пожалуйста, введи 'да' для подтверждения или 'нет' для отмены (или используй /%s):",
 			constants.CancelCommand,
 		), nil)
@@ -144,7 +144,7 @@ func (h *eventFinishHandler) handleConfirmation(b *gotgbot.Bot, ctx *ext.Context
 
 	// If user said "no", cancel the operation
 	if confirmationText == eventFinishConfirmNo {
-		h.messageSenderService.Reply(b, msg, "Операция завершения мероприятия отменена.", nil)
+		h.messageSenderService.Reply(msg, "Операция завершения мероприятия отменена.", nil)
 		h.userStore.Clear(ctx.EffectiveUser.Id)
 		return handlers.EndConversation()
 	}
@@ -152,7 +152,7 @@ func (h *eventFinishHandler) handleConfirmation(b *gotgbot.Bot, ctx *ext.Context
 	// Get the selected event ID
 	eventIDVal, ok := h.userStore.Get(ctx.EffectiveUser.Id, eventFinishCtxDataKeySelectedEventID)
 	if !ok {
-		h.messageSenderService.Reply(b, msg, fmt.Sprintf(
+		h.messageSenderService.Reply(msg, fmt.Sprintf(
 			"Произошла ошибка при получении выбранного мероприятия. Пожалуйста, начни заново с /%s",
 			constants.EventFinishCommand,
 		), nil)
@@ -163,7 +163,7 @@ func (h *eventFinishHandler) handleConfirmation(b *gotgbot.Bot, ctx *ext.Context
 	eventID, ok := eventIDVal.(int)
 	if !ok {
 		log.Println("Invalid event ID type:", eventIDVal)
-		h.messageSenderService.Reply(b, msg, fmt.Sprintf(
+		h.messageSenderService.Reply(msg, fmt.Sprintf(
 			"Произошла внутренняя ошибка (неверный тип ID). Пожалуйста, начни заново с /%s",
 			constants.EventFinishCommand,
 		), nil)
@@ -174,7 +174,7 @@ func (h *eventFinishHandler) handleConfirmation(b *gotgbot.Bot, ctx *ext.Context
 	// Get the event details for the success message
 	event, err := h.eventRepository.GetEventByID(eventID)
 	if err != nil {
-		h.messageSenderService.Reply(b, msg, fmt.Sprintf("Ошибка при получении мероприятия с ID %d", eventID), nil)
+		h.messageSenderService.Reply(msg, fmt.Sprintf("Ошибка при получении мероприятия с ID %d", eventID), nil)
 		log.Printf("EventFinishHandler: Error during event retrieval: %v", err)
 		return handlers.EndConversation()
 	}
@@ -182,13 +182,13 @@ func (h *eventFinishHandler) handleConfirmation(b *gotgbot.Bot, ctx *ext.Context
 	// Update the event status to finished
 	err = h.eventRepository.UpdateEventStatus(eventID, constants.EventStatusFinished)
 	if err != nil {
-		h.messageSenderService.Reply(b, msg, "Произошла ошибка при обновлении статуса мероприятия.", nil)
+		h.messageSenderService.Reply(msg, "Произошла ошибка при обновлении статуса мероприятия.", nil)
 		log.Printf("EventFinishHandler: Error during event update: %v", err)
 		return handlers.EndConversation()
 	}
 
 	// Confirmation message
-	h.messageSenderService.Reply(b, msg, fmt.Sprintf("Мероприятие '%s' (ID: %d) успешно завершено.", event.Name, event.ID), nil)
+	h.messageSenderService.Reply(msg, fmt.Sprintf("Мероприятие '%s' (ID: %d) успешно завершено.", event.Name, event.ID), nil)
 
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)
@@ -199,7 +199,7 @@ func (h *eventFinishHandler) handleConfirmation(b *gotgbot.Bot, ctx *ext.Context
 // 4. handleCancel handles the /cancel command
 func (h *eventFinishHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
-	h.messageSenderService.Reply(b, msg, "Операция завершения мероприятия отменена.", nil)
+	h.messageSenderService.Reply(msg, "Операция завершения мероприятия отменена.", nil)
 
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)

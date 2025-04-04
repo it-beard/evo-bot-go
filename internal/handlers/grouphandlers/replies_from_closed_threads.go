@@ -19,12 +19,12 @@ import (
 type RepliesFromClosedThreadsHandler struct {
 	config               *config.Config
 	closedTopics         map[int]bool
-	messageSenderService services.MessageSenderService
+	messageSenderService *services.MessageSenderService
 }
 
 func NewRepliesFromClosedThreadsHandler(
 	config *config.Config,
-	messageSenderService services.MessageSenderService,
+	messageSenderService *services.MessageSenderService,
 ) ext.Handler {
 	// Create map of closed topics
 	closedTopics := make(map[int]bool)

@@ -37,7 +37,7 @@ type contentHandler struct {
 	config                      *config.Config
 	openaiClient                *clients.OpenAiClient
 	promptingTemplateRepository *repositories.PromptingTemplateRepository
-	messageSenderService        services.MessageSenderService
+	messageSenderService        *services.MessageSenderService
 	userStore                   *utils.UserDataStore
 	permissionsService          *services.PermissionsService
 }
@@ -45,7 +45,7 @@ type contentHandler struct {
 func NewContentHandler(
 	config *config.Config,
 	openaiClient *clients.OpenAiClient,
-	messageSenderService services.MessageSenderService,
+	messageSenderService *services.MessageSenderService,
 	promptingTemplateRepository *repositories.PromptingTemplateRepository,
 	permissionsService *services.PermissionsService,
 ) ext.Handler {
@@ -78,18 +78,17 @@ func (h *contentHandler) startContentSearch(b *gotgbot.Bot, ctx *ext.Context) er
 	msg := ctx.EffectiveMessage
 
 	// Only proceed if this is a private chat
-	if !h.permissionsService.CheckPrivateChatType(b, ctx) {
+	if !h.permissionsService.CheckPrivateChatType(msg) {
 		return handlers.EndConversation()
 	}
 
 	// Check if user is a club member
-	if !h.permissionsService.CheckClubMemberPermissions(b, msg, constants.ContentCommand) {
+	if !h.permissionsService.CheckClubMemberPermissions(msg, constants.ContentCommand) {
 		return handlers.EndConversation()
 	}
 
 	// Ask user to enter search query
 	h.messageSenderService.Reply(
-		b,
 		msg,
 		fmt.Sprintf("Введите поисковый запрос по контенту или используйте /%s для отмены:", constants.CancelCommand),
 		nil,
@@ -105,7 +104,6 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 	// Check if we're already processing a request for this user
 	if isProcessing, ok := h.userStore.Get(ctx.EffectiveUser.Id, contentUserStoreKeyProcessing); ok && isProcessing.(bool) {
 		h.messageSenderService.Reply(
-			b,
 			msg,
 			fmt.Sprintf("Пожалуйста, дождитесь окончания обработки предыдущего запроса, или используйте /%s для отмены:", constants.CancelCommand),
 			nil,
@@ -117,7 +115,6 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 	query := strings.TrimSpace(msg.Text)
 	if query == "" {
 		h.messageSenderService.Reply(
-			b,
 			msg,
 			fmt.Sprintf("Поисковый запрос не может быть пустым. Пожалуйста, введите запрос или используйте /%s для отмены:", constants.CancelCommand),
 			nil,
@@ -141,7 +138,7 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 	}()
 
 	// Inform user that search has started
-	h.messageSenderService.Reply(b, msg, fmt.Sprintf("Ищу информацию по запросу: \"%s\"...", query), nil)
+	h.messageSenderService.Reply(msg, fmt.Sprintf("Ищу информацию по запросу: \"%s\"...", query), nil)
 
 	// Send typing action using MessageSender.
 	h.messageSenderService.SendTypingAction(msg.Chat.Id)
@@ -149,14 +146,14 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 	// Get messages from chat
 	messages, err := clients.GetChatMessages(h.config.SuperGroupChatID, h.config.ContentTopicID)
 	if err != nil {
-		h.messageSenderService.Reply(b, msg, "Произошла ошибка при получении сообщений из чата.", nil)
+		h.messageSenderService.Reply(msg, "Произошла ошибка при получении сообщений из чата.", nil)
 		log.Printf("ContentHandler: Error during messages retrieval: %v", err)
 		return handlers.EndConversation()
 	}
 
 	dataMessages, err := h.prepareTelegramMessages(messages)
 	if err != nil {
-		h.messageSenderService.Reply(b, msg, "Произошла ошибка при подготовке сообщений для поиска.", nil)
+		h.messageSenderService.Reply(msg, "Произошла ошибка при подготовке сообщений для поиска.", nil)
 		log.Printf("ContentHandler: Error during messages preparation: %v", err)
 		return handlers.EndConversation()
 	}
@@ -166,7 +163,7 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 	// Get the prompt template from the database
 	templateText, err := h.promptingTemplateRepository.Get(prompts.GetContentPromptTemplateDbKey)
 	if err != nil {
-		h.messageSenderService.Reply(b, msg, "Произошла ошибка при получении шаблона для поиска контента.", nil)
+		h.messageSenderService.Reply(msg, "Произошла ошибка при получении шаблона для поиска контента.", nil)
 		log.Printf("ContentHandler: Error during template retrieval: %v", err)
 		return handlers.EndConversation()
 	}
@@ -210,12 +207,12 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 
 	// Continue only if no errors
 	if err != nil {
-		h.messageSenderService.Reply(b, msg, "Произошла ошибка при получении ответа от OpenAI.", nil)
+		h.messageSenderService.Reply(msg, "Произошла ошибка при получении ответа от OpenAI.", nil)
 		log.Printf("ContentHandler: Error during OpenAI response retrieval: %v", err)
 		return handlers.EndConversation()
 	}
 
-	h.messageSenderService.ReplyMarkdown(b, msg, responseOpenAi, nil)
+	h.messageSenderService.ReplyMarkdown(msg, responseOpenAi, nil)
 
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)
@@ -232,10 +229,10 @@ func (h *contentHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 		// Call the cancel function to stop any ongoing API calls
 		if cf, ok := cancelFunc.(context.CancelFunc); ok {
 			cf()
-			h.messageSenderService.Reply(b, msg, "Операция поиска контента отменена.", nil)
+			h.messageSenderService.Reply(msg, "Операция поиска контента отменена.", nil)
 		}
 	} else {
-		h.messageSenderService.Reply(b, msg, "Операция поиска контента отменена.", nil)
+		h.messageSenderService.Reply(msg, "Операция поиска контента отменена.", nil)
 	}
 
 	// Clean up user data
