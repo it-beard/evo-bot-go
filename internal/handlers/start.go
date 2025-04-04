@@ -79,7 +79,7 @@ func (h *startHandler) handleStart(b *gotgbot.Bot, ctx *ext.Context) error {
 		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
 			{
 				{
-					Text:         "💡 Инструкция",
+					Text:         "💡 Как пользоваться ботом?",
 					CallbackData: startHandlerCallbackHelp,
 				},
 			},
