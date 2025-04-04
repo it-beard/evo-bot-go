@@ -63,30 +63,40 @@ func (h *startHandler) handleStart(b *gotgbot.Bot, ctx *ext.Context) error {
 	isClubMember := utils.IsUserClubMember(b, ctx.EffectiveMessage, h.config)
 
 	var message string
+	var inlineKeyboard gotgbot.InlineKeyboardMarkup
 	if isClubMember {
 		// Message for club members
 		message = greeting + "\n\n" +
 			"Я — *Дженкинс Вебстер*, потомственный дворецкий и верный помощник клуба _\"Эволюция Кода\"_ 🧐\n\n" +
-			"Рад видеть тебя среди участников нашего клуба! Я готов помочь тебе во всех твоих начинаниях. 🤵\n\n" +
-			"Воспользуйся командой /help, чтобы узнать о всех моих возможностях."
+			"Рад видеть тебя среди участников нашего клуба! Я готов помочь тебе во всех твоих начинаниях. 🤵"
+
+		inlineKeyboard = gotgbot.InlineKeyboardMarkup{
+			InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
+				{
+					{
+						Text:         "💡 Как пользоваться ботом?",
+						CallbackData: startHandlerCallbackHelp,
+					},
+				},
+			},
+		}
 	} else {
 		// Message for non-members
 		message = greeting + "\n\n" +
 			"Я — *Дженкинс Вебстер*, потомственный дворецкий и верный помощник клуба _\"Эволюция Кода\"_ 🧐\n\n" +
 			"Позвольте предложить тебе присоединиться к нашему изысканному сообществу разработчиков и разработчиц, " +
-			"где я буду рад служить тебе всеми своими возможностями и ресурсами. 🤵\n\n" +
-			"👉 [Жду тебя в клубе!](https://web.tribute.tg/l/get-started)"
-	}
+			"где я буду рад служить тебе всеми своими возможностями и ресурсами."
 
-	inlineKeyboard := gotgbot.InlineKeyboardMarkup{
-		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
-			{
+		inlineKeyboard = gotgbot.InlineKeyboardMarkup{
+			InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
 				{
-					Text:         "💡 Как пользоваться ботом?",
-					CallbackData: startHandlerCallbackHelp,
+					{
+						Text: "💡 Жду тебя в клубе!",
+						Url:  "https://web.tribute.tg/l/ge",
+					},
 				},
 			},
-		},
+		}
 	}
 
 	h.messageSenderService.ReplyMarkdown(

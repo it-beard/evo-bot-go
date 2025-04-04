@@ -173,7 +173,7 @@ func GetHandlerName(i interface{}) string {
 // GetCurrentHandlerName returns the name of the handler for the current function.
 func GetCurrentHandlerName() string {
 	// Get the program counter and function data for the caller
-	pc, _, _, ok := runtime.Caller(0) // skip 0 for the current function
+	pc, _, _, ok := runtime.Caller(1) // skip 1 for the current function
 	if !ok {
 		return ""
 	}
