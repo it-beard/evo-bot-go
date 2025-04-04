@@ -10,24 +10,31 @@ import (
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/repositories"
+	"evo-bot-go/internal/formatters"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/callbackquery"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/message"
 )
 
 const (
-	// Conversation states
-	eventSetupStateAskEventName      = "event_setup_ask_event_name"
-	eventSetupStateAskEventType      = "event_setup_ask_event_type"
-	eventSetupStateAskEventStartedAt = "event_setup_ask_event_started_at"
+	// Conversation states names
+	eventSetupStateAskEventName      = "event_setup_state_ask_event_name"
+	eventSetupStateAskEventType      = "event_setup_state_ask_event_type"
+	eventSetupStateAskEventStartedAt = "event_setup_state_ask_event_started_at"
 
 	// Context data keys
-	eventSetupCtxDataKeyEventName = "event_setup_event_name"
-	eventSetupCtxDataKeyEventID   = "event_setup_event_id"
+	eventSetupCtxDataKeyEventName         = "event_setup_ctx_data_event_name"
+	eventSetupCtxDataKeyEventID           = "event_setup_ctx_data_event_id"
+	eventSetupCtxDataKeyPreviousMessageID = "event_setup_ctx_data_previous_message_id"
+	eventSetupCtxDataKeyPreviousChatID    = "event_setup_ctx_data_previous_chat_id"
+
+	// Callback data
+	eventSetupCallbackConfirmCancel = "event_setup_callback_confirm_cancel"
 )
 
 type eventSetupHandler struct {
@@ -59,12 +66,15 @@ func NewEventSetupHandler(
 		map[string][]ext.Handler{
 			eventSetupStateAskEventName: {
 				handlers.NewMessage(message.Text, h.handleEventName),
+				handlers.NewCallback(callbackquery.Equal(eventSetupCallbackConfirmCancel), h.handleCallbackCancel),
 			},
 			eventSetupStateAskEventType: {
 				handlers.NewMessage(message.Text, h.handleEventType),
+				handlers.NewCallback(callbackquery.Equal(eventSetupCallbackConfirmCancel), h.handleCallbackCancel),
 			},
 			eventSetupStateAskEventStartedAt: {
 				handlers.NewMessage(message.Text, h.handleEventStartedAt),
+				handlers.NewCallback(callbackquery.Equal(eventSetupCallbackConfirmCancel), h.handleCallbackCancel),
 			},
 		},
 		&handlers.ConversationOpts{
@@ -82,12 +92,15 @@ func (h *eventSetupHandler) startSetup(b *gotgbot.Bot, ctx *ext.Context) error {
 		return handlers.EndConversation()
 	}
 
-	h.messageSenderService.Reply(
+	sentMsg, _ := h.messageSenderService.ReplyWithReturnMessage(
 		msg,
-		fmt.Sprintf("Пожалуйста, введи название для нового мероприятия или /%s для отмены:", constants.CancelCommand),
-		nil,
+		"Пожалуйста, введи название для нового мероприятия:",
+		&gotgbot.SendMessageOpts{
+			ReplyMarkup: formatters.CancelButton(eventSetupCallbackConfirmCancel),
+		},
 	)
 
+	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
 	return handlers.NextConversationState(eventSetupStateAskEventName)
 }
 
@@ -99,11 +112,13 @@ func (h *eventSetupHandler) handleEventName(b *gotgbot.Bot, ctx *ext.Context) er
 	if eventName == "" {
 		h.messageSenderService.Reply(
 			msg,
-			fmt.Sprintf("Название не может быть пустым. Пожалуйста, введи название для мероприятия или /%s для отмены:", constants.CancelCommand),
+			"Название не может быть пустым. Пожалуйста, введи название для мероприятия или используй кнопку для отмены.",
 			nil,
 		)
 		return nil // Stay in the same state
 	}
+
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 
 	// Store the event name
 	h.userStore.Set(ctx.EffectiveUser.Id, eventSetupCtxDataKeyEventName, eventName)
@@ -111,22 +126,28 @@ func (h *eventSetupHandler) handleEventName(b *gotgbot.Bot, ctx *ext.Context) er
 	// Ask for event type
 	eventTypeOptions := []string{}
 	for i, eventType := range constants.AllEventTypes {
-		eventTypeOptions = append(eventTypeOptions, fmt.Sprintf("%d. %s", i+1, eventType))
+		eventTypeOptions = append(eventTypeOptions, fmt.Sprintf("/%d. %s", i+1, eventType))
 	}
-	typeOptions := fmt.Sprintf("Выбери тип мероприятия (введи число):\n%s\nИли /%s для отмены",
+	typeOptions := fmt.Sprintf("Выбери тип мероприятия (введи число):\n%s",
 		strings.Join(eventTypeOptions, "\n"),
-		constants.CancelCommand,
 	)
 
-	h.messageSenderService.Reply(msg, typeOptions, nil)
+	sentMsg, _ := h.messageSenderService.ReplyWithReturnMessage(
+		msg,
+		typeOptions,
+		&gotgbot.SendMessageOpts{
+			ReplyMarkup: formatters.CancelButton(eventSetupCallbackConfirmCancel),
+		},
+	)
 
+	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
 	return handlers.NextConversationState(eventSetupStateAskEventType)
 }
 
 // 3. handleEventType processes the event type selection and creates the event
 func (h *eventSetupHandler) handleEventType(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
-	typeSelection := strings.TrimSpace(msg.Text)
+	typeSelection := strings.TrimSpace(strings.Replace(msg.Text, "/", "", 1))
 
 	var eventType constants.EventType
 
@@ -135,11 +156,15 @@ func (h *eventSetupHandler) handleEventType(b *gotgbot.Bot, ctx *ext.Context) er
 	if err != nil || index < 1 || index > len(constants.AllEventTypes) {
 		h.messageSenderService.Reply(
 			msg,
-			fmt.Sprintf("Неверный выбор. Пожалуйста, введи число от 1 до %d, или /%s для отмены:", len(constants.AllEventTypes), constants.CancelCommand),
+			fmt.Sprintf("Неверный выбор. Пожалуйста, введи число от 1 до %d, или используй кнопку для отмены.",
+				len(constants.AllEventTypes),
+			),
 			nil,
 		)
 		return nil // Stay in the same state
 	}
+
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 
 	// Arrays are 0-indexed but our options start from 1
 	eventType = constants.AllEventTypes[index-1]
@@ -149,7 +174,9 @@ func (h *eventSetupHandler) handleEventType(b *gotgbot.Bot, ctx *ext.Context) er
 	if !ok {
 		h.messageSenderService.Reply(
 			msg,
-			fmt.Sprintf("Произошла внутренняя ошибка. Не удалось найти название мероприятия. Попробуй начать заново с /%s.", constants.EventSetupCommand),
+			fmt.Sprintf("Произошла внутренняя ошибка. Не удалось найти название мероприятия. Попробуй начать заново с /%s.",
+				constants.EventSetupCommand,
+			),
 			nil,
 		)
 		return handlers.EndConversation()
@@ -159,7 +186,9 @@ func (h *eventSetupHandler) handleEventType(b *gotgbot.Bot, ctx *ext.Context) er
 	if !ok {
 		h.messageSenderService.Reply(
 			msg,
-			fmt.Sprintf("Произошла внутренняя ошибка (неверный тип названия). Попробуй начать заново с /%s.", constants.EventSetupCommand),
+			fmt.Sprintf("Произошла внутренняя ошибка (неверный тип названия). Попробуй начать заново с /%s.",
+				constants.EventSetupCommand,
+			),
 			nil,
 		)
 		return handlers.EndConversation()
@@ -177,12 +206,15 @@ func (h *eventSetupHandler) handleEventType(b *gotgbot.Bot, ctx *ext.Context) er
 	h.userStore.Set(ctx.EffectiveUser.Id, eventSetupCtxDataKeyEventID, id)
 
 	// Ask for start date
-	h.messageSenderService.Reply(
+	sentMsg, _ := h.messageSenderService.ReplyWithReturnMessage(
 		msg,
-		fmt.Sprintf("Когда стартует мероприятие? Введи дату и время в формате DD.MM.YYYY HH:MM или /%s для отмены.", constants.CancelCommand),
-		nil,
+		"Когда стартует мероприятие? Введи дату и время в формате DD.MM.YYYY HH:MM:",
+		&gotgbot.SendMessageOpts{
+			ReplyMarkup: formatters.CancelButton(eventSetupCallbackConfirmCancel),
+		},
 	)
 
+	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
 	return handlers.NextConversationState(eventSetupStateAskEventStartedAt)
 }
 
@@ -196,18 +228,22 @@ func (h *eventSetupHandler) handleEventStartedAt(b *gotgbot.Bot, ctx *ext.Contex
 	if err != nil {
 		h.messageSenderService.Reply(
 			msg,
-			fmt.Sprintf("Неверный формат даты. Пожалуйста, введи дату и время в формате DD.MM.YYYY HH:MM или /%s для отмены.", constants.CancelCommand),
+			"Неверный формат даты. Пожалуйста, введи дату и время в формате DD.MM.YYYY HH:MM или используй кнопку для отмены.",
 			nil,
 		)
 		return nil // Stay in the same state
 	}
+
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 
 	// Get event ID from user data store
 	eventIDVal, ok := h.userStore.Get(ctx.EffectiveUser.Id, eventSetupCtxDataKeyEventID)
 	if !ok {
 		h.messageSenderService.Reply(
 			msg,
-			fmt.Sprintf("Произошла внутренняя ошибка. Не удалось найти ID мероприятия. Попробуй начать заново с /%s.", constants.EventSetupCommand),
+			fmt.Sprintf("Произошла внутренняя ошибка. Не удалось найти ID мероприятия. Попробуй начать заново с /%s.",
+				constants.EventSetupCommand,
+			),
 			nil,
 		)
 		return handlers.EndConversation()
@@ -217,7 +253,9 @@ func (h *eventSetupHandler) handleEventStartedAt(b *gotgbot.Bot, ctx *ext.Contex
 	if !ok {
 		h.messageSenderService.Reply(
 			msg,
-			fmt.Sprintf("Произошла внутренняя ошибка (неверный тип ID). Попробуй начать заново с /%s.", constants.EventSetupCommand),
+			fmt.Sprintf("Произошла внутренняя ошибка (неверный тип ID). Попробуй начать заново с /%s.",
+				constants.EventSetupCommand,
+			),
 			nil,
 		)
 		return handlers.EndConversation()
@@ -249,8 +287,13 @@ func (h *eventSetupHandler) handleEventStartedAt(b *gotgbot.Bot, ctx *ext.Contex
 	// Success message
 	h.messageSenderService.Reply(
 		msg,
-		fmt.Sprintf("Запись о мероприятии '%s' успешно создана с ID: %d и датой старта: %s", eventName, eventID, startedAt.Format("02.01.2006 15:04")),
-		nil,
+		fmt.Sprintf(
+			"Запись о мероприятии '*%s*' успешно создана с ID: %d и датой старта: *%s*\n\nДля редактирования мероприятия используй команду /%s.\nДля просмотра всех команд используй команду /%s",
+			eventName, eventID, startedAt.Format("02.01.2006 15:04"), constants.EventEditCommand, constants.HelpCommand,
+		),
+		&gotgbot.SendMessageOpts{
+			ParseMode: "Markdown",
+		},
 	)
 
 	// Clean up user data
@@ -259,13 +302,57 @@ func (h *eventSetupHandler) handleEventStartedAt(b *gotgbot.Bot, ctx *ext.Contex
 	return handlers.EndConversation()
 }
 
+// handleCallbackCancel processes the cancel button click
+func (h *eventSetupHandler) handleCallbackCancel(b *gotgbot.Bot, ctx *ext.Context) error {
+	// Answer the callback query to remove the loading state on the button
+	cb := ctx.Update.CallbackQuery
+	_, _ = cb.Answer(b, nil)
+
+	return h.handleCancel(b, ctx)
+}
+
 // 5. handleCancel handles the /cancel command
 func (h *eventSetupHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
+
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 	h.messageSenderService.Reply(msg, "Операция создания мероприятия отменена.", nil)
 
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)
 
 	return handlers.EndConversation()
+}
+
+func (h *eventSetupHandler) MessageRemoveInlineKeyboard(b *gotgbot.Bot, userID *int64) {
+	var chatID, messageID int64
+
+	// If userID provided, try to get stored message info
+	if userID != nil {
+		if val, ok := h.userStore.Get(*userID, eventSetupCtxDataKeyPreviousMessageID); ok {
+			messageID = val.(int64)
+		}
+		if val, ok := h.userStore.Get(*userID, eventSetupCtxDataKeyPreviousChatID); ok {
+			chatID = val.(int64)
+		}
+	}
+
+	// Skip if we don't have valid chat and message IDs
+	if chatID == 0 || messageID == 0 {
+		return
+	}
+
+	// Remove the inline keyboard
+	if _, _, err := b.EditMessageReplyMarkup(&gotgbot.EditMessageReplyMarkupOpts{
+		ChatId:      chatID,
+		MessageId:   messageID,
+		ReplyMarkup: gotgbot.InlineKeyboardMarkup{},
+	}); err != nil {
+		log.Printf("%s: Error removing inline keyboard: %v", utils.GetCurrentTypeName(), err)
+	}
+}
+
+func (h *eventSetupHandler) SavePreviousMessageInfo(userID int64, sentMsg *gotgbot.Message) {
+	h.userStore.Set(userID, eventSetupCtxDataKeyPreviousMessageID, sentMsg.MessageId)
+	h.userStore.Set(userID, eventSetupCtxDataKeyPreviousChatID, sentMsg.Chat.Id)
 }
