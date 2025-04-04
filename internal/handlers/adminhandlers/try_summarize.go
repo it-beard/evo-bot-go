@@ -2,8 +2,6 @@ package adminhandlers
 
 import (
 	"context"
-	"fmt"
-	"log"
 	"time"
 
 	"evo-bot-go/internal/config"
@@ -14,12 +12,15 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/message"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/callbackquery"
 )
 
 const (
 	// Conversation states
 	trySummarizeHandlerStateConfirmation = "try_summarize_handler_confirmation"
+	// Callback data
+	trySummarizeCallbackConfirmYes    = "try_summarize_confirm_yes"
+	trySummarizeCallbackConfirmCancel = "try_summarize_confirm_cancel"
 )
 
 type trySummarizeHandler struct {
@@ -48,7 +49,8 @@ func NewTrySummarizeHandler(
 		},
 		map[string][]ext.Handler{
 			trySummarizeHandlerStateConfirmation: {
-				handlers.NewMessage(message.All, h.handleConfirmation),
+				handlers.NewCallback(callbackquery.Equal(trySummarizeCallbackConfirmYes), h.handleCallbackConfirmation),
+				handlers.NewCallback(callbackquery.Equal(trySummarizeCallbackConfirmCancel), h.handleCallbackCancel),
 			},
 		},
 		&handlers.ConversationOpts{
@@ -67,34 +69,67 @@ func (h *trySummarizeHandler) startSummarizeConversation(b *gotgbot.Bot, ctx *ex
 		return handlers.EndConversation()
 	}
 
-	// Ask user to confirm
-	utils.SendLoggedReply(b, msg,
-		fmt.Sprintf("Вы собираетесь запустить процесс тестирования саммаризации общения в клубе. Саммаризация будет отправлена в личные сообщения.\n\nПодтвердите действие набрав 'да' или используйте /%s для отмены:",
-			constants.CancelCommand), nil)
+	// Create an inline keyboard with "Да" and "Отмена" buttons
+	inlineKeyboard := gotgbot.InlineKeyboardMarkup{
+		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
+			{
+				{
+					Text:         "✅ Да",
+					CallbackData: trySummarizeCallbackConfirmYes,
+				},
+				{
+					Text:         "❌Отмена",
+					CallbackData: trySummarizeCallbackConfirmCancel,
+				},
+			},
+		},
+	}
+
+	// Ask user to confirm with inline keyboard
+	utils.SendLoggedReplyWithOptions(
+		b,
+		msg,
+		"Вы собираетесь запустить процесс тестирования саммаризации общения в клубе. Саммаризация будет отправлена в личные сообщения.\n\nПодтвердите действие, нажав одну из кнопок ниже:",
+		&gotgbot.SendMessageOpts{
+			ReplyMarkup: inlineKeyboard,
+		},
+		nil)
 
 	return handlers.NextConversationState(trySummarizeHandlerStateConfirmation)
 }
 
-// handleConfirmation processes the user's confirmation
-func (h *trySummarizeHandler) handleConfirmation(b *gotgbot.Bot, ctx *ext.Context) error {
-	msg := ctx.EffectiveMessage
+// handleCallbackConfirmation processes the user's callback confirmation
+func (h *trySummarizeHandler) handleCallbackConfirmation(b *gotgbot.Bot, ctx *ext.Context) error {
+	// Answer the callback query to remove the loading state on the button
+	cb := ctx.Update.CallbackQuery
+	_, _ = cb.Answer(b, nil)
 
-	confirmation := msg.Text
-	if confirmation != "да" && confirmation != "Да" {
-		utils.SendLoggedReply(b, msg,
-			fmt.Sprintf("Действие не подтверждено. Пожалуйста, введите 'да' для подтверждения или используйте /%s для отмены:",
-				constants.CancelCommand), nil)
-		return nil // Stay in the same state
-	}
+	return h.startSummarization(b, ctx)
+}
 
-	// Send a message indicating that summarization has started
-	replyMsg, err := msg.Reply(b, "Запуск процесса саммаризации...", nil)
-	if err != nil {
-		return handlers.EndConversation()
-	}
+// handleCallbackCancel processes the cancel button click
+func (h *trySummarizeHandler) handleCallbackCancel(b *gotgbot.Bot, ctx *ext.Context) error {
+	// Answer the callback query to remove the loading state on the button
+	cb := ctx.Update.CallbackQuery
+	_, _ = cb.Answer(b, nil)
+
+	utils.SendLoggedReply(b, ctx.EffectiveMessage, "Операция саммаризации отменена.", nil)
+
+	// Clean up user data
+	h.userStore.Clear(ctx.EffectiveUser.Id)
+
+	return handlers.EndConversation()
+}
+
+// startSummarization starts the summarization process
+func (h *trySummarizeHandler) startSummarization(b *gotgbot.Bot, ctx *ext.Context) error {
+	// Get the chat ID from either the message or callback query
+	var chatId int64
+
+	utils.SendLoggedReply(b, ctx.EffectiveMessage, "Запуск процесса саммаризации...", nil)
 
 	// Send typing action using MessageSender.
-	h.messageSenderService.SendTypingAction(msg.Chat.Id)
+	h.messageSenderService.SendTypingAction(chatId)
 
 	// Run summarization in a goroutine to avoid blocking
 	go func() {
@@ -108,7 +143,7 @@ func (h *trySummarizeHandler) handleConfirmation(b *gotgbot.Bot, ctx *ext.Contex
 			for {
 				select {
 				case <-ticker.C:
-					h.messageSenderService.SendTypingAction(msg.Chat.Id)
+					h.messageSenderService.SendTypingAction(chatId)
 				case <-typingCtx.Done():
 					return
 				}
@@ -116,31 +151,19 @@ func (h *trySummarizeHandler) handleConfirmation(b *gotgbot.Bot, ctx *ext.Contex
 		}()
 
 		// Create a context with timeout and user ID for DM
-		ctxWithValues := context.WithValue(context.Background(), "userID", msg.From.Id)
+		ctxWithValues := context.WithValue(context.Background(), "userID", ctx.EffectiveUser.Id)
 		ctxTimeout, cancel := context.WithTimeout(ctxWithValues, 10*time.Minute)
 		defer cancel()
 
 		// Run the summarization with sendToDM=true as default
 		err := h.summarizationService.RunDailySummarization(ctxTimeout, true)
-
-		// Update the reply message with the result
-		var resultText string
 		if err != nil {
-			resultText = fmt.Sprintf("Ошибка при создании саммаризации: %v", err)
-			log.Printf("Error running manual summarization: %v", err)
-		} else {
-			resultText = "Саммаризация общения в клубе успешно завершена, результат отправлен вам в личные сообщения."
+			utils.SendLoggedReply(b, ctx.EffectiveMessage, "Ошибка при создании саммаризации.", err)
 		}
 
 		// Cancel the periodic typing action immediately after getting the response.
 		cancelTyping()
-		_, _, err = b.EditMessageText(resultText, &gotgbot.EditMessageTextOpts{
-			ChatId:    msg.Chat.Id,
-			MessageId: replyMsg.MessageId,
-		})
-		if err != nil {
-			log.Printf("Error updating summarization result message: %v", err)
-		}
+
 	}()
 
 	// Clean up user data
