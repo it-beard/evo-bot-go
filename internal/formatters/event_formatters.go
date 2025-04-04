@@ -126,6 +126,14 @@ func FormatTopicListForUsers(topics []repositories.Topic, eventName string, even
 				response.WriteString("\n")
 			}
 		}
+
+		response.WriteString(
+			fmt.Sprintf(
+				"\n\nИспользуй команду /%s для добавления новых тем и вопросов, либо /%s для просмотра тем и вопросов к другому мероприятию.",
+				constants.TopicAddCommand,
+				constants.TopicsCommand,
+			),
+		)
 	}
 
 	return response.String()

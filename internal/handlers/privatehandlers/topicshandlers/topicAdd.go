@@ -112,7 +112,7 @@ func (h *topicAddHandler) startTopicAdd(b *gotgbot.Bot, ctx *ext.Context) error 
 	// Format and display event list for selection
 	formattedEvents := formatters.FormatEventListForUsers(
 		events,
-		fmt.Sprintf("Выбери ID мероприятия, к которому ты хочешь закинуть темы или вопросы:"),
+		fmt.Sprintf("Выбери ID мероприятия, к которому ты хочешь закинуть темы или вопросы"),
 	)
 
 	sentMsg, _ := h.messageSenderService.ReplyMarkdownWithReturnMessage(
