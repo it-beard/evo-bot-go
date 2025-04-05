@@ -309,6 +309,6 @@ func (h *topicAddHandler) MessageRemoveInlineKeyboard(b *gotgbot.Bot, userID *in
 }
 
 func (h *topicAddHandler) SavePreviousMessageInfo(userID int64, sentMsg *gotgbot.Message) {
-	h.userStore.Set(userID, topicAddCtxDataKeyPreviousMessageID, sentMsg.MessageId)
-	h.userStore.Set(userID, topicAddCtxDataKeyPreviousChatID, sentMsg.Chat.Id)
+	h.userStore.SetPreviousMessageInfo(userID, sentMsg.MessageId, sentMsg.Chat.Id,
+		topicAddCtxDataKeyPreviousMessageID, topicAddCtxDataKeyPreviousChatID)
 }

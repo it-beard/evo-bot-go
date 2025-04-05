@@ -52,3 +52,9 @@ func (s *UserDataStore) Clear(userID int64) {
 
 	delete(s.userData, userID)
 }
+
+// SetPreviousMessageInfo stores message ID and chat ID for a user
+func (s *UserDataStore) SetPreviousMessageInfo(userID int64, messageID int64, chatID int64, messageIDKey string, chatIDKey string) {
+	s.Set(userID, messageIDKey, messageID)
+	s.Set(userID, chatIDKey, chatID)
+}

@@ -104,7 +104,7 @@ func (h *toolsHandler) startToolSearch(b *gotgbot.Bot, ctx *ext.Context) error {
 		},
 	)
 
-	h.SavePreviouseMessageInfo(ctx.EffectiveUser.Id, sentMsg)
+	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
 	return handlers.NextConversationState(toolsStateStartToolSearch)
 }
 
@@ -153,7 +153,7 @@ func (h *toolsHandler) processToolSearch(b *gotgbot.Bot, ctx *ext.Context) error
 	sentMsg, _ := h.messageSenderService.ReplyWithReturnMessage(msg, fmt.Sprintf("Ищу информацию по запросу: \"%s\"...", query), &gotgbot.SendMessageOpts{
 		ReplyMarkup: formatters.CancelButton(toolsCallbackConfirmCancel),
 	})
-	h.SavePreviouseMessageInfo(ctx.EffectiveUser.Id, sentMsg)
+	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
 
 	// Send typing action using MessageSender.
 	h.messageSenderService.SendTypingAction(msg.Chat.Id)
@@ -325,7 +325,7 @@ func (h *toolsHandler) MessageRemoveInlineKeyboard(b *gotgbot.Bot, userID *int64
 	}
 }
 
-func (h *toolsHandler) SavePreviouseMessageInfo(userID int64, sentMsg *gotgbot.Message) {
-	h.userStore.Set(userID, toolsUserCtxDataKeyPreviousMessageID, sentMsg.MessageId)
-	h.userStore.Set(userID, toolsUserCtxDataKeyPreviousChatID, sentMsg.Chat.Id)
+func (h *toolsHandler) SavePreviousMessageInfo(userID int64, sentMsg *gotgbot.Message) {
+	h.userStore.SetPreviousMessageInfo(userID, sentMsg.MessageId, sentMsg.Chat.Id,
+		toolsUserCtxDataKeyPreviousMessageID, toolsUserCtxDataKeyPreviousChatID)
 }

@@ -120,7 +120,7 @@ func (h *eventStartHandler) startEvent(b *gotgbot.Bot, ctx *ext.Context) error {
 		ReplyMarkup: formatters.CancelButton(eventStartCallbackConfirmCancel),
 	})
 
-	h.SavePreviouseMessageInfo(ctx.EffectiveUser.Id, sentMsg)
+	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
 	return handlers.NextConversationState(eventStartStateSelectEvent)
 }
 
@@ -158,7 +158,7 @@ func (h *eventStartHandler) handleSelectEvent(b *gotgbot.Bot, ctx *ext.Context) 
 		},
 	)
 
-	h.SavePreviouseMessageInfo(ctx.EffectiveUser.Id, sentMsg)
+	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
 	return handlers.NextConversationState(eventStartStateEnterLink)
 }
 
@@ -218,7 +218,7 @@ func (h *eventStartHandler) handleEnterLink(b *gotgbot.Bot, ctx *ext.Context) er
 		ReplyMarkup: formatters.ConfirmAndCancelButton(eventStartCallbackConfirmYes, eventStartCallbackConfirmCancel),
 	})
 
-	h.SavePreviouseMessageInfo(ctx.EffectiveUser.Id, sentMsg)
+	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
 	return handlers.NextConversationState(eventStartStateConfirm)
 }
 
@@ -384,7 +384,7 @@ func (h *eventStartHandler) MessageRemoveInlineKeyboard(b *gotgbot.Bot, userID *
 	}
 }
 
-func (h *eventStartHandler) SavePreviouseMessageInfo(userID int64, sentMsg *gotgbot.Message) {
-	h.userStore.Set(userID, eventStartCtxDataKeyPreviousMessageID, sentMsg.MessageId)
-	h.userStore.Set(userID, eventStartCtxDataKeyPreviousChatID, sentMsg.Chat.Id)
+func (h *eventStartHandler) SavePreviousMessageInfo(userID int64, sentMsg *gotgbot.Message) {
+	h.userStore.SetPreviousMessageInfo(userID, sentMsg.MessageId, sentMsg.Chat.Id,
+		eventStartCtxDataKeyPreviousMessageID, eventStartCtxDataKeyPreviousChatID)
 }

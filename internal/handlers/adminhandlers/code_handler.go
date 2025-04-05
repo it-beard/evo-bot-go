@@ -175,8 +175,8 @@ func (h *codeHandler) MessageRemoveInlineKeyboard(b *gotgbot.Bot, userID *int64)
 }
 
 func (h *codeHandler) SavePreviousMessageInfo(userID int64, sentMsg *gotgbot.Message) {
-	h.userStore.Set(userID, codeHandlerCtxDataKeyPreviousMessageID, sentMsg.MessageId)
-	h.userStore.Set(userID, codeHandlerCtxDataKeyPreviousChatID, sentMsg.Chat.Id)
+	h.userStore.SetPreviousMessageInfo(userID, sentMsg.MessageId, sentMsg.Chat.Id,
+		codeHandlerCtxDataKeyPreviousMessageID, codeHandlerCtxDataKeyPreviousChatID)
 }
 
 func reverseString(s string) string {

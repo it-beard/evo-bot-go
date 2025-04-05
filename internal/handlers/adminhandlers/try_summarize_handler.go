@@ -241,6 +241,6 @@ func (h *trySummarizeHandler) MessageRemoveInlineKeyboard(b *gotgbot.Bot, userID
 }
 
 func (h *trySummarizeHandler) SavePreviousMessageInfo(userID int64, sentMsg *gotgbot.Message) {
-	h.userStore.Set(userID, trySummarizeCtxDataKeyPreviousMessageID, sentMsg.MessageId)
-	h.userStore.Set(userID, trySummarizeCtxDataKeyPreviousChatID, sentMsg.Chat.Id)
+	h.userStore.SetPreviousMessageInfo(userID, sentMsg.MessageId, sentMsg.Chat.Id,
+		trySummarizeCtxDataKeyPreviousMessageID, trySummarizeCtxDataKeyPreviousChatID)
 }
