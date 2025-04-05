@@ -394,14 +394,13 @@ func (h *eventEditHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error 
 func (h *eventEditHandler) MessageRemoveInlineKeyboard(b *gotgbot.Bot, userID *int64) {
 	var chatID, messageID int64
 
-	// If userID provided, try to get stored message info
+	// If userID provided, get stored message info using the utility method
 	if userID != nil {
-		if val, ok := h.userStore.Get(*userID, eventEditCtxDataKeyPreviousMessageID); ok {
-			messageID = val.(int64)
-		}
-		if val, ok := h.userStore.Get(*userID, eventEditCtxDataKeyPreviousChatID); ok {
-			chatID = val.(int64)
-		}
+		messageID, chatID = h.userStore.GetPreviousMessageInfo(
+			*userID,
+			eventEditCtxDataKeyPreviousMessageID,
+			eventEditCtxDataKeyPreviousChatID,
+		)
 	}
 
 	// Skip if we don't have valid chat and message IDs
@@ -409,14 +408,8 @@ func (h *eventEditHandler) MessageRemoveInlineKeyboard(b *gotgbot.Bot, userID *i
 		return
 	}
 
-	// Remove the inline keyboard
-	if _, _, err := b.EditMessageReplyMarkup(&gotgbot.EditMessageReplyMarkupOpts{
-		ChatId:      chatID,
-		MessageId:   messageID,
-		ReplyMarkup: gotgbot.InlineKeyboardMarkup{},
-	}); err != nil {
-		log.Printf("%s: Error removing inline keyboard: %v", utils.GetCurrentTypeName(), err)
-	}
+	// Use message sender service to remove the inline keyboard
+	_ = h.messageSenderService.RemoveInlineKeyboard(chatID, messageID)
 }
 
 func (h *eventEditHandler) SavePreviousMessageInfo(userID int64, sentMsg *gotgbot.Message) {

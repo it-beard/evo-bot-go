@@ -58,3 +58,14 @@ func (s *UserDataStore) SetPreviousMessageInfo(userID int64, messageID int64, ch
 	s.Set(userID, messageIDKey, messageID)
 	s.Set(userID, chatIDKey, chatID)
 }
+
+// GetPreviousMessageInfo retrieves the stored message ID and chat ID for a user
+func (s *UserDataStore) GetPreviousMessageInfo(userID int64, messageIDKey string, chatIDKey string) (messageID int64, chatID int64) {
+	if val, ok := s.Get(userID, messageIDKey); ok {
+		messageID = val.(int64)
+	}
+	if val, ok := s.Get(userID, chatIDKey); ok {
+		chatID = val.(int64)
+	}
+	return
+}

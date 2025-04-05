@@ -412,3 +412,22 @@ func utf16CodeUnitCount(s string) int {
 	}
 	return count
 }
+
+// RemoveInlineKeyboard removes the inline keyboard from a message
+func (s *MessageSenderService) RemoveInlineKeyboard(chatID int64, messageID int64) error {
+	if chatID == 0 || messageID == 0 {
+		return nil
+	}
+
+	_, _, err := s.bot.EditMessageReplyMarkup(&gotgbot.EditMessageReplyMarkupOpts{
+		ChatId:      chatID,
+		MessageId:   messageID,
+		ReplyMarkup: gotgbot.InlineKeyboardMarkup{},
+	})
+
+	if err != nil {
+		log.Printf("%s: Error removing inline keyboard: %v", utils.GetCurrentTypeName(), err)
+	}
+
+	return err
+}
