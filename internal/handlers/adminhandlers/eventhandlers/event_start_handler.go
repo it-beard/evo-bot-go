@@ -300,11 +300,19 @@ func (h *eventStartHandler) handleCallbackYes(b *gotgbot.Bot, ctx *ext.Context) 
 	}
 
 	// Send announcement message with the event link to the announcement topic if configured
-	announcementMsg := fmt.Sprintf("🔴 *НАЧЕИНАЕМ ИВЕНТ!* 🔴\n\n📅 *%s*\n\nИспользуй кнопку ниже, чтобы присоединиться ⬇️", event.Name)
-	h.messageSenderService.SendMarkdown(utils.ChatIdToFullChatId(h.config.SuperGroupChatID), announcementMsg, &gotgbot.SendMessageOpts{
+	announcementMsg := fmt.Sprintf("🔴 *НАЧИНАЕМ ИВЕНТ!* 🔴\n\n📅 *%s*\n\nИспользуй кнопку ниже, чтобы присоединиться ⬇️", event.Name)
+	sentAnnouncementMsg, err := h.messageSenderService.SendMarkdownWithReturnMessage(utils.ChatIdToFullChatId(h.config.SuperGroupChatID), announcementMsg, &gotgbot.SendMessageOpts{
 		MessageThreadId: int64(h.config.AnnouncementTopicID),
 		ReplyMarkup:     buttonWithLink,
 	})
+
+	// Pin the announcement message with notification for all users
+	if err == nil && sentAnnouncementMsg != nil {
+		err = h.messageSenderService.PinMessageWithNotification(sentAnnouncementMsg.Chat.Id, sentAnnouncementMsg.MessageId, false)
+		if err != nil {
+			log.Printf("%s: Error pinning announcement message: %v", utils.GetCurrentTypeName(), err)
+		}
+	}
 
 	// Confirmation message
 	h.messageSenderService.ReplyMarkdown(
