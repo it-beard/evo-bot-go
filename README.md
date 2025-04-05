@@ -24,6 +24,15 @@ A Telegram bot for Evocoders Club management implemented in Go. Helps moderate d
 
 For more details on bot usage, use the `/help` command in the bot chat.
 
+## 🔑 Required Bot Permissions
+
+For the bot to function properly, it must have the following admin permissions in the Telegram supergroup:
+
+- 📌 **Pin messages**: Required for pinning event announcements and important information
+- 🗑️ **Delete messages**: Required for clearing service messages and moderating threads
+
+To assign these permissions, add the bot as an administrator in your group and enable these specific rights.
+
 ## 💾 Database
 
 The bot uses PostgreSQL with automatically initialized tables:

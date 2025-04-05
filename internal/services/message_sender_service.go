@@ -77,6 +77,35 @@ func (s *MessageSenderService) SendMarkdown(chatId int64, text string, opts *got
 	return err
 }
 
+// Send markdown message to chat and return the sent message
+func (s *MessageSenderService) SendMarkdownWithReturnMessage(chatId int64, text string, opts *gotgbot.SendMessageOpts) (*gotgbot.Message, error) {
+	// default options for markdown messages
+	if opts == nil {
+		opts = &gotgbot.SendMessageOpts{
+			ParseMode: "Markdown",
+			LinkPreviewOptions: &gotgbot.LinkPreviewOptions{
+				IsDisabled: true,
+			},
+		}
+	} else {
+		opts.ParseMode = "Markdown"
+		// default link preview options are disabled
+		if opts.LinkPreviewOptions == nil {
+			opts.LinkPreviewOptions = &gotgbot.LinkPreviewOptions{
+				IsDisabled: true,
+			}
+		}
+	}
+
+	sentMsg, err := s.bot.SendMessage(chatId, text, opts)
+
+	if err != nil {
+		log.Printf("%s: SendMarkdownWithReturnMessage: Failed to send message: %v", utils.GetCurrentTypeName(), err)
+	}
+
+	return sentMsg, err
+}
+
 // Send html message to chat
 func (s *MessageSenderService) SendHtml(chatId int64, text string, opts *gotgbot.SendMessageOpts) error {
 	// default options for html messages
@@ -427,6 +456,19 @@ func (s *MessageSenderService) RemoveInlineKeyboard(chatID int64, messageID int6
 
 	if err != nil {
 		log.Printf("%s: Error removing inline keyboard: %v", utils.GetCurrentTypeName(), err)
+	}
+
+	return err
+}
+
+// PinMessageWithNotification pins a message with optional notification to all users
+func (s *MessageSenderService) PinMessageWithNotification(chatID int64, messageID int64, disableNotification bool) error {
+	_, err := s.bot.PinChatMessage(chatID, messageID, &gotgbot.PinChatMessageOpts{
+		DisableNotification: disableNotification,
+	})
+
+	if err != nil {
+		log.Printf("%s: Error pinning message: %v", utils.GetCurrentTypeName(), err)
 	}
 
 	return err
