@@ -16,23 +16,24 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/callbackquery"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/message"
 )
 
 const (
-	// Conversation states
-	eventDeleteStateSelectEvent = "event_delete_select_event"
-	eventDeleteStateConfirm     = "event_delete_confirm"
+	// Conversation states names
+	eventDeleteStateSelectEvent = "event_delete_state_select_event"
+	eventDeleteStateConfirm     = "event_delete_state_confirm"
 
 	// Context data keys
-	eventDeleteCtxDataKeySelectedEventID   = "event_delete_selected_event_id"
-	eventDeleteCtxDataKeySelectedEventName = "event_delete_selected_event_name"
-)
+	eventDeleteCtxDataKeySelectedEventID   = "event_delete_ctx_data_selected_event_id"
+	eventDeleteCtxDataKeySelectedEventName = "event_delete_ctx_data_selected_event_name"
+	eventDeleteCtxDataKeyPreviousMessageID = "event_delete_ctx_data_previous_message_id"
+	eventDeleteCtxDataKeyPreviousChatID    = "event_delete_ctx_data_previous_chat_id"
 
-// Confirmation message options
-const (
-	eventDeleteConfirmYes = "да"
-	eventDeleteConfirmNo  = "нет"
+	// Callback data
+	eventDeleteCallbackConfirmCancel = "event_delete_callback_confirm_cancel"
+	eventDeleteCallbackConfirmYes    = "event_delete_callback_confirm_yes"
 )
 
 type eventDeleteHandler struct {
@@ -64,9 +65,12 @@ func NewEventDeleteHandler(
 		map[string][]ext.Handler{
 			eventDeleteStateSelectEvent: {
 				handlers.NewMessage(message.Text, h.handleSelectEvent),
+				handlers.NewCallback(callbackquery.Equal(eventDeleteCallbackConfirmCancel), h.handleCallbackCancel),
 			},
 			eventDeleteStateConfirm: {
-				handlers.NewMessage(message.Text, h.handleConfirmation),
+				handlers.NewCallback(callbackquery.Equal(eventDeleteCallbackConfirmYes), h.handleCallbackConfirmYes),
+				handlers.NewCallback(callbackquery.Equal(eventDeleteCallbackConfirmCancel), h.handleCallbackCancel),
+				handlers.NewMessage(message.Text, h.handleMessageDuringConfirmation),
 			},
 		},
 		&handlers.ConversationOpts{
@@ -101,8 +105,15 @@ func (h *eventDeleteHandler) startDelete(b *gotgbot.Bot, ctx *ext.Context) error
 	actionDescription := "которое ты хочешь удалить"
 	formattedResponse := formatters.FormatEventListForAdmin(events, title, constants.CancelCommand, actionDescription)
 
-	h.messageSenderService.ReplyMarkdown(msg, formattedResponse, nil)
+	sentMsg, _ := h.messageSenderService.ReplyMarkdownWithReturnMessage(
+		msg,
+		formattedResponse,
+		&gotgbot.SendMessageOpts{
+			ReplyMarkup: formatters.CancelButton(eventDeleteCallbackConfirmCancel),
+		},
+	)
 
+	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
 	return handlers.NextConversationState(eventDeleteStateSelectEvent)
 }
 
@@ -112,7 +123,7 @@ func (h *eventDeleteHandler) handleSelectEvent(b *gotgbot.Bot, ctx *ext.Context)
 	eventIDStr := strings.TrimSpace(strings.Replace(msg.Text, "/", "", 1))
 	eventID, err := strconv.Atoi(eventIDStr)
 	if err != nil {
-		h.messageSenderService.Reply(msg, fmt.Sprintf("Некорректный ID. Пожалуйста, введи числовой ID или /%s для отмены.", constants.CancelCommand), nil)
+		h.messageSenderService.Reply(msg, "Некорректный ID. Пожалуйста, введи числовой ID или используй кнопку для отмены.", nil)
 		return nil // Stay in the same state
 	}
 
@@ -138,11 +149,13 @@ func (h *eventDeleteHandler) handleSelectEvent(b *gotgbot.Bot, ctx *ext.Context)
 	if !found {
 		h.messageSenderService.Reply(
 			msg,
-			fmt.Sprintf("Мероприятие с ID %d не найдено. Пожалуйста, введи корректный ID или /%s для отмены.", eventID, constants.CancelCommand),
+			fmt.Sprintf("Мероприятие с ID %d не найдено. Пожалуйста, введи корректный ID или используй кнопку для отмены.", eventID),
 			nil,
 		)
 		return nil // Stay in the same state
 	}
+
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 
 	// Store event ID and name for confirmation
 	h.userStore.Set(ctx.EffectiveUser.Id, eventDeleteCtxDataKeySelectedEventID, eventID)
@@ -150,44 +163,45 @@ func (h *eventDeleteHandler) handleSelectEvent(b *gotgbot.Bot, ctx *ext.Context)
 
 	// Ask for confirmation
 	confirmMessage := fmt.Sprintf(
-		"Ты действительно хочешь удалить мероприятие '%s' (ID: %d)? Это также удалит все связанные с ним темы и вопросы.\n\nВведи 'да' для подтверждения или 'нет' для отмены (или используй /%s):",
-		eventName, eventID, constants.CancelCommand)
+		"Ты действительно хочешь удалить мероприятие '*%s*' (ID: %d)?\n\nЭто также удалит все связанные с ним темы и вопросы.",
+		eventName, eventID)
 
-	h.messageSenderService.Reply(msg, confirmMessage, nil)
+	sentMsg, _ := h.messageSenderService.ReplyMarkdownWithReturnMessage(
+		msg,
+		confirmMessage,
+		&gotgbot.SendMessageOpts{
+			ParseMode:   "Markdown",
+			ReplyMarkup: formatters.ConfirmAndCancelButton(eventDeleteCallbackConfirmYes, eventDeleteCallbackConfirmCancel),
+		},
+	)
 
+	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
 	return handlers.NextConversationState(eventDeleteStateConfirm)
 }
 
-// 3. handleConfirmation processes the user's confirmation to delete the event
-func (h *eventDeleteHandler) handleConfirmation(b *gotgbot.Bot, ctx *ext.Context) error {
-	msg := ctx.EffectiveMessage
-	confirmationText := strings.ToLower(strings.TrimSpace(msg.Text))
+// handleMessageDuringConfirmation handles text messages during the confirmation state
+func (h *eventDeleteHandler) handleMessageDuringConfirmation(b *gotgbot.Bot, ctx *ext.Context) error {
+	h.messageSenderService.Reply(
+		ctx.EffectiveMessage,
+		"Пожалуйста, используй кнопки выше для подтверждения или отмены.",
+		nil,
+	)
+	return nil // Stay in the same state
+}
 
-	// Check the confirmation
-	if confirmationText != eventDeleteConfirmYes && confirmationText != eventDeleteConfirmNo {
-		h.messageSenderService.Reply(
-			msg,
-			fmt.Sprintf(
-				"Пожалуйста, введи 'да' для подтверждения или 'нет' для отмены (или используй /%s):",
-				constants.CancelCommand,
-			),
-			nil,
-		)
-		return nil // Stay in the same state
-	}
+// handleCallbackConfirmYes processes the confirmation to delete the event
+func (h *eventDeleteHandler) handleCallbackConfirmYes(b *gotgbot.Bot, ctx *ext.Context) error {
+	// Answer the callback query to remove the loading state on the button
+	cb := ctx.Update.CallbackQuery
+	_, _ = cb.Answer(b, nil)
 
-	// If user said "no", cancel the operation
-	if confirmationText == eventDeleteConfirmNo {
-		h.messageSenderService.Reply(msg, "Операция удаления мероприятия отменена.", nil)
-		h.userStore.Clear(ctx.EffectiveUser.Id)
-		return handlers.EndConversation()
-	}
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 
 	// Get the selected event ID
 	eventIDVal, ok := h.userStore.Get(ctx.EffectiveUser.Id, eventDeleteCtxDataKeySelectedEventID)
 	if !ok {
 		h.messageSenderService.Reply(
-			msg,
+			ctx.EffectiveMessage,
 			fmt.Sprintf(
 				"Произошла ошибка при получении выбранного мероприятия. Пожалуйста, начни заново с /%s",
 				constants.EventDeleteCommand,
@@ -202,7 +216,7 @@ func (h *eventDeleteHandler) handleConfirmation(b *gotgbot.Bot, ctx *ext.Context
 	if !ok {
 		log.Println("Invalid event ID type:", eventIDVal)
 		h.messageSenderService.Reply(
-			msg,
+			ctx.EffectiveMessage,
 			fmt.Sprintf(
 				"Произошла внутренняя ошибка (неверный тип ID). Пожалуйста, начни заново с /%s",
 				constants.EventDeleteCommand,
@@ -224,13 +238,19 @@ func (h *eventDeleteHandler) handleConfirmation(b *gotgbot.Bot, ctx *ext.Context
 	// Delete the event
 	err := h.eventRepository.DeleteEvent(eventID)
 	if err != nil {
-		h.messageSenderService.Reply(msg, "Произошла ошибка при удалении мероприятия.", nil)
+		h.messageSenderService.Reply(ctx.EffectiveMessage, "Произошла ошибка при удалении мероприятия.", nil)
 		log.Printf("%s: Error during event deletion: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 
 	// Confirmation message
-	h.messageSenderService.Reply(msg, fmt.Sprintf("Мероприятие '%s' успешно удалено.", eventName), nil)
+	h.messageSenderService.ReplyMarkdown(
+		ctx.EffectiveMessage,
+		fmt.Sprintf("Мероприятие '*%s*' успешно удалено. \n\nДля просмотра всех команд используй команду /%s", eventName, constants.HelpCommand),
+		&gotgbot.SendMessageOpts{
+			ParseMode: "Markdown",
+		},
+	)
 
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)
@@ -238,13 +258,57 @@ func (h *eventDeleteHandler) handleConfirmation(b *gotgbot.Bot, ctx *ext.Context
 	return handlers.EndConversation()
 }
 
+// handleCallbackCancel processes the cancel button click
+func (h *eventDeleteHandler) handleCallbackCancel(b *gotgbot.Bot, ctx *ext.Context) error {
+	// Answer the callback query to remove the loading state on the button
+	cb := ctx.Update.CallbackQuery
+	_, _ = cb.Answer(b, nil)
+
+	return h.handleCancel(b, ctx)
+}
+
 // 4. handleCancel handles the /cancel command
 func (h *eventDeleteHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
+
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 	h.messageSenderService.Reply(msg, "Операция удаления мероприятия отменена.", nil)
 
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)
 
 	return handlers.EndConversation()
+}
+
+func (h *eventDeleteHandler) MessageRemoveInlineKeyboard(b *gotgbot.Bot, userID *int64) {
+	var chatID, messageID int64
+
+	// If userID provided, try to get stored message info
+	if userID != nil {
+		if val, ok := h.userStore.Get(*userID, eventDeleteCtxDataKeyPreviousMessageID); ok {
+			messageID = val.(int64)
+		}
+		if val, ok := h.userStore.Get(*userID, eventDeleteCtxDataKeyPreviousChatID); ok {
+			chatID = val.(int64)
+		}
+	}
+
+	// Skip if we don't have valid chat and message IDs
+	if chatID == 0 || messageID == 0 {
+		return
+	}
+
+	// Remove the inline keyboard
+	if _, _, err := b.EditMessageReplyMarkup(&gotgbot.EditMessageReplyMarkupOpts{
+		ChatId:      chatID,
+		MessageId:   messageID,
+		ReplyMarkup: gotgbot.InlineKeyboardMarkup{},
+	}); err != nil {
+		log.Printf("%s: Error removing inline keyboard: %v", utils.GetCurrentTypeName(), err)
+	}
+}
+
+func (h *eventDeleteHandler) SavePreviousMessageInfo(userID int64, sentMsg *gotgbot.Message) {
+	h.userStore.Set(userID, eventDeleteCtxDataKeyPreviousMessageID, sentMsg.MessageId)
+	h.userStore.Set(userID, eventDeleteCtxDataKeyPreviousChatID, sentMsg.Chat.Id)
 }
