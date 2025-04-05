@@ -26,7 +26,8 @@ type HandlerDependencies struct {
 	OpenAiClient                *clients.OpenAiClient
 	AppConfig                   *config.Config
 	SummarizationService        *services.SummarizationService
-	MessageSenderService        services.MessageSenderService
+	MessageSenderService        *services.MessageSenderService
+	PermissionsService          *services.PermissionsService
 	EventRepository             *repositories.EventRepository
 	TopicRepository             *repositories.TopicRepository
 	PromptingTemplateRepository *repositories.PromptingTemplateRepository
@@ -74,6 +75,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	promptingTemplateRepository := repositories.NewPromptingTemplateRepository(db.DB)
 	// Initialize services
 	messageSenderService := services.NewMessageSenderService(bot)
+	permissionsService := services.NewPermissionsService(appConfig, bot, messageSenderService)
 	summarizationService := services.NewSummarizationService(
 		appConfig, openaiClient, messageSenderService, promptingTemplateRepository,
 	)
@@ -99,6 +101,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 		AppConfig:                   appConfig,
 		SummarizationService:        summarizationService,
 		MessageSenderService:        messageSenderService,
+		PermissionsService:          permissionsService,
 		EventRepository:             eventRepository,
 		TopicRepository:             topicRepository,
 		PromptingTemplateRepository: promptingTemplateRepository,
@@ -127,34 +130,34 @@ func setupDatabase(connectionString string) (*database.DB, error) {
 // registerHandlers registers all bot handlers
 func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 	// Register start handler, that avaliable for all users
-	b.dispatcher.AddHandler(handlers.NewStartHandler(deps.AppConfig))
+	b.dispatcher.AddHandler(handlers.NewStartHandler(deps.AppConfig, deps.MessageSenderService, deps.PermissionsService))
 
 	// Register admin chat handlers
 	adminHandlers := []ext.Handler{
-		adminhandlers.NewCodeHandler(deps.AppConfig),
-		adminhandlers.NewTrySummarizeHandler(deps.SummarizationService, deps.MessageSenderService, deps.AppConfig),
-		adminhandlers.NewShowTopicsHandler(deps.TopicRepository, deps.EventRepository, deps.MessageSenderService, deps.AppConfig),
-		eventhandlers.NewEventEditHandler(deps.EventRepository, deps.AppConfig),
-		eventhandlers.NewEventSetupHandler(deps.EventRepository, deps.AppConfig),
-		eventhandlers.NewEventDeleteHandler(deps.EventRepository, deps.AppConfig),
-		eventhandlers.NewEventFinishHandler(deps.EventRepository, deps.AppConfig),
+		adminhandlers.NewCodeHandler(deps.AppConfig, deps.MessageSenderService, deps.PermissionsService),
+		adminhandlers.NewTrySummarizeHandler(deps.AppConfig, deps.SummarizationService, deps.MessageSenderService, deps.PermissionsService),
+		adminhandlers.NewShowTopicsHandler(deps.AppConfig, deps.TopicRepository, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
+		eventhandlers.NewEventEditHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
+		eventhandlers.NewEventSetupHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
+		eventhandlers.NewEventDeleteHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
+		eventhandlers.NewEventStartHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
 	}
 
 	// Register private chat handlers
 	privateHandlers := []ext.Handler{
-		privatehandlers.NewHelpHandler(deps.AppConfig),
-		privatehandlers.NewToolsHandler(deps.OpenAiClient, deps.MessageSenderService, deps.PromptingTemplateRepository, deps.AppConfig),
-		privatehandlers.NewContentHandler(deps.OpenAiClient, deps.MessageSenderService, deps.PromptingTemplateRepository, deps.AppConfig),
-		privatehandlers.NewEventsHandler(deps.EventRepository, deps.AppConfig),
-		topicshandlers.NewTopicsHandler(deps.TopicRepository, deps.EventRepository, deps.MessageSenderService, deps.AppConfig),
-		topicshandlers.NewTopicAddHandler(deps.TopicRepository, deps.EventRepository, deps.MessageSenderService, deps.AppConfig),
+		privatehandlers.NewHelpHandler(deps.AppConfig, deps.MessageSenderService, deps.PermissionsService),
+		privatehandlers.NewToolsHandler(deps.AppConfig, deps.OpenAiClient, deps.MessageSenderService, deps.PromptingTemplateRepository, deps.PermissionsService),
+		privatehandlers.NewContentHandler(deps.AppConfig, deps.OpenAiClient, deps.MessageSenderService, deps.PromptingTemplateRepository, deps.PermissionsService),
+		privatehandlers.NewEventsHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
+		topicshandlers.NewTopicsHandler(deps.AppConfig, deps.TopicRepository, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
+		topicshandlers.NewTopicAddHandler(deps.AppConfig, deps.TopicRepository, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
 	}
 
 	// Register group chat handlers
 	groupHandlers := []ext.Handler{
 		grouphandlers.NewDeleteJoinLeftMessagesHandler(),
-		grouphandlers.NewRepliesFromClosedThreadsHandler(deps.MessageSenderService, deps.AppConfig),
-		grouphandlers.NewCleanClosedThreadsHandler(deps.MessageSenderService, deps.AppConfig),
+		grouphandlers.NewRepliesFromClosedThreadsHandler(deps.AppConfig, deps.MessageSenderService),
+		grouphandlers.NewCleanClosedThreadsHandler(deps.AppConfig, deps.MessageSenderService),
 	}
 
 	// Combine all handlers

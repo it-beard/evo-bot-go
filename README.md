@@ -52,6 +52,12 @@ Run the bot with:
 go run main.go  
 ```
 
+Build the project:
+
+```shell
+go build main.go
+```
+
 Command for update dependencies:
 
 ```shell
@@ -203,3 +209,26 @@ To check for race conditions:
 ```shell
 go test -race ./...
 ```
+
+### Colored Test Output with gotestsum
+
+For better visibility with colored test output and icons, you can use gotestsum:
+
+```shell
+# Install gotestsum
+go install gotest.tools/gotestsum@latest
+
+# Run tests with colored output and icons
+gotestsum --format pkgname --format-icons hivis
+
+# If gotestsum is not in your PATH, run it directly
+go run gotest.tools/gotestsum@latest --format pkgname --format-icons hivis
+```
+
+For maximum detail with colors and icons:
+
+```shell
+go run gotest.tools/gotestsum@latest --format standard-verbose --format-icons hivis --packages=./... -- -v
+```
+
+This provides colored output with clear pass/fail indicators and detailed test information.

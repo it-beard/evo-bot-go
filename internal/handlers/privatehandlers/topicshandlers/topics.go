@@ -3,49 +3,60 @@ package topicshandlers
 import (
 	"context"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/repositories"
+	"evo-bot-go/internal/formatters"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/callbackquery"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/message"
 )
 
 const (
-	// Conversation states
-	topicsStateSelectEvent = "topics_select_event"
+	// Conversation states names
+	topicsStateSelectEvent = "topics_state_select_event"
 
-	// UserStore keys
-	topicsUserStoreKeyCancelFunc = "topics_cancel_func"
+	// Context data keys
+	topicsCtxDataKeyCancelFunc        = "topics_ctx_data_cancel_func"
+	topicsCtxDataKeyPreviousMessageID = "topics_ctx_data_previous_message_id"
+	topicsCtxDataKeyPreviousChatID    = "topics_ctx_data_previous_chat_id"
+
+	// Callback data
+	topicsCallbackConfirmCancel = "topics_callback_confirm_cancel"
 )
 
 type topicsHandler struct {
+	config               *config.Config
 	topicRepository      *repositories.TopicRepository
 	eventRepository      *repositories.EventRepository
-	messageSenderService services.MessageSenderService
-	config               *config.Config
+	messageSenderService *services.MessageSenderService
 	userStore            *utils.UserDataStore
+	permissionsService   *services.PermissionsService
 }
 
 func NewTopicsHandler(
+	config *config.Config,
 	topicRepository *repositories.TopicRepository,
 	eventRepository *repositories.EventRepository,
-	messageSenderService services.MessageSenderService,
-	config *config.Config,
+	messageSenderService *services.MessageSenderService,
+	permissionsService *services.PermissionsService,
 ) ext.Handler {
 	h := &topicsHandler{
+		config:               config,
 		topicRepository:      topicRepository,
 		eventRepository:      eventRepository,
 		messageSenderService: messageSenderService,
-		config:               config,
 		userStore:            utils.NewUserDataStore(),
+		permissionsService:   permissionsService,
 	}
 
 	return handlers.NewConversation(
@@ -55,6 +66,7 @@ func NewTopicsHandler(
 		map[string][]ext.Handler{
 			topicsStateSelectEvent: {
 				handlers.NewMessage(message.All, h.handleEventSelection),
+				handlers.NewCallback(callbackquery.Equal(topicsCallbackConfirmCancel), h.handleCallbackCancel),
 			},
 		},
 		&handlers.ConversationOpts{
@@ -68,50 +80,57 @@ func (h *topicsHandler) startTopics(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
 	// Only proceed if this is a private chat
-	if !utils.CheckPrivateChatType(b, ctx) {
+	if !h.permissionsService.CheckPrivateChatType(msg) {
 		return handlers.EndConversation()
 	}
 
 	// Check if user is a club member
-	if !utils.CheckClubMemberPermissions(b, msg, h.config, constants.TopicsCommand) {
+	if !h.permissionsService.CheckClubMemberPermissions(msg, constants.TopicsCommand) {
 		return handlers.EndConversation()
 	}
 
 	// Get last actual events to show for selection
 	events, err := h.eventRepository.GetLastActualEvents(10)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Ошибка при получении списка мероприятий.", err)
+		h.messageSenderService.Reply(msg, "Ошибка при получении списка мероприятий.", nil)
+		log.Printf("TopicsHandler: Error during events retrieval: %v", err)
 		return handlers.EndConversation()
 	}
 
 	if len(events) == 0 {
-		utils.SendLoggedReply(b, msg, "Нет доступных мероприятий для просмотра тем и вопросов.", nil)
+		h.messageSenderService.Reply(msg, "Нет доступных мероприятий для просмотра тем и вопросов.", nil)
 		return handlers.EndConversation()
 	}
 
 	// Format and display event list for selection
-	formattedEvents := utils.FormatEventListForUsers(
+	formattedEvents := formatters.FormatEventListForUsers(
 		events,
-		fmt.Sprintf("Выбери ID мероприятия, для которого ты хочешь увидеть темы и вопросы, либо жми /%s для отмены диалога", constants.CancelCommand),
+		fmt.Sprintf("Выбери ID мероприятия, для которого ты хочешь увидеть темы и вопросы"),
 	)
 
-	utils.SendLoggedMarkdownReply(b, msg, formattedEvents, nil)
+	sentMsg, _ := h.messageSenderService.ReplyMarkdownWithReturnMessage(
+		msg,
+		formattedEvents,
+		&gotgbot.SendMessageOpts{
+			ReplyMarkup: formatters.CancelButton(topicsCallbackConfirmCancel),
+		},
+	)
 
+	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
 	return handlers.NextConversationState(topicsStateSelectEvent)
 }
 
 // 2. handleEventSelection processes the user's event selection
 func (h *topicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
-	userInput := strings.TrimSpace(msg.Text)
+	userInput := strings.TrimSpace(strings.Replace(msg.Text, "/", "", 1))
 
 	// Check if the input is a valid event ID
 	eventID, err := strconv.Atoi(userInput)
 	if err != nil {
-		utils.SendLoggedReply(
-			b,
+		h.messageSenderService.Reply(
 			msg,
-			fmt.Sprintf("Пожалуйста, отправь корректный ID мероприятия или /%s для отмены.", constants.CancelCommand),
+			fmt.Sprintf("Пожалуйста, отправь корректный ID мероприятия или используй /%s для отмены.", constants.CancelCommand),
 			nil,
 		)
 		return nil // Stay in the same state
@@ -120,27 +139,41 @@ func (h *topicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Context) e
 	// Get the event information
 	event, err := h.eventRepository.GetEventByID(eventID)
 	if err != nil {
-		utils.SendLoggedReply(
-			b,
+		h.messageSenderService.Reply(
 			msg,
 			fmt.Sprintf("Не удалось найти мероприятие с ID %d. Пожалуйста, проверь ID.", eventID),
-			err,
+			nil,
 		)
+		log.Printf("TopicsHandler: Error during event retrieval: %v", err)
 		return nil // Stay in the same state
 	}
 
 	// Get topics for this event
 	topics, err := h.topicRepository.GetTopicsByEventID(eventID)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Ошибка при получении тем и вопросов для выбранного мероприятия.", err)
+		h.messageSenderService.Reply(msg, "Ошибка при получении тем и вопросов для выбранного мероприятия.", nil)
+		log.Printf("TopicsHandler: Error during topics retrieval: %v", err)
 		return handlers.EndConversation()
 	}
 
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 	// Format and display topics
-	formattedTopics := utils.FormatTopicListForUsers(topics, event.Name, event.Type)
-	utils.SendLoggedMarkdownReply(b, msg, formattedTopics, nil)
+	formattedTopics := formatters.FormatTopicListForUsers(topics, event.Name, event.Type)
+	h.messageSenderService.ReplyMarkdown(msg, formattedTopics, nil)
+
+	// Clean up user data
+	h.userStore.Clear(ctx.EffectiveUser.Id)
 
 	return handlers.EndConversation()
+}
+
+// handleCallbackCancel processes the cancel button click
+func (h *topicsHandler) handleCallbackCancel(b *gotgbot.Bot, ctx *ext.Context) error {
+	// Answer the callback query to remove the loading state on the button
+	cb := ctx.Update.CallbackQuery
+	_, _ = cb.Answer(b, nil)
+
+	return h.handleCancel(b, ctx)
 }
 
 // 3. handleCancel handles the /cancel command
@@ -148,18 +181,46 @@ func (h *topicsHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
 	// Check if there's an ongoing operation to cancel
-	if cancelFunc, ok := h.userStore.Get(ctx.EffectiveUser.Id, topicsUserStoreKeyCancelFunc); ok {
+	if cancelFunc, ok := h.userStore.Get(ctx.EffectiveUser.Id, topicsCtxDataKeyCancelFunc); ok {
 		// Call the cancel function to stop any ongoing API calls
 		if cf, ok := cancelFunc.(context.CancelFunc); ok {
 			cf()
-			utils.SendLoggedReply(b, msg, "Операция просмотра тем отменена.", nil)
+			h.messageSenderService.Reply(msg, "Операция просмотра тем отменена.", nil)
 		}
 	} else {
-		utils.SendLoggedReply(b, msg, "Операция просмотра тем отменена.", nil)
+		h.messageSenderService.Reply(msg, "Операция просмотра тем отменена.", nil)
 	}
+
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)
 
 	return handlers.EndConversation()
+}
+
+func (h *topicsHandler) MessageRemoveInlineKeyboard(b *gotgbot.Bot, userID *int64) {
+	var chatID, messageID int64
+
+	// If userID provided, get stored message info using the utility method
+	if userID != nil {
+		messageID, chatID = h.userStore.GetPreviousMessageInfo(
+			*userID,
+			topicsCtxDataKeyPreviousMessageID,
+			topicsCtxDataKeyPreviousChatID,
+		)
+	}
+
+	// Skip if we don't have valid chat and message IDs
+	if chatID == 0 || messageID == 0 {
+		return
+	}
+
+	// Use message sender service to remove the inline keyboard
+	_ = h.messageSenderService.RemoveInlineKeyboard(chatID, messageID)
+}
+
+func (h *topicsHandler) SavePreviousMessageInfo(userID int64, sentMsg *gotgbot.Message) {
+	h.userStore.SetPreviousMessageInfo(userID, sentMsg.MessageId, sentMsg.Chat.Id,
+		topicsCtxDataKeyPreviousMessageID, topicsCtxDataKeyPreviousChatID)
 }

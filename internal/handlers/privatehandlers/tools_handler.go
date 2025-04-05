@@ -14,45 +14,55 @@ import (
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/prompts"
 	"evo-bot-go/internal/database/repositories"
+	"evo-bot-go/internal/formatters"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/callbackquery"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/message"
 	"github.com/gotd/td/tg"
 )
 
 const (
-	// Conversation states
-	stateProcessToolQuery = "process_tool_query"
+	// Conversation states names
+	toolsStateStartToolSearch = "tools_state_start_tool_search"
 
-	// UserStore keys
-	userStoreKeyProcessing = "is_processing"
-	userStoreKeyCancelFunc = "cancel_func"
+	// Context data keys
+	toolsUserCtxDataKeyProcessing        = "tools_user_ctx_data_key_processing"
+	toolsUserCtxDataKeyCancelFunc        = "tools_user_ctx_data_key_cancel_func"
+	toolsUserCtxDataKeyPreviousMessageID = "tools_user_ctx_data_key_previous_message_id"
+	toolsUserCtxDataKeyPreviousChatID    = "tools_user_ctx_data_key_previous_chat_id"
+
+	// Callback data
+	toolsCallbackConfirmCancel = "tools_callback_confirm_cancel"
 )
 
 type toolsHandler struct {
-	openaiClient                *clients.OpenAiClient
 	config                      *config.Config
+	openaiClient                *clients.OpenAiClient
 	promptingTemplateRepository *repositories.PromptingTemplateRepository
-	messageSenderService        services.MessageSenderService
+	messageSenderService        *services.MessageSenderService
 	userStore                   *utils.UserDataStore
+	permissionsService          *services.PermissionsService
 }
 
 func NewToolsHandler(
-	openaiClient *clients.OpenAiClient,
-	messageSenderService services.MessageSenderService,
-	promptingTemplateRepository *repositories.PromptingTemplateRepository,
 	config *config.Config,
+	openaiClient *clients.OpenAiClient,
+	messageSenderService *services.MessageSenderService,
+	promptingTemplateRepository *repositories.PromptingTemplateRepository,
+	permissionsService *services.PermissionsService,
 ) ext.Handler {
 	h := &toolsHandler{
-		openaiClient:                openaiClient,
 		config:                      config,
+		openaiClient:                openaiClient,
 		promptingTemplateRepository: promptingTemplateRepository,
 		messageSenderService:        messageSenderService,
 		userStore:                   utils.NewUserDataStore(),
+		permissionsService:          permissionsService,
 	}
 
 	return handlers.NewConversation(
@@ -60,8 +70,9 @@ func NewToolsHandler(
 			handlers.NewCommand(constants.ToolsCommand, h.startToolSearch),
 		},
 		map[string][]ext.Handler{
-			stateProcessToolQuery: {
+			toolsStateStartToolSearch: {
 				handlers.NewMessage(message.All, h.processToolSearch),
+				handlers.NewCallback(callbackquery.Equal(toolsCallbackConfirmCancel), h.handleCallbackCancel),
 			},
 		},
 		&handlers.ConversationOpts{
@@ -75,19 +86,26 @@ func (h *toolsHandler) startToolSearch(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
 	// Only proceed if this is a private chat
-	if !utils.CheckPrivateChatType(b, ctx) {
+	if !h.permissionsService.CheckPrivateChatType(msg) {
 		return handlers.EndConversation()
 	}
 
 	// Check if user is a club member
-	if !utils.CheckClubMemberPermissions(b, msg, h.config, constants.ToolsCommand) {
+	if !h.permissionsService.CheckClubMemberPermissions(msg, constants.ToolsCommand) {
 		return handlers.EndConversation()
 	}
 
 	// Ask user to enter search query
-	utils.SendLoggedReply(b, msg, fmt.Sprintf("Введите поисковый запрос по инструментам или используйте /%s для отмены:", constants.CancelCommand), nil)
+	sentMsg, _ := h.messageSenderService.ReplyWithReturnMessage(
+		msg,
+		fmt.Sprintf("Введите поисковый запрос по инструментам:"),
+		&gotgbot.SendMessageOpts{
+			ReplyMarkup: formatters.CancelButton(toolsCallbackConfirmCancel),
+		},
+	)
 
-	return handlers.NextConversationState(stateProcessToolQuery)
+	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
+	return handlers.NextConversationState(toolsStateStartToolSearch)
 }
 
 // 2. processToolSearch handles the actual tool search
@@ -95,11 +113,10 @@ func (h *toolsHandler) processToolSearch(b *gotgbot.Bot, ctx *ext.Context) error
 	msg := ctx.EffectiveMessage
 
 	// Check if we're already processing a request for this user
-	if isProcessing, ok := h.userStore.Get(ctx.EffectiveUser.Id, userStoreKeyProcessing); ok && isProcessing.(bool) {
-		utils.SendLoggedReply(
-			b,
+	if isProcessing, ok := h.userStore.Get(ctx.EffectiveUser.Id, toolsUserCtxDataKeyProcessing); ok && isProcessing.(bool) {
+		h.messageSenderService.Reply(
 			msg,
-			fmt.Sprintf("Пожалуйста, дождитесь окончания обработки предыдущего запроса, или используйте /%s для отмены:", constants.CancelCommand),
+			fmt.Sprintf("Пожалуйста, дождитесь окончания обработки предыдущего запроса, или используйте /%s для отмены.", constants.CancelCommand),
 			nil,
 		)
 		return nil // Stay in the same state
@@ -108,32 +125,35 @@ func (h *toolsHandler) processToolSearch(b *gotgbot.Bot, ctx *ext.Context) error
 	// Get query from user message
 	query := strings.TrimSpace(msg.Text)
 	if query == "" {
-		utils.SendLoggedReply(
-			b,
+		h.messageSenderService.Reply(
 			msg,
-			fmt.Sprintf("Поисковый запрос не может быть пустым. Пожалуйста, введите запрос или используйте /%s для отмены:", constants.CancelCommand),
+			fmt.Sprintf("Поисковый запрос не может быть пустым. Пожалуйста, введите запрос или используйте /%s для отмены.", constants.CancelCommand),
 			nil,
 		)
 		return nil // Stay in the same state
 	}
 
 	// Mark as processing
-	h.userStore.Set(ctx.EffectiveUser.Id, userStoreKeyProcessing, true)
+	h.userStore.Set(ctx.EffectiveUser.Id, toolsUserCtxDataKeyProcessing, true)
 
 	// Create a cancellable context for this operation
 	typingCtx, cancelTyping := context.WithCancel(context.Background())
 
 	// Store cancel function in user store so it can be called from handleCancel
-	h.userStore.Set(ctx.EffectiveUser.Id, userStoreKeyCancelFunc, cancelTyping)
+	h.userStore.Set(ctx.EffectiveUser.Id, toolsUserCtxDataKeyCancelFunc, cancelTyping)
 
 	// Make sure we clean up the processing flag in all exit paths
 	defer func() {
-		h.userStore.Set(ctx.EffectiveUser.Id, userStoreKeyProcessing, false)
-		h.userStore.Set(ctx.EffectiveUser.Id, userStoreKeyCancelFunc, nil)
+		h.userStore.Set(ctx.EffectiveUser.Id, toolsUserCtxDataKeyProcessing, false)
+		h.userStore.Set(ctx.EffectiveUser.Id, toolsUserCtxDataKeyCancelFunc, nil)
 	}()
 
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 	// Inform user that search has started
-	utils.SendLoggedReply(b, msg, fmt.Sprintf("Ищу информацию по запросу: \"%s\"...", query), nil)
+	sentMsg, _ := h.messageSenderService.ReplyWithReturnMessage(msg, fmt.Sprintf("Ищу информацию по запросу: \"%s\"...", query), &gotgbot.SendMessageOpts{
+		ReplyMarkup: formatters.CancelButton(toolsCallbackConfirmCancel),
+	})
+	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
 
 	// Send typing action using MessageSender.
 	h.messageSenderService.SendTypingAction(msg.Chat.Id)
@@ -141,13 +161,15 @@ func (h *toolsHandler) processToolSearch(b *gotgbot.Bot, ctx *ext.Context) error
 	// Get messages from chat
 	messages, err := clients.GetChatMessages(h.config.SuperGroupChatID, h.config.ToolTopicID)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Произошла ошибка при получении сообщений из чата.", err)
+		h.messageSenderService.Reply(msg, "Произошла ошибка при получении сообщений из чата.", nil)
+		log.Printf("ToolsHandler: Error during messages retrieval: %v", err)
 		return handlers.EndConversation()
 	}
 
 	dataMessages, err := h.prepareTelegramMessages(messages)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Произошла ошибка при подготовке сообщений для поиска.", err)
+		h.messageSenderService.Reply(msg, "Произошла ошибка при подготовке сообщений для поиска.", nil)
+		log.Printf("ToolsHandler: Error during messages preparation: %v", err)
 		return handlers.EndConversation()
 	}
 
@@ -155,7 +177,8 @@ func (h *toolsHandler) processToolSearch(b *gotgbot.Bot, ctx *ext.Context) error
 
 	templateText, err := h.promptingTemplateRepository.Get(prompts.GetToolPromptTemplateDbKey)
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Произошла ошибка при получении шаблона для поиска инструментов.", err)
+		h.messageSenderService.Reply(msg, "Произошла ошибка при получении шаблона для поиска инструментов.", nil)
+		log.Printf("ToolsHandler: Error during template retrieval: %v", err)
 		return handlers.EndConversation()
 	}
 
@@ -198,32 +221,45 @@ func (h *toolsHandler) processToolSearch(b *gotgbot.Bot, ctx *ext.Context) error
 
 	// Continue only if no errors
 	if err != nil {
-		utils.SendLoggedReply(b, msg, "Произошла ошибка при получении ответа от OpenAI.", err)
+		h.messageSenderService.Reply(msg, "Произошла ошибка при получении ответа от OpenAI.", nil)
+		log.Printf("ToolsHandler: Error during OpenAI response retrieval: %v", err)
 		return handlers.EndConversation()
 	}
 
-	utils.SendLoggedMarkdownReply(b, msg, responseOpenAi, nil)
+	h.messageSenderService.ReplyMarkdown(msg, responseOpenAi, nil)
 
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)
 
 	return handlers.EndConversation()
 }
 
-// 3. handleCancel handles the /cancel command
+// handleCallbackCancel processes the cancel button click
+func (h *toolsHandler) handleCallbackCancel(b *gotgbot.Bot, ctx *ext.Context) error {
+	// Answer the callback query to remove the loading state on the button
+	cb := ctx.Update.CallbackQuery
+	_, _ = cb.Answer(b, nil)
+
+	return h.handleCancel(b, ctx)
+}
+
+// handleCancel handles the /cancel command
 func (h *toolsHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
 	// Check if there's an ongoing operation to cancel
-	if cancelFunc, ok := h.userStore.Get(ctx.EffectiveUser.Id, userStoreKeyCancelFunc); ok {
+	if cancelFunc, ok := h.userStore.Get(ctx.EffectiveUser.Id, toolsUserCtxDataKeyCancelFunc); ok {
 		// Call the cancel function to stop any ongoing API calls
 		if cf, ok := cancelFunc.(context.CancelFunc); ok {
 			cf()
-			utils.SendLoggedReply(b, msg, "Операция поиска инструментов отменена.", nil)
+			h.messageSenderService.Reply(msg, "Операция поиска инструментов отменена.", nil)
 		}
 	} else {
-		utils.SendLoggedReply(b, msg, "Операция поиска инструментов отменена.", nil)
+		h.messageSenderService.Reply(msg, "Операция поиска инструментов отменена.", nil)
 	}
+
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)
@@ -259,4 +295,30 @@ func (h *toolsHandler) prepareTelegramMessages(messages []tg.Message) ([]byte, e
 	}
 
 	return dataMessages, nil
+}
+
+func (h *toolsHandler) MessageRemoveInlineKeyboard(b *gotgbot.Bot, userID *int64) {
+	var chatID, messageID int64
+
+	// If userID provided, get stored message info using the utility method
+	if userID != nil {
+		messageID, chatID = h.userStore.GetPreviousMessageInfo(
+			*userID,
+			toolsUserCtxDataKeyPreviousMessageID,
+			toolsUserCtxDataKeyPreviousChatID,
+		)
+	}
+
+	// Skip if we don't have valid chat and message IDs
+	if chatID == 0 || messageID == 0 {
+		return
+	}
+
+	// Use message sender service to remove the inline keyboard
+	_ = h.messageSenderService.RemoveInlineKeyboard(chatID, messageID)
+}
+
+func (h *toolsHandler) SavePreviousMessageInfo(userID int64, sentMsg *gotgbot.Message) {
+	h.userStore.SetPreviousMessageInfo(userID, sentMsg.MessageId, sentMsg.Chat.Id,
+		toolsUserCtxDataKeyPreviousMessageID, toolsUserCtxDataKeyPreviousChatID)
 }

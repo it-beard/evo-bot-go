@@ -1,4 +1,4 @@
-package utils
+package formatters
 
 import (
 	"fmt"
@@ -30,7 +30,7 @@ func FormatEventListForUsers(events []repositories.Event, title string) string {
 		}
 
 		response.WriteString(fmt.Sprintf("\n%s _%s_: *%s*\n", typeEmoji, event.Type, event.Name))
-		response.WriteString(fmt.Sprintf("└ _ID_ `%d`, _дата проведения_: %s\n",
+		response.WriteString(fmt.Sprintf("└ _ID_ /%d, _дата проведения_: %s\n",
 			event.ID, startedAtStr))
 	}
 
@@ -86,13 +86,12 @@ func FormatEventListForAdmin(events []repositories.Event, title string, cancelCo
 			statusEmoji = "🔄"
 		}
 
-		response.WriteString(fmt.Sprintf("\nID `%d`: *%s*\n", event.ID, event.Name))
+		response.WriteString(fmt.Sprintf("\nID /%d: *%s*\n", event.ID, event.Name))
 		response.WriteString(fmt.Sprintf("└ %s, тип: _%s_, старт: _%s_\n",
 			statusEmoji, event.Type, startedAtStr))
 	}
 
-	response.WriteString(fmt.Sprintf("\nПожалуйста, отправь ID мероприятия, %s, или /%s для отмены.",
-		actionDescription, cancelCommand))
+	response.WriteString(fmt.Sprintf("\nПожалуйста, отправь ID мероприятия, %s.", actionDescription))
 
 	return response.String()
 }
@@ -127,6 +126,14 @@ func FormatTopicListForUsers(topics []repositories.Topic, eventName string, even
 				response.WriteString("\n")
 			}
 		}
+
+		response.WriteString(
+			fmt.Sprintf(
+				"\n\nИспользуй команду /%s для добавления новых тем и вопросов, либо /%s для просмотра тем и вопросов к другому мероприятию.",
+				constants.TopicAddCommand,
+				constants.TopicsCommand,
+			),
+		)
 	}
 
 	return response.String()
