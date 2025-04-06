@@ -170,7 +170,7 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 	title := fmt.Sprintf("📋 Сводка чата <b>\"%s\"</b> за %s", topicName, dateNowWithMonth)
 	finalSummary := fmt.Sprintf("%s\n\n%s", title, summary)
 
-	// Determine the target topic ID
+	// Determine the target chat ID and options with summary topic ID
 	var targetChatID int64 = int64(s.config.SuperGroupChatID)
 	var opts *gotgbot.SendMessageOpts = &gotgbot.SendMessageOpts{
 		MessageThreadId: int64(s.config.SummaryTopicID),
