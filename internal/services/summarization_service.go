@@ -14,6 +14,7 @@ import (
 	"evo-bot-go/internal/database/repositories"
 	"evo-bot-go/internal/utils"
 
+	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/gotd/td/tg"
 )
 
@@ -170,18 +171,22 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 	finalSummary := fmt.Sprintf("%s\n\n%s", title, summary)
 
 	// Determine the target topic ID
-	var targetTopicID int64 = int64(s.config.SummaryTopicID)
+	var targetChatID int64 = int64(s.config.SuperGroupChatID)
+	var opts *gotgbot.SendMessageOpts = &gotgbot.SendMessageOpts{
+		MessageThreadId: int64(s.config.SummaryTopicID),
+	}
 	if sendToDM {
 		// If sendToDM is true, try to get the user ID from context
 		if userID, ok := ctx.Value("userID").(int64); ok {
-			targetTopicID = userID
+			targetChatID = userID
+			opts = nil
 		} else {
 			log.Printf("%s: Warning: sendToDM is true but userID not found in context, using SummaryTopicID instead", utils.GetCurrentTypeName())
 		}
 	}
 
 	// Send the summary to the target chat
-	s.messageSenderService.SendHtml(targetTopicID, finalSummary, nil)
+	s.messageSenderService.SendHtml(targetChatID, finalSummary, opts)
 
 	log.Printf("%s: Summary sent successfully", utils.GetCurrentTypeName())
 	return nil
