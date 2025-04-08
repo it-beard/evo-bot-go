@@ -166,7 +166,7 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 	}
 
 	// Format the final summary message using the title format from the prompts package
-	dateNowWithMonth := time.Now().Format("01.02.2006")
+	dateNowWithMonth := time.Now().Format("02.01.2006")
 	title := fmt.Sprintf("📋 Сводка чата <b>\"%s\"</b> за %s", topicName, dateNowWithMonth)
 	finalSummary := fmt.Sprintf("%s\n\n%s", title, summary)
 

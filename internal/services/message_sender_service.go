@@ -2,9 +2,11 @@ package services
 
 import (
 	"evo-bot-go/internal/utils"
+	"fmt"
 	"log"
 	"math/rand"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -42,7 +44,14 @@ func (s *MessageSenderService) SendWithReturnMessage(chatId int64, text string, 
 	sentMsg, err := s.bot.SendMessage(chatId, text, opts)
 
 	if err != nil {
-		log.Printf("%s: Send: Failed to send message: %v", utils.GetCurrentTypeName(), err)
+		// If topic is closed, try to reopen it and send again
+		if s.isTopicClosedError(err) && opts != nil && opts.MessageThreadId != 0 {
+			sentMsg, err = s.handleClosedTopicReturnMessage(chatId, text, opts, "SendWithReturnMessage", err)
+		}
+
+		if err != nil {
+			log.Printf("%s: Send: Failed to send message: %v", utils.GetCurrentTypeName(), err)
+		}
 	}
 
 	return sentMsg, err
@@ -71,7 +80,14 @@ func (s *MessageSenderService) SendMarkdown(chatId int64, text string, opts *got
 	_, err := s.bot.SendMessage(chatId, text, opts)
 
 	if err != nil {
-		log.Printf("%s: SendMarkdown: Failed to send message: %v", utils.GetCurrentTypeName(), err)
+		// If topic is closed, try to reopen it and send again
+		if s.isTopicClosedError(err) && opts != nil && opts.MessageThreadId != 0 {
+			err = s.handleClosedTopic(chatId, text, opts, "SendMarkdown", err)
+		}
+
+		if err != nil {
+			log.Printf("%s: SendMarkdown: Failed to send message: %v", utils.GetCurrentTypeName(), err)
+		}
 	}
 
 	return err
@@ -100,7 +116,14 @@ func (s *MessageSenderService) SendMarkdownWithReturnMessage(chatId int64, text 
 	sentMsg, err := s.bot.SendMessage(chatId, text, opts)
 
 	if err != nil {
-		log.Printf("%s: SendMarkdownWithReturnMessage: Failed to send message: %v", utils.GetCurrentTypeName(), err)
+		// If topic is closed, try to reopen it and send again
+		if s.isTopicClosedError(err) && opts != nil && opts.MessageThreadId != 0 {
+			sentMsg, err = s.handleClosedTopicReturnMessage(chatId, text, opts, "SendMarkdownWithReturnMessage", err)
+		}
+
+		if err != nil {
+			log.Printf("%s: SendMarkdownWithReturnMessage: Failed to send message: %v", utils.GetCurrentTypeName(), err)
+		}
 	}
 
 	return sentMsg, err
@@ -129,7 +152,14 @@ func (s *MessageSenderService) SendHtml(chatId int64, text string, opts *gotgbot
 	_, err := s.bot.SendMessage(chatId, text, opts)
 
 	if err != nil {
-		log.Printf("%s: SendHtml: Failed to send message: %v", utils.GetCurrentTypeName(), err)
+		// If topic is closed, try to reopen it and send again
+		if s.isTopicClosedError(err) && opts != nil && opts.MessageThreadId != 0 {
+			err = s.handleClosedTopic(chatId, text, opts, "SendHtml", err)
+		}
+
+		if err != nil {
+			log.Printf("%s: SendHtml: Failed to send message: %v", utils.GetCurrentTypeName(), err)
+		}
 	}
 
 	return err
@@ -472,4 +502,42 @@ func (s *MessageSenderService) PinMessageWithNotification(chatID int64, messageI
 	}
 
 	return err
+}
+
+func (s *MessageSenderService) isTopicClosedError(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "TOPIC_CLOSED")
+}
+
+func (s *MessageSenderService) handleClosedTopic(chatId int64, text string, opts *gotgbot.SendMessageOpts, methodName string, originalErr error) error {
+	_, err := s.handleClosedTopicReturnMessage(chatId, text, opts, methodName, originalErr)
+	return err
+}
+
+func (s *MessageSenderService) handleClosedTopicReturnMessage(chatId int64, text string, opts *gotgbot.SendMessageOpts, methodName string, originalErr error) (*gotgbot.Message, error) {
+	log.Printf("%s: %s: Topic is closed, attempting to reopen it", utils.GetCurrentTypeName(), methodName)
+
+	// Try to reopen the topic
+	_, reopenErr := s.bot.ReopenForumTopic(chatId, opts.MessageThreadId, nil)
+	if reopenErr != nil {
+		log.Printf("%s: %s: Failed to reopen topic: %v", utils.GetCurrentTypeName(), methodName, reopenErr)
+		return nil, fmt.Errorf("failed to reopen topic and send message: %w", originalErr)
+	}
+
+	// Try sending the message again
+	sentMsg, err := s.bot.SendMessage(chatId, text, opts)
+
+	// Close the topic again to maintain its original state
+	_, closeErr := s.bot.CloseForumTopic(chatId, opts.MessageThreadId, nil)
+	if closeErr != nil {
+		log.Printf("%s: %s: Warning: Failed to close topic after sending message: %v", utils.GetCurrentTypeName(), methodName, closeErr)
+		// We don't return an error here as the message was sent successfully
+	} else {
+		log.Printf("%s: %s: Topic closed successfully after sending message", utils.GetCurrentTypeName(), methodName)
+	}
+
+	if err != nil {
+		log.Printf("%s: %s: Failed to send message after reopening topic: %v", utils.GetCurrentTypeName(), methodName, err)
+		return nil, err
+	}
+	return sentMsg, nil
 }
