@@ -49,11 +49,22 @@ func (s *SummarizationService) RunDailySummarization(ctx context.Context, sendTo
 	since := time.Now().Add(-24 * time.Hour)
 
 	// Process each monitored topic
-	for _, topicID := range s.config.MonitoredTopicsIDs {
+	for i, topicID := range s.config.MonitoredTopicsIDs {
 		if err := s.summarizeTopicMessages(ctx, topicID, since, sendToDM); err != nil {
 			log.Printf("%s: Error summarizing topic %d: %v", utils.GetCurrentTypeName(), topicID, err)
 			// Continue with other chats even if one fails
 			continue
+		}
+
+		// Add delay between topics to avoid rate limiting (except after the last topic)
+		if i < len(s.config.MonitoredTopicsIDs)-1 {
+			log.Printf("%s: Waiting 20 seconds before processing next topic to avoid rate limiting", utils.GetCurrentTypeName())
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(20 * time.Second):
+				// Continue after delay
+			}
 		}
 	}
 
@@ -72,9 +83,43 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 	// Calculate hours since the given time
 	hoursSince := int(time.Since(since).Hours()) + 1 // Add 1 to ensure we get all messages since 'since' time
 
-	// Get messages directly from Telegram instead of database
-	tgMessages, err := clients.GetLastTopicMessagesByTime(s.config.SuperGroupChatID, topicID, hoursSince)
-	if err != nil {
+	// Get messages directly from Telegram with retry logic for rate limiting
+	var tgMessages []tg.Message
+	maxRetries := 3
+	for retry := 0; retry < maxRetries; retry++ {
+		tgMessages, err = clients.GetLastTopicMessagesByTime(s.config.SuperGroupChatID, topicID, hoursSince)
+		if err == nil {
+			break
+		}
+
+		// Check if it's a FLOOD_WAIT error
+		if retry < maxRetries-1 && err.Error() != "" {
+			errStr := err.Error()
+			if floodWaitIndex := utils.IndexAny(errStr, "FLOOD_WAIT"); floodWaitIndex != -1 {
+				// Try to extract wait time from error message (format: "FLOOD_WAIT (seconds)")
+				waitTimeStr := utils.ExtractNumber(errStr[floodWaitIndex:])
+				waitTime := 10 // Default wait time in seconds
+				if extractedTime, err := strconv.Atoi(waitTimeStr); err == nil && extractedTime > 0 {
+					waitTime = extractedTime
+				}
+
+				// Add buffer to required wait time
+				waitTime += 10
+
+				log.Printf("%s: Hit rate limit for topic %d, waiting %d seconds before retry %d/%d",
+					utils.GetCurrentTypeName(), topicID, waitTime, retry+1, maxRetries)
+
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(time.Duration(waitTime) * time.Second):
+					// Continue after waiting
+					continue
+				}
+			}
+		}
+
+		// If we got here, it's not a rate limit error or we've exceeded retries
 		return fmt.Errorf("%s: failed to get messages from Telegram: %w", utils.GetCurrentTypeName(), err)
 	}
 
