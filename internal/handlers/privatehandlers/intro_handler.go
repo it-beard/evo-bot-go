@@ -22,10 +22,14 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/callbackquery"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/message"
 	"github.com/gotd/td/tg"
 )
 
 const (
+	// Conversation states names
+	introStateProcessQuery = "intro_state_process_query"
+
 	// UserStore keys
 	introCtxDataKeyProcessing        = "intro_ctx_data_processing"
 	introCtxDataKeyCancelFunc        = "intro_ctx_data_cancel_func"
@@ -63,9 +67,14 @@ func NewIntroHandler(
 
 	return handlers.NewConversation(
 		[]ext.Handler{
-			handlers.NewCommand(constants.IntroCommand, h.handleIntro),
+			handlers.NewCommand(constants.IntroCommand, h.startIntroSearch),
 		},
-		map[string][]ext.Handler{},
+		map[string][]ext.Handler{
+			introStateProcessQuery: {
+				handlers.NewMessage(message.All, h.processIntroSearch),
+				handlers.NewCallback(callbackquery.Equal(introCallbackConfirmCancel), h.handleCallbackCancel),
+			},
+		},
 		&handlers.ConversationOpts{
 			Exits: []ext.Handler{
 				handlers.NewCommand(constants.CancelCommand, h.handleCancel),
@@ -75,19 +84,36 @@ func NewIntroHandler(
 	)
 }
 
-// handleIntro is the handler for the intro command
-func (h *introHandler) handleIntro(b *gotgbot.Bot, ctx *ext.Context) error {
+// startIntroSearch is the entry point handler for the intro search conversation
+func (h *introHandler) startIntroSearch(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
 	// Only proceed if this is a private chat
 	if !h.permissionsService.CheckPrivateChatType(msg) {
-		return nil
+		return handlers.EndConversation()
 	}
 
 	// Check if user is a club member
 	if !h.permissionsService.CheckClubMemberPermissions(msg, constants.IntroCommand) {
-		return nil
+		return handlers.EndConversation()
 	}
+
+	// Ask user to enter search query
+	sentMsg, _ := h.messageSenderService.ReplyWithReturnMessage(
+		msg,
+		fmt.Sprintf("Введите поисковый запрос по участникам клуба или нажмите /%s для получения общей информации:", constants.CancelCommand),
+		&gotgbot.SendMessageOpts{
+			ReplyMarkup: formatters.CancelButton(introCallbackConfirmCancel),
+		},
+	)
+
+	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
+	return handlers.NextConversationState(introStateProcessQuery)
+}
+
+// processIntroSearch handles the actual intro search
+func (h *introHandler) processIntroSearch(b *gotgbot.Bot, ctx *ext.Context) error {
+	msg := ctx.EffectiveMessage
 
 	// Check if we're already processing a request for this user
 	if isProcessing, ok := h.userStore.Get(ctx.EffectiveUser.Id, introCtxDataKeyProcessing); ok && isProcessing.(bool) {
@@ -96,8 +122,11 @@ func (h *introHandler) handleIntro(b *gotgbot.Bot, ctx *ext.Context) error {
 			fmt.Sprintf("Пожалуйста, дождитесь окончания обработки предыдущего запроса, или используйте /%s для отмены.", constants.CancelCommand),
 			nil,
 		)
-		return nil
+		return nil // Stay in the same state
 	}
+
+	// Get query from user message
+	query := strings.TrimSpace(msg.Text)
 
 	// Mark as processing
 	h.userStore.Set(ctx.EffectiveUser.Id, introCtxDataKeyProcessing, true)
@@ -114,10 +143,19 @@ func (h *introHandler) handleIntro(b *gotgbot.Bot, ctx *ext.Context) error {
 		h.userStore.Set(ctx.EffectiveUser.Id, introCtxDataKeyCancelFunc, nil)
 	}()
 
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
+
 	// Inform user that processing has started
-	sentMsg, _ := h.messageSenderService.ReplyWithReturnMessage(msg, "Генерирую вводную информацию о клубе...", &gotgbot.SendMessageOpts{
-		ReplyMarkup: formatters.CancelButton(introCallbackConfirmCancel),
-	})
+	var sentMsg *gotgbot.Message
+	if query == "" {
+		sentMsg, _ = h.messageSenderService.ReplyWithReturnMessage(msg, "Генерирую вводную информацию о клубе...", &gotgbot.SendMessageOpts{
+			ReplyMarkup: formatters.CancelButton(introCallbackConfirmCancel),
+		})
+	} else {
+		sentMsg, _ = h.messageSenderService.ReplyWithReturnMessage(msg, fmt.Sprintf("Ищу информацию по запросу: \"%s\"...", query), &gotgbot.SendMessageOpts{
+			ReplyMarkup: formatters.CancelButton(introCallbackConfirmCancel),
+		})
+	}
 	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
 
 	// Send typing action using MessageSender.
@@ -128,14 +166,14 @@ func (h *introHandler) handleIntro(b *gotgbot.Bot, ctx *ext.Context) error {
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Произошла ошибка при получении сообщений из чата.", nil)
 		log.Printf("IntroHandler: Error during messages retrieval: %v", err)
-		return nil
+		return handlers.EndConversation()
 	}
 
 	dataMessages, err := h.prepareTelegramMessages(messages)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Произошла ошибка при подготовке сообщений для обработки.", nil)
 		log.Printf("IntroHandler: Error during messages preparation: %v", err)
-		return nil
+		return handlers.EndConversation()
 	}
 
 	// Get the prompt template from the database
@@ -143,12 +181,13 @@ func (h *introHandler) handleIntro(b *gotgbot.Bot, ctx *ext.Context) error {
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Произошла ошибка при получении шаблона для вводной информации.", nil)
 		log.Printf("IntroHandler: Error during template retrieval: %v", err)
-		return nil
+		return handlers.EndConversation()
 	}
 
 	prompt := fmt.Sprintf(
 		templateText,
-		string(dataMessages))
+		string(dataMessages),
+		query)
 
 	// Save the prompt into a temporary file for logging purposes.
 	err = os.WriteFile("last-intro-prompt-log.txt", []byte(prompt), 0644)
@@ -177,14 +216,14 @@ func (h *introHandler) handleIntro(b *gotgbot.Bot, ctx *ext.Context) error {
 	// Check if context was cancelled
 	if typingCtx.Err() != nil {
 		log.Printf("Request was cancelled")
-		return nil
+		return handlers.EndConversation()
 	}
 
 	// Continue only if no errors
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Произошла ошибка при получении ответа от OpenAI.", nil)
 		log.Printf("IntroHandler: Error during OpenAI response retrieval: %v", err)
-		return nil
+		return handlers.EndConversation()
 	}
 
 	h.messageSenderService.ReplyMarkdown(msg, responseOpenAi, nil)
@@ -193,7 +232,7 @@ func (h *introHandler) handleIntro(b *gotgbot.Bot, ctx *ext.Context) error {
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)
 
-	return nil
+	return handlers.EndConversation()
 }
 
 // handleCallbackCancel processes the cancel button click
@@ -214,10 +253,10 @@ func (h *introHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 		// Call the cancel function to stop any ongoing API calls
 		if cf, ok := cancelFunc.(context.CancelFunc); ok {
 			cf()
-			h.messageSenderService.Reply(msg, "Операция генерации вводной информации отменена.", nil)
+			h.messageSenderService.Reply(msg, "Операция поиска вводной информации отменена.", nil)
 		}
 	} else {
-		h.messageSenderService.Reply(msg, "Операция генерации вводной информации отменена.", nil)
+		h.messageSenderService.Reply(msg, "Операция поиска вводной информации отменена.", nil)
 	}
 
 	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
@@ -225,7 +264,7 @@ func (h *introHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)
 
-	return nil
+	return handlers.EndConversation()
 }
 
 func (h *introHandler) prepareTelegramMessages(messages []tg.Message) ([]byte, error) {
