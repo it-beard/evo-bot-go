@@ -147,6 +147,10 @@ func (db *DB) initPromptingTemplatesSchema() error {
 		return fmt.Errorf("failed to insert tool prompt: %w", err)
 	}
 
+	if err := db.insertDefaultPromptIfNotExists(prompts.GetIntroPromptTemplateDbKey, prompts.GetIntroPromptDefaultTemplate); err != nil {
+		return fmt.Errorf("failed to insert intro prompt: %w", err)
+	}
+
 	return nil
 }
 
