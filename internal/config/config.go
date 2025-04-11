@@ -22,6 +22,7 @@ type Config struct {
 	ToolTopicID         int
 	ContentTopicID      int
 	AnnouncementTopicID int
+	InviteTopicID       int
 
 	// Telegram User Client
 	TGUserClientAppID       int
@@ -120,6 +121,15 @@ func LoadConfig() (*Config, error) {
 			return nil, fmt.Errorf("invalid announcement topic ID: %s", announcementTopicIDStr)
 		}
 		config.AnnouncementTopicID = announcementTopicID
+	}
+
+	inviteTopicIDStr := os.Getenv("TG_EVO_BOT_INVITE_TOPIC_ID")
+	if inviteTopicIDStr != "" {
+		inviteTopicID, err := strconv.Atoi(inviteTopicIDStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid invite topic ID: %s", inviteTopicIDStr)
+		}
+		config.InviteTopicID = inviteTopicID
 	}
 
 	// Telegram User Client

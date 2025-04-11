@@ -148,6 +148,7 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 		privatehandlers.NewHelpHandler(deps.AppConfig, deps.MessageSenderService, deps.PermissionsService),
 		privatehandlers.NewToolsHandler(deps.AppConfig, deps.OpenAiClient, deps.MessageSenderService, deps.PromptingTemplateRepository, deps.PermissionsService),
 		privatehandlers.NewContentHandler(deps.AppConfig, deps.OpenAiClient, deps.MessageSenderService, deps.PromptingTemplateRepository, deps.PermissionsService),
+		privatehandlers.NewIntroHandler(deps.AppConfig, deps.OpenAiClient, deps.MessageSenderService, deps.PromptingTemplateRepository, deps.PermissionsService),
 		privatehandlers.NewEventsHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
 		topicshandlers.NewTopicsHandler(deps.AppConfig, deps.TopicRepository, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
 		topicshandlers.NewTopicAddHandler(deps.AppConfig, deps.TopicRepository, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),

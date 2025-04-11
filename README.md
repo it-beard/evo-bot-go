@@ -14,6 +14,7 @@ A Telegram bot for Evocoders Club management implemented in Go. Helps moderate d
 ### AI-Powered Functionality
 - 🔍 **Tool Search** (`/tool`): Finds relevant AI tools based on user queries
 - 📚 **Content Search** (`/content`): Searches through designated topics for information
+- 👋 **Club Members Introduction Search** (`/intro`): Provides information about clubs members
 - 📋 **Chat Summarization**: Creates daily summaries of conversations
   - Auto-posts at configured times
   - Manual trigger with `/summarize` (admin-only)
@@ -88,6 +89,7 @@ The bot uses environment variables for configuration, make sure to set them all:
 - `TG_EVO_BOT_FORWARDING_TOPIC_ID`: ID of the topic where forwarded replies will be sent (0 for General topic)
 - `TG_EVO_BOT_TOOL_TOPIC_ID`: Topic ID for the AI tools database
 - `TG_EVO_BOT_CONTENT_TOPIC_ID`: Topic ID for the content topic
+- `TG_EVO_BOT_INVITE_TOPIC_ID`: Topic ID for the club introductions and member information
 
 ### Telegram User Client
 - `TG_EVO_BOT_TGUSERCLIENT_APPID`: Telegram API App ID
@@ -120,6 +122,7 @@ set TG_EVO_BOT_CLOSED_TOPICS_IDS=topic_id_1,topic_id_2,topic_id_3
 set TG_EVO_BOT_FORWARDING_TOPIC_ID=forwarding_topic_id
 set TG_EVO_BOT_TOOL_TOPIC_ID=tool_topic_id
 set TG_EVO_BOT_CONTENT_TOPIC_ID=content_topic_id
+set TG_EVO_BOT_INVITE_TOPIC_ID=invite_topic_id
 
 # Telegram User Client
 set TG_EVO_BOT_TGUSERCLIENT_APPID=your_app_id
