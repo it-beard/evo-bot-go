@@ -184,8 +184,11 @@ func (h *introHandler) processIntroSearch(b *gotgbot.Bot, ctx *ext.Context) erro
 		return handlers.EndConversation()
 	}
 
+	topicLink := fmt.Sprintf("https://t.me/c/%d/%d", h.config.SuperGroupChatID, h.config.IntroTopicID)
+
 	prompt := fmt.Sprintf(
 		templateText,
+		topicLink,
 		string(dataMessages),
 		query)
 
