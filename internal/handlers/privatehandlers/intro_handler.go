@@ -190,7 +190,7 @@ func (h *introHandler) processIntroSearch(b *gotgbot.Bot, ctx *ext.Context) erro
 		query)
 
 	// Save the prompt into a temporary file for logging purposes.
-	err = os.WriteFile("last-intro-prompt-log.txt", []byte(prompt), 0644)
+	err = os.WriteFile("last-prompt-log.txt", []byte(prompt), 0644)
 	if err != nil {
 		log.Printf("Error writing prompt to file: %v", err)
 	}
