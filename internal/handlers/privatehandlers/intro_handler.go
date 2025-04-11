@@ -161,8 +161,8 @@ func (h *introHandler) processIntroSearch(b *gotgbot.Bot, ctx *ext.Context) erro
 	// Send typing action using MessageSender.
 	h.messageSenderService.SendTypingAction(msg.Chat.Id)
 
-	// Get messages from Invite topic
-	messages, err := clients.GetChatMessages(h.config.SuperGroupChatID, h.config.InviteTopicID)
+	// Get messages from Intro topic
+	messages, err := clients.GetChatMessages(h.config.SuperGroupChatID, h.config.IntroTopicID)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Произошла ошибка при получении сообщений из чата.", nil)
 		log.Printf("IntroHandler: Error during messages retrieval: %v", err)
