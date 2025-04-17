@@ -240,7 +240,7 @@ func (h *eventEditHandler) handleSelectEditType(b *gotgbot.Bot, ctx *ext.Context
 			currentStartedAt = "не задана"
 		}
 		message = fmt.Sprintf(
-			"Текущая дата старта: `%s`\nВведи новую дату и время в формате DD.MM.YYYY HH:MM:",
+			"Текущая дата старта: `%s` (UTC)\nВведи новую дату и время в формате DD.MM.YYYY HH:MM (UTC):",
 			currentStartedAt,
 		)
 	case 3:
@@ -342,7 +342,7 @@ func (h *eventEditHandler) handleEditStartedAt(b *gotgbot.Bot, ctx *ext.Context)
 	startedAt, err := time.Parse("02.01.2006 15:04", dateTimeStr)
 	if err != nil {
 		h.messageSenderService.ReplyMarkdown(msg, fmt.Sprintf(
-			"Неверный формат даты. Пожалуйста, введи дату и время в формате *DD.MM.YYYY HH:MM* или используй кнопку для отмены.",
+			"Неверный формат даты. Пожалуйста, введи дату и время в формате *DD.MM.YYYY HH:MM* (UTC) или используй кнопку для отмены.",
 		), nil)
 		return nil // Stay in the same state
 	}
@@ -380,7 +380,7 @@ func (h *eventEditHandler) handleEditStartedAt(b *gotgbot.Bot, ctx *ext.Context)
 	// Confirmation message
 	h.messageSenderService.ReplyMarkdown(msg, fmt.Sprintf(
 		"Дата начала мероприятия с ID %d успешно обновлена на *%s* \n\nДля продолжения редактирования мероприятия используй команду /%s.\nДля просмотра всех команд используй команду /%s",
-		eventID, startedAt.Format("02.01.2006 15:04"), constants.EventEditCommand, constants.HelpCommand,
+		eventID, startedAt.Format("02.01.2006 15:04 UTC"), constants.EventEditCommand, constants.HelpCommand,
 	), nil)
 
 	// Clean up user data
