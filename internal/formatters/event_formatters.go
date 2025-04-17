@@ -8,6 +8,36 @@ import (
 	"evo-bot-go/internal/database/repositories"
 )
 
+// GetTypeEmoji returns an emoji corresponding to the event type
+func GetTypeEmoji(eventType constants.EventType) string {
+	switch eventType {
+	case constants.EventTypeClubCall:
+		return "💬"
+	case constants.EventTypeMeetup:
+		return "🎙"
+	case constants.EventTypeWorkshop:
+		return "⚙️"
+	case constants.EventTypeReadingClub:
+		return "📚"
+	case constants.EventTypeConference:
+		return "👥"
+	default:
+		return "🔄"
+	}
+}
+
+// GetStatusEmoji returns an emoji corresponding to the event status
+func GetStatusEmoji(status constants.EventStatus) string {
+	switch status {
+	case constants.EventStatusFinished:
+		return "✅"
+	case constants.EventStatusActual:
+		return "🔄"
+	default:
+		return "🔄"
+	}
+}
+
 // FormatEventListForUsers formats a slice of events for display to users
 // It returns a markdown-formatted string with event information
 func FormatEventListForUsers(events []repositories.Event, title string) string {
@@ -21,13 +51,7 @@ func FormatEventListForUsers(events []repositories.Event, title string) string {
 			startedAtStr = event.StartedAt.Format("02.01.2006 в 15:04")
 		}
 
-		// Emoji based on event status
-		typeEmoji := "🔄"
-		if event.Type == "club-call" {
-			typeEmoji = "💬"
-		} else if event.Type == "meetup" {
-			typeEmoji = "🎙"
-		}
+		typeEmoji := GetTypeEmoji(constants.EventType(event.Type))
 
 		response.WriteString(fmt.Sprintf("\n%s _%s_: *%s*\n", typeEmoji, event.Type, event.Name))
 		response.WriteString(fmt.Sprintf("└ _ID_ /%d, _дата проведения_: %s\n",
@@ -50,13 +74,7 @@ func FormatEventListForUsersWithoutIds(events []repositories.Event, title string
 			startedAtStr = event.StartedAt.Format("02.01.2006 в 15:04")
 		}
 
-		// Emoji based on event status
-		typeEmoji := "🔄"
-		if event.Type == "club-call" {
-			typeEmoji = "💬"
-		} else if event.Type == "meetup" {
-			typeEmoji = "🎙"
-		}
+		typeEmoji := GetTypeEmoji(constants.EventType(event.Type))
 
 		response.WriteString(fmt.Sprintf("\n%s _%s_: *%s*\n", typeEmoji, event.Type, event.Name))
 		response.WriteString(fmt.Sprintf("└ _дата проведения_: %s\n", startedAtStr))
@@ -78,17 +96,12 @@ func FormatEventListForAdmin(events []repositories.Event, title string, cancelCo
 			startedAtStr = event.StartedAt.Format("02.01.2006 в 15:04")
 		}
 
-		// Emoji based on event status
-		statusEmoji := "🔄"
-		if event.Status == "finished" {
-			statusEmoji = "✅"
-		} else if event.Status == "actual" {
-			statusEmoji = "🔄"
-		}
+		statusEmoji := GetStatusEmoji(constants.EventStatus(event.Status))
+		typeEmoji := GetTypeEmoji(constants.EventType(event.Type))
 
-		response.WriteString(fmt.Sprintf("\nID /%d: *%s*\n", event.ID, event.Name))
-		response.WriteString(fmt.Sprintf("└ %s, тип: _%s_, старт: _%s_\n",
-			statusEmoji, event.Type, startedAtStr))
+		response.WriteString(fmt.Sprintf("\n%s ID /%d: *%s*\n", statusEmoji, event.ID, event.Name))
+		response.WriteString(fmt.Sprintf("└ %s _старт_: `%s`\n",
+			typeEmoji, startedAtStr))
 	}
 
 	response.WriteString(fmt.Sprintf("\nПожалуйста, отправь ID мероприятия, %s.", actionDescription))
@@ -100,13 +113,9 @@ func FormatEventListForAdmin(events []repositories.Event, title string, cancelCo
 // It returns a html-formatted string with topic information
 func FormatHtmlTopicListForUsers(topics []repositories.Topic, eventName string, eventType string) string {
 	var response strings.Builder
-	// Emoji based on event status
-	typeEmoji := "🔄"
-	if eventType == "club-call" {
-		typeEmoji = "💬"
-	} else if eventType == "meetup" {
-		typeEmoji = "🎙"
-	}
+
+	typeEmoji := GetTypeEmoji(constants.EventType(eventType))
+
 	response.WriteString(fmt.Sprintf("\n %s Мероприятие: <b>%s</b>\n", typeEmoji, eventName))
 
 	if len(topics) == 0 {
@@ -147,12 +156,9 @@ func FormatHtmlTopicListForUsers(topics []repositories.Topic, eventName string, 
 // It returns a html-formatted string with topic information
 func FormatHtmlTopicListForAdmin(topics []repositories.Topic, eventName string, eventType string) string {
 	var response strings.Builder
-	typeEmoji := "🔄"
-	if eventType == "club-call" {
-		typeEmoji = "💬"
-	} else if eventType == "meetup" {
-		typeEmoji = "🎙"
-	}
+
+	typeEmoji := GetTypeEmoji(constants.EventType(eventType))
+
 	response.WriteString(fmt.Sprintf("\n %s <i>Мероприятие:</i> %s\n\n", typeEmoji, eventName))
 
 	if len(topics) == 0 {

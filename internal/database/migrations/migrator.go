@@ -14,6 +14,7 @@ func Registry() []implementations.Migration {
 		implementations.NewChangeUserIdToNullableString(),
 		implementations.NewRenameUserIdToUserNickname(),
 		implementations.NewRenameContentsToEvents(),
+		implementations.NewAddNewEventTypes(),
 		// Add new migrations here
 	}
 }
