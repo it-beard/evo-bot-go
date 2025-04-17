@@ -3,12 +3,12 @@ package formatters
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/repositories"
 )
 
-// GetTypeEmoji returns an emoji corresponding to the event type
 func GetTypeEmoji(eventType constants.EventType) string {
 	switch eventType {
 	case constants.EventTypeClubCall:
@@ -26,7 +26,24 @@ func GetTypeEmoji(eventType constants.EventType) string {
 	}
 }
 
-// GetStatusEmoji returns an emoji corresponding to the event status
+// GetTypeInRussian returns the Russian translation of the event type
+func GetTypeInRussian(eventType constants.EventType) string {
+	switch eventType {
+	case constants.EventTypeClubCall:
+		return "клубный созвон"
+	case constants.EventTypeMeetup:
+		return "митап"
+	case constants.EventTypeWorkshop:
+		return "воркшоп"
+	case constants.EventTypeReadingClub:
+		return "книжный клуб"
+	case constants.EventTypeConference:
+		return "конфа"
+	default:
+		return string(eventType)
+	}
+}
+
 func GetStatusEmoji(status constants.EventStatus) string {
 	switch status {
 	case constants.EventStatusFinished:
@@ -38,9 +55,7 @@ func GetStatusEmoji(status constants.EventStatus) string {
 	}
 }
 
-// FormatEventListForUsers formats a slice of events for display to users
-// It returns a markdown-formatted string with event information
-func FormatEventListForUsers(events []repositories.Event, title string) string {
+func FormatEventListForTopicsView(events []repositories.Event, title string) string {
 	var response strings.Builder
 	response.WriteString(fmt.Sprintf("%s:\n", title))
 
@@ -52,18 +67,19 @@ func FormatEventListForUsers(events []repositories.Event, title string) string {
 		}
 
 		typeEmoji := GetTypeEmoji(constants.EventType(event.Type))
+		typeInRussian := GetTypeInRussian(constants.EventType(event.Type))
 
-		response.WriteString(fmt.Sprintf("\n%s _%s_: *%s*\n", typeEmoji, event.Type, event.Name))
-		response.WriteString(fmt.Sprintf("└ _ID_ /%d, _дата проведения_: %s\n",
+		response.WriteString(fmt.Sprintf("\n%s _%s_: *%s*\n", typeEmoji, typeInRussian, event.Name))
+		response.WriteString(fmt.Sprintf("└   _ID_ /%d, _когда_: %s\n",
 			event.ID, startedAtStr))
 	}
 
 	return response.String()
 }
 
-// FormatEventListForUsersWithoutIds formats a slice of events for display to users
+// FormatEventListForEventsView formats a slice of events for display to users
 // It returns a markdown-formatted string with event information
-func FormatEventListForUsersWithoutIds(events []repositories.Event, title string) string {
+func FormatEventListForEventsView(events []repositories.Event, title string) string {
 	var response strings.Builder
 	response.WriteString(fmt.Sprintf("%s:\n", title))
 
@@ -71,20 +87,32 @@ func FormatEventListForUsersWithoutIds(events []repositories.Event, title string
 		// Handle optional started_at field
 		startedAtStr := "не указано"
 		if event.StartedAt != nil && !event.StartedAt.IsZero() {
-			startedAtStr = event.StartedAt.Format("02.01.2006 в 15:04")
+			startedAtStr = event.StartedAt.Format("02.01.2006 в 15:04 UTC")
+
+			// Add time remaining if event is within next 12 hours
+			utcNow := time.Now().UTC()
+			if event.StartedAt.After(utcNow) && event.StartedAt.Sub(utcNow) <= 24*time.Hour {
+				hoursRemaining := int(event.StartedAt.Sub(utcNow).Hours())
+				minutesRemaining := int(event.StartedAt.Sub(utcNow).Minutes()) % 60
+
+				if hoursRemaining > 0 {
+					startedAtStr += fmt.Sprintf(" `(через %dч %dмин)`", hoursRemaining, minutesRemaining)
+				} else {
+					startedAtStr += fmt.Sprintf(" `(через %dмин)`", minutesRemaining)
+				}
+			}
 		}
 
 		typeEmoji := GetTypeEmoji(constants.EventType(event.Type))
+		typeInRussian := GetTypeInRussian(constants.EventType(event.Type))
 
-		response.WriteString(fmt.Sprintf("\n%s _%s_: *%s*\n", typeEmoji, event.Type, event.Name))
-		response.WriteString(fmt.Sprintf("└ _дата проведения_: %s\n", startedAtStr))
+		response.WriteString(fmt.Sprintf("\n%s _%s_: *%s*\n", typeEmoji, typeInRussian, event.Name))
+		response.WriteString(fmt.Sprintf("└   _когда_: %s\n", startedAtStr))
 	}
 
 	return response.String()
 }
 
-// FormatEventListForAdmin formats a slice of events for display to admins
-// It returns a markdown-formatted string with event information
 func FormatEventListForAdmin(events []repositories.Event, title string, cancelCommand string, actionDescription string) string {
 	var response strings.Builder
 	response.WriteString(fmt.Sprintf("*%s*\n", title))
@@ -93,14 +121,14 @@ func FormatEventListForAdmin(events []repositories.Event, title string, cancelCo
 		// Handle optional started_at field
 		startedAtStr := "не указано"
 		if event.StartedAt != nil && !event.StartedAt.IsZero() {
-			startedAtStr = event.StartedAt.Format("02.01.2006 в 15:04")
+			startedAtStr = event.StartedAt.Format("02.01.2006 в 15:04 UTC")
 		}
 
 		statusEmoji := GetStatusEmoji(constants.EventStatus(event.Status))
 		typeEmoji := GetTypeEmoji(constants.EventType(event.Type))
 
 		response.WriteString(fmt.Sprintf("\n%s ID /%d: *%s*\n", typeEmoji, event.ID, event.Name))
-		response.WriteString(fmt.Sprintf("└ %s _старт_: *%s*\n",
+		response.WriteString(fmt.Sprintf("└ %s _когда_: *%s*\n",
 			statusEmoji, startedAtStr))
 	}
 
@@ -109,14 +137,13 @@ func FormatEventListForAdmin(events []repositories.Event, title string, cancelCo
 	return response.String()
 }
 
-// FormatHtmlTopicListForUsers formats a slice of topics for display to users
-// It returns a html-formatted string with topic information
 func FormatHtmlTopicListForUsers(topics []repositories.Topic, eventName string, eventType string) string {
 	var response strings.Builder
 
 	typeEmoji := GetTypeEmoji(constants.EventType(eventType))
+	typeInRussian := GetTypeInRussian(constants.EventType(eventType))
 
-	response.WriteString(fmt.Sprintf("\n %s Мероприятие: <b>%s</b>\n", typeEmoji, eventName))
+	response.WriteString(fmt.Sprintf("\n %s Мероприятие (%s): <b>%s</b>\n", typeEmoji, typeInRussian, eventName))
 
 	if len(topics) == 0 {
 		response.WriteString(
@@ -152,14 +179,13 @@ func FormatHtmlTopicListForUsers(topics []repositories.Topic, eventName string, 
 	return response.String()
 }
 
-// FormatHtmlTopicListForAdmin formats a slice of topics for display to admins
-// It returns a html-formatted string with topic information
 func FormatHtmlTopicListForAdmin(topics []repositories.Topic, eventName string, eventType string) string {
 	var response strings.Builder
 
 	typeEmoji := GetTypeEmoji(constants.EventType(eventType))
+	typeInRussian := GetTypeInRussian(constants.EventType(eventType))
 
-	response.WriteString(fmt.Sprintf("\n %s <i>Мероприятие:</i> %s\n\n", typeEmoji, eventName))
+	response.WriteString(fmt.Sprintf("\n %s <i>Мероприятие (%s):</i> %s\n\n", typeEmoji, typeInRussian, eventName))
 
 	if len(topics) == 0 {
 		response.WriteString("Для этого мероприятия пока нет тем и вопросов.")

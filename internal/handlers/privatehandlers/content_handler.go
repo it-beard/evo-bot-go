@@ -282,15 +282,15 @@ func (h *contentHandler) prepareTelegramMessages(messages []tg.Message) ([]byte,
 		Date    string `json:"date"` // now formatted as "10 february 2024"
 	}
 
-	// Load CET location
-	loc, err := time.LoadLocation("CET")
+	// Load UTC location
+	loc, err := time.LoadLocation("UTC")
 	if err != nil {
-		return nil, fmt.Errorf("failed to load CET location: %w", err)
+		return nil, fmt.Errorf("failed to load UTC location: %w", err)
 	}
 
 	messageObjects := make([]MessageObject, 0, len(messages))
 	for _, message := range messages {
-		// Convert Unix timestamp to CET time
+		// Convert Unix timestamp to UTC time
 		t := time.Unix(int64(message.Date), 0).In(loc)
 		// Format date as "day month year" and convert to lowercase
 		dateFormatted := strings.ToLower(t.Format("2 January 2006"))

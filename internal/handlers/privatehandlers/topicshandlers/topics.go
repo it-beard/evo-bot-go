@@ -103,7 +103,7 @@ func (h *topicsHandler) startTopics(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	// Format and display event list for selection
-	formattedEvents := formatters.FormatEventListForUsers(
+	formattedEvents := formatters.FormatEventListForTopicsView(
 		events,
 		fmt.Sprintf("Выбери ID мероприятия, для которого ты хочешь увидеть темы и вопросы"),
 	)

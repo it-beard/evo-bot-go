@@ -64,7 +64,7 @@ func (h *eventsHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 
 	// Format and display event list
-	formattedEvents := formatters.FormatEventListForUsersWithoutIds(
+	formattedEvents := formatters.FormatEventListForEventsView(
 		events,
 		"📋 Список ближайших мероприятий",
 	)
