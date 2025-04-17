@@ -158,8 +158,8 @@ func (h *topicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Context) e
 
 	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 	// Format and display topics
-	formattedTopics := formatters.FormatTopicListForUsers(topics, event.Name, event.Type)
-	h.messageSenderService.ReplyMarkdown(msg, formattedTopics, nil)
+	formattedTopics := formatters.FormatHtmlTopicListForUsers(topics, event.Name, event.Type)
+	h.messageSenderService.ReplyHtml(msg, formattedTopics, nil)
 
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)

@@ -38,7 +38,8 @@ func (c *OpenAiClient) GetCompletion(ctx context.Context, message string) (strin
 		Messages: []openai.ChatCompletionMessageParamUnion{
 			openai.UserMessage(message),
 		},
-		Model: "o4-mini",
+		Model: openai.ChatModelO3Mini,
+		//Model: "o4-mini",
 		//Model: "gpt-4.1-mini",
 	})
 	if err != nil {

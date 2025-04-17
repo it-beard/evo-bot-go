@@ -43,7 +43,7 @@ func (r *TopicRepository) GetTopicsByEventID(eventID int) ([]Topic, error) {
 		SELECT id, topic, user_nickname, event_id, created_at
 		FROM topics
 		WHERE event_id = $1
-		ORDER BY created_at DESC`
+		ORDER BY created_at ASC`
 
 	rows, err := r.db.Query(query, eventID)
 	if err != nil {
