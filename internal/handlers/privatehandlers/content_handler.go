@@ -187,8 +187,9 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 		templateText,
 		topicLink,
 		topicLink,
-		string(dataMessages),
-		query)
+		utils.EscapeMarkdown(string(dataMessages)),
+		utils.EscapeMarkdown(query),
+	)
 
 	// Save the prompt into a temporary file for logging purposes.
 	err = os.WriteFile("last-prompt-log.txt", []byte(prompt), 0644)
@@ -227,7 +228,12 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 		return handlers.EndConversation()
 	}
 
-	h.messageSenderService.ReplyMarkdown(msg, responseOpenAi, nil)
+	err = h.messageSenderService.ReplyMarkdown(msg, responseOpenAi, nil)
+	if err != nil {
+		h.messageSenderService.Reply(msg, "Произошла ошибка при отправке ответа.", nil)
+		log.Printf("ContentHandler: Error during message sending: %v", err)
+		return handlers.EndConversation()
+	}
 
 	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 	// Clean up user data
