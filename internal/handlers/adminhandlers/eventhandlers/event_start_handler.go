@@ -300,11 +300,26 @@ func (h *eventStartHandler) handleCallbackYes(b *gotgbot.Bot, ctx *ext.Context) 
 	}
 
 	// Send announcement message with the event link to the announcement topic if configured
-	announcementMsg := fmt.Sprintf("🔴 *НАЧИНАЕМ ИВЕНТ!* 🔴\n\n📅 *%s*\n\nИспользуй кнопку ниже, чтобы присоединиться ⬇️", event.Name)
-	sentAnnouncementMsg, err := h.messageSenderService.SendMarkdownWithReturnMessage(utils.ChatIdToFullChatId(h.config.SuperGroupChatID), announcementMsg, &gotgbot.SendMessageOpts{
-		MessageThreadId: int64(h.config.AnnouncementTopicID),
-		ReplyMarkup:     buttonWithLink,
-	})
+	announcementMsg := fmt.Sprintf(
+		"🔴 *НАЧИНАЕМ ИВЕНТ!* 🔴\n\n%s *%s*\n",
+		formatters.GetTypeEmoji(constants.EventType(event.Type)),
+		event.Name,
+	)
+
+	if event.Type == string(constants.EventTypeClubCall) {
+		announcementMsg += fmt.Sprintf("💡 [Про формат и правила клубных созвонов](https://t.me/c/2069889012/127/33823)\n")
+	}
+
+	announcementMsg += fmt.Sprintf("\nИспользуй кнопку ниже, чтобы присоединиться ⬇️")
+
+	sentAnnouncementMsg, err := h.messageSenderService.SendMarkdownWithReturnMessage(
+		utils.ChatIdToFullChatId(h.config.SuperGroupChatID),
+		announcementMsg,
+		&gotgbot.SendMessageOpts{
+			MessageThreadId: int64(h.config.AnnouncementTopicID),
+			ReplyMarkup:     buttonWithLink,
+		},
+	)
 
 	// Pin the announcement message with notification for all users
 	if err == nil && sentAnnouncementMsg != nil {
