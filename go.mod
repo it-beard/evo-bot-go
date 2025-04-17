@@ -5,10 +5,10 @@ go 1.23.3
 toolchain go1.23.5
 
 require (
-	github.com/PaulSonOfLars/gotgbot/v2 v2.0.0-rc.29
+	github.com/PaulSonOfLars/gotgbot/v2 v2.0.0-rc.32
 	github.com/gotd/td v0.118.0
 	github.com/lib/pq v1.10.9
-	github.com/openai/openai-go v0.1.0-alpha.51
+	github.com/openai/openai-go v0.1.0-beta.10
 	github.com/stretchr/testify v1.10.0
 )
 

@@ -20,3 +20,16 @@ func ExtractNumber(s string) string {
 	}
 	return ""
 }
+
+func EscapeMarkdown(s string) string {
+	symbolsForEscaping := []string{
+		"_",
+	}
+
+	result := s
+	for _, char := range symbolsForEscaping {
+		result = strings.ReplaceAll(result, char, "-")
+	}
+
+	return result
+}
