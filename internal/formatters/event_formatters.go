@@ -99,9 +99,9 @@ func FormatEventListForAdmin(events []repositories.Event, title string, cancelCo
 		statusEmoji := GetStatusEmoji(constants.EventStatus(event.Status))
 		typeEmoji := GetTypeEmoji(constants.EventType(event.Type))
 
-		response.WriteString(fmt.Sprintf("\n%s ID /%d: *%s*\n", statusEmoji, event.ID, event.Name))
-		response.WriteString(fmt.Sprintf("└ %s _старт_: `%s`\n",
-			typeEmoji, startedAtStr))
+		response.WriteString(fmt.Sprintf("\n%s ID /%d: *%s*\n", typeEmoji, event.ID, event.Name))
+		response.WriteString(fmt.Sprintf("└ %s _старт_: *%s*\n",
+			statusEmoji, startedAtStr))
 	}
 
 	response.WriteString(fmt.Sprintf("\nПожалуйста, отправь ID мероприятия, %s.", actionDescription))

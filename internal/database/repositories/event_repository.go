@@ -171,6 +171,24 @@ func (r *EventRepository) UpdateEventStartedAt(id int, startedAt time.Time) erro
 	return nil
 }
 
+// UpdateEventType updates the type of an event record by its ID
+func (r *EventRepository) UpdateEventType(id int, eventType constants.EventType) error {
+	query := `UPDATE events SET type = $1, updated_at = NOW() WHERE id = $2`
+	result, err := r.db.Exec(query, string(eventType), id)
+	if err != nil {
+		return fmt.Errorf("failed to update event type for ID %d: %w", id, err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		log.Printf("Could not get rows affected after update: %v", err)
+	} else if rowsAffected == 0 {
+		return fmt.Errorf("no event found with ID %d to update type", id)
+	}
+
+	return nil
+}
+
 // DeleteEvent removes an event record from the database by its ID
 func (r *EventRepository) DeleteEvent(id int) error {
 	// First, get all topics related to this event
