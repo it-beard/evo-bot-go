@@ -4,14 +4,20 @@ package constants
 type EventType string
 
 const (
-	EventTypeClubCall EventType = "club-call"
-	EventTypeMeetup   EventType = "meetup"
+	EventTypeClubCall    EventType = "club-call"
+	EventTypeMeetup      EventType = "meetup"
+	EventTypeWorkshop    EventType = "workshop"
+	EventTypeReadingClub EventType = "reading-club"
+	EventTypeConference  EventType = "conference"
 )
 
 // AllEventTypes is a slice containing all possible EventType values
 var AllEventTypes = []EventType{
 	EventTypeClubCall,
 	EventTypeMeetup,
+	EventTypeWorkshop,
+	EventTypeReadingClub,
+	EventTypeConference,
 }
 
 // EventStatus represents the status of event
