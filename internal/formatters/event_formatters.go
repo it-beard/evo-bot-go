@@ -26,7 +26,6 @@ func GetTypeEmoji(eventType constants.EventType) string {
 	}
 }
 
-// GetTypeInRussian returns the Russian translation of the event type
 func GetTypeInRussian(eventType constants.EventType) string {
 	switch eventType {
 	case constants.EventTypeClubCall:
@@ -77,8 +76,6 @@ func FormatEventListForTopicsView(events []repositories.Event, title string) str
 	return response.String()
 }
 
-// FormatEventListForEventsView formats a slice of events for display to users
-// It returns a markdown-formatted string with event information
 func FormatEventListForEventsView(events []repositories.Event, title string) string {
 	var response strings.Builder
 	response.WriteString(fmt.Sprintf("%s:\n", title))
@@ -89,16 +86,26 @@ func FormatEventListForEventsView(events []repositories.Event, title string) str
 		if event.StartedAt != nil && !event.StartedAt.IsZero() {
 			startedAtStr = event.StartedAt.Format("02.01.2006 в 15:04 UTC")
 
-			// Add time remaining if event is within next 12 hours
+			// Add time remaining if event is in the future
 			utcNow := time.Now().UTC()
-			if event.StartedAt.After(utcNow) && event.StartedAt.Sub(utcNow) <= 24*time.Hour {
-				hoursRemaining := int(event.StartedAt.Sub(utcNow).Hours())
-				minutesRemaining := int(event.StartedAt.Sub(utcNow).Minutes()) % 60
+			if event.StartedAt.After(utcNow) {
+				timeUntil := event.StartedAt.Sub(utcNow)
 
-				if hoursRemaining > 0 {
-					startedAtStr += fmt.Sprintf(" `(через %dч %dмин)`", hoursRemaining, minutesRemaining)
-				} else {
-					startedAtStr += fmt.Sprintf(" `(через %dмин)`", minutesRemaining)
+				switch {
+				case timeUntil <= 24*time.Hour:
+					// Less than 24 hours
+					hours := int(timeUntil.Hours())
+					mins := int(timeUntil.Minutes()) % 60
+					if hours > 0 {
+						startedAtStr += fmt.Sprintf(" _(через %dч %dмин)_", hours, mins)
+					} else {
+						startedAtStr += fmt.Sprintf(" _(через %dмин)_", mins)
+					}
+				case timeUntil <= 7*24*time.Hour:
+					// Less than 7 days
+					days := int(timeUntil.Hours() / 24)
+					hours := int(timeUntil.Hours()) % 24
+					startedAtStr += fmt.Sprintf(" _(через %dд %dч)_", days, hours)
 				}
 			}
 		}
