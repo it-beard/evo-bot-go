@@ -96,9 +96,9 @@ func FormatEventListForAdmin(events []repositories.Event, title string, cancelCo
 	return response.String()
 }
 
-// FormatTopicListForUsers formats a slice of topics for display to users
-// It returns a markdown-formatted string with topic information
-func FormatTopicListForUsers(topics []repositories.Topic, eventName string, eventType string) string {
+// FormatHtmlTopicListForUsers formats a slice of topics for display to users
+// It returns a html-formatted string with topic information
+func FormatHtmlTopicListForUsers(topics []repositories.Topic, eventName string, eventType string) string {
 	var response strings.Builder
 	// Emoji based on event status
 	typeEmoji := "🔄"
@@ -107,19 +107,23 @@ func FormatTopicListForUsers(topics []repositories.Topic, eventName string, even
 	} else if eventType == "meetup" {
 		typeEmoji = "🎙"
 	}
-	response.WriteString(fmt.Sprintf("\n %s _Мероприятие:_ *%s*\n", typeEmoji, eventName))
+	response.WriteString(fmt.Sprintf("\n %s Мероприятие: <b>%s</b>\n", typeEmoji, eventName))
 
 	if len(topics) == 0 {
 		response.WriteString(
 			fmt.Sprintf("\n🔍 Для этого мероприятия пока нет тем и вопросов. \n Используй команду /%s для добавления.", constants.TopicAddCommand))
 	} else {
 		topicCount := len(topics)
-		response.WriteString(fmt.Sprintf("📋 _Найдено тем:_ *%d*\n\n", topicCount))
+		response.WriteString(fmt.Sprintf("📋 Найдено тем и вопросов: <b>%d</b>\n\n", topicCount))
 
 		for i, topic := range topics {
 			// Format date as DD.MM.YYYY for better readability
 			dateFormatted := topic.CreatedAt.Format("02.01.2006")
-			response.WriteString(fmt.Sprintf("🔸 _%s_ / *%s*", dateFormatted, topic.Topic))
+			response.WriteString(fmt.Sprintf(
+				"<i>%s</i> <blockquote expandable>%s</blockquote>\n",
+				dateFormatted,
+				topic.Topic,
+			))
 
 			// Don't add separator after the last item
 			if i < topicCount-1 {
@@ -129,7 +133,7 @@ func FormatTopicListForUsers(topics []repositories.Topic, eventName string, even
 
 		response.WriteString(
 			fmt.Sprintf(
-				"\n\nИспользуй команду /%s для добавления новых тем и вопросов, либо /%s для просмотра тем и вопросов к другому мероприятию.",
+				"\nИспользуй команду /%s для добавления новых тем и вопросов, либо /%s для просмотра тем и вопросов к другому мероприятию.",
 				constants.TopicAddCommand,
 				constants.TopicsCommand,
 			),
@@ -139,9 +143,9 @@ func FormatTopicListForUsers(topics []repositories.Topic, eventName string, even
 	return response.String()
 }
 
-// FormatTopicListForAdmin formats a slice of topics for display to admins
-// It returns a markdown-formatted string with topic information
-func FormatTopicListForAdmin(topics []repositories.Topic, eventName string, eventType string) string {
+// FormatHtmlTopicListForAdmin formats a slice of topics for display to admins
+// It returns a html-formatted string with topic information
+func FormatHtmlTopicListForAdmin(topics []repositories.Topic, eventName string, eventType string) string {
 	var response strings.Builder
 	typeEmoji := "🔄"
 	if eventType == "club-call" {
@@ -149,10 +153,10 @@ func FormatTopicListForAdmin(topics []repositories.Topic, eventName string, even
 	} else if eventType == "meetup" {
 		typeEmoji = "🎙"
 	}
-	response.WriteString(fmt.Sprintf("\n %s _Мероприятие:_ *%s*\n", typeEmoji, eventName))
+	response.WriteString(fmt.Sprintf("\n %s <i>Мероприятие:</i> %s\n\n", typeEmoji, eventName))
 
 	if len(topics) == 0 {
-		response.WriteString("\nДля этого мероприятия пока нет тем и вопросов.")
+		response.WriteString("Для этого мероприятия пока нет тем и вопросов.")
 	} else {
 		for _, topic := range topics {
 			userNickname := "не указано"
@@ -160,9 +164,13 @@ func FormatTopicListForAdmin(topics []repositories.Topic, eventName string, even
 				userNickname = "@" + *topic.UserNickname
 			}
 			dateFormatted := topic.CreatedAt.Format("02.01.2006")
-			response.WriteString(fmt.Sprintf("\n_%s_ / *%s*\n", dateFormatted, topic.Topic))
-			response.WriteString(fmt.Sprintf("└ _ID_ `%d`, _пользователь_: %s\n",
-				topic.ID, userNickname))
+			response.WriteString(fmt.Sprintf(
+				"ID:<code>%d</code> / <i>%s</i> / %s \n",
+				topic.ID,
+				dateFormatted,
+				userNickname,
+			))
+			response.WriteString(fmt.Sprintf("<blockquote expandable>%s</blockquote> \n", topic.Topic))
 		}
 	}
 

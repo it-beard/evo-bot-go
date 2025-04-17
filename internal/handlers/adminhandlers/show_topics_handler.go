@@ -163,8 +163,8 @@ func (h *showTopicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Contex
 	h.userStore.Set(ctx.EffectiveUser.Id, showTopicsCtxDataKeyEventID, eventID)
 
 	// Format and display topics for admin
-	formattedTopics := formatters.FormatTopicListForAdmin(topics, event.Name, event.Type)
-	h.messageSenderService.ReplyMarkdown(msg, formattedTopics, nil)
+	formattedTopics := formatters.FormatHtmlTopicListForAdmin(topics, event.Name, event.Type)
+	h.messageSenderService.ReplyHtml(msg, formattedTopics, nil)
 	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 
 	// If there are topics, suggest deletion option
@@ -186,7 +186,7 @@ func (h *showTopicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Contex
 // 3. handleTopicDeletion processes the admin's selection for topic deletion
 func (h *showTopicsHandler) handleTopicDeletion(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
-	userInput := strings.TrimSpace(msg.Text)
+	userInput := strings.TrimSpace(strings.Replace(msg.Text, "/", "", 1))
 
 	// Check if the input is a valid topic ID
 	topicID, err := strconv.Atoi(userInput)
@@ -266,8 +266,8 @@ func (h *showTopicsHandler) handleTopicDeletion(b *gotgbot.Bot, ctx *ext.Context
 	}
 
 	// Show updated list of topics
-	formattedTopics := formatters.FormatTopicListForAdmin(topics, event.Name, event.Type)
-	h.messageSenderService.ReplyMarkdown(msg, formattedTopics, nil)
+	formattedTopics := formatters.FormatHtmlTopicListForAdmin(topics, event.Name, event.Type)
+	h.messageSenderService.ReplyHtml(msg, formattedTopics, nil)
 
 	// If there are still topics, allow for more deletions
 	if len(topics) > 0 {
