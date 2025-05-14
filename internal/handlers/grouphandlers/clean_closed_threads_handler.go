@@ -9,6 +9,7 @@ import (
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/services"
+	"evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -93,6 +94,11 @@ func (h *CleanClosedThreadsHandler) handle(b *gotgbot.Bot, ctx *ext.Context) err
 
 	// Don't trigger if message from bot with name "GroupAnonymousBot" (this is anonymous group bot)
 	if msg.From.IsBot && msg.From.Username == "GroupAnonymousBot" {
+		return nil
+	}
+
+	// Check if the user is an admin or creator
+	if utils.IsUserAdminOrCreator(b, msg.From.Id, h.config) {
 		return nil
 	}
 
