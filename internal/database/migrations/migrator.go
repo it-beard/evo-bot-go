@@ -16,6 +16,7 @@ func Registry() []implementations.Migration {
 		implementations.NewRenameContentsToEvents(),
 		implementations.NewAddNewEventTypes(),
 		implementations.NewUpdateEventsConstraints(),
+		implementations.NewAddUsersAndProfilesTables(),
 		// Add new migrations here
 	}
 }
