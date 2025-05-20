@@ -744,19 +744,26 @@ func (h *profileHandler) handlePublishProfile(b *gotgbot.Bot, ctx *ext.Context, 
 	// Check if we need to update existing message or create a new one
 	if profile.PublishedMessageID.Valid {
 		// Try to edit existing message
-		_, _, err := b.EditMessageText(publicMessageText, &gotgbot.EditMessageTextOpts{
-			ChatId:    utils.ChatIdToFullChatId(h.config.SuperGroupChatID),
-			MessageId: profile.PublishedMessageID.Int64,
-			ParseMode: "HTML",
-		})
-
-		if err != nil {
-			// If editing fails, create a new message
+		_, _, err := b.EditMessageText(
+			publicMessageText,
+			&gotgbot.EditMessageTextOpts{
+				ChatId:    utils.ChatIdToFullChatId(h.config.SuperGroupChatID),
+				MessageId: profile.PublishedMessageID.Int64,
+				ParseMode: "HTML",
+				LinkPreviewOptions: &gotgbot.LinkPreviewOptions{
+					IsDisabled: false,
+				},
+			})
+		// If editing fails, create a new message if the error is not about the message being exactly the same
+		if err != nil && !strings.Contains(err.Error(), "are exactly the same") {
 			publishedMsg, err = h.messageSenderService.SendHtmlWithReturnMessage(
 				utils.ChatIdToFullChatId(h.config.SuperGroupChatID),
 				publicMessageText,
 				&gotgbot.SendMessageOpts{
 					MessageThreadId: int64(h.config.IntroTopicID),
+					LinkPreviewOptions: &gotgbot.LinkPreviewOptions{
+						IsDisabled: false,
+					},
 				})
 			if err != nil {
 				return fmt.Errorf("ProfileHandler: failed to publish profile: %w", err)
@@ -775,6 +782,9 @@ func (h *profileHandler) handlePublishProfile(b *gotgbot.Bot, ctx *ext.Context, 
 			publicMessageText,
 			&gotgbot.SendMessageOpts{
 				MessageThreadId: int64(h.config.IntroTopicID),
+				LinkPreviewOptions: &gotgbot.LinkPreviewOptions{
+					IsDisabled: false,
+				},
 			})
 		if err != nil {
 			return fmt.Errorf("ProfileHandler: failed to publish profile: %w", err)

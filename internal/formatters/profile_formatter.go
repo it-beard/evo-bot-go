@@ -4,6 +4,7 @@ import (
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/repositories"
 	"fmt"
+	"strconv"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 )
@@ -154,16 +155,19 @@ func FormatProfileView(user *repositories.User, profile *repositories.Profile, s
 	}
 
 	// Format username
-	username := "<b>" + user.Firstname + "</b>"
+	username := ""
+	fullName := user.Firstname
 	if user.Lastname != "" {
-		username += " " + "<b>" + user.Lastname + "</b>"
+		fullName += " " + user.Lastname
 	}
+	fullName = "<b><a href = 'tg://user?id=" + strconv.FormatInt(user.TgID, 10) + "'>" + fullName + "</a></b>"
+
 	if user.TgUsername != "" {
-		username += " (@" + user.TgUsername + ")"
+		username = " (@" + user.TgUsername + ")"
 	}
 
 	// Build profile text
-	text := fmt.Sprintf("👤 %s\n", username)
+	text := fmt.Sprintf("🖐 %s %s\n", fullName, username)
 
 	if profile.Bio != "" {
 		text += fmt.Sprintf("\n<blockquote>О себе</blockquote>\n%s\n", profile.Bio)
@@ -197,16 +201,19 @@ func FormatProfileView(user *repositories.User, profile *repositories.Profile, s
 func FormatPublicProfileForMessage(user *repositories.User, profile *repositories.Profile, showScore bool) string {
 
 	// Format username
-	username := "<b>" + user.Firstname + "</b>"
+	username := ""
+	fullName := user.Firstname
 	if user.Lastname != "" {
-		username += " " + "<b>" + user.Lastname + "</b>"
+		fullName += " " + user.Lastname
 	}
+	fullName = "<b><a href=\"tg://user?id=" + strconv.FormatInt(user.TgID, 10) + "\">" + fullName + "</a></b>"
+
 	if user.TgUsername != "" {
-		username += " (@" + user.TgUsername + ")"
+		username = " (@" + user.TgUsername + ")"
 	}
 
 	// Build profile text
-	text := fmt.Sprintf("🖐 %s\n", username)
+	text := fmt.Sprintf("🖐 %s %s\n", fullName, username)
 
 	if profile.Bio != "" {
 		text += fmt.Sprintf("\n<blockquote>О себе</blockquote>\n%s\n", profile.Bio)
