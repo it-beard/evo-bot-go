@@ -46,6 +46,7 @@ const (
 	profileMenuEditGithubHeader    = "Профиль → Редактирование → GitHub"
 	profileMenuEditWebsiteHeader   = "Профиль → Редактирование → Веб-ресурс"
 	profileMenuSearchHeader        = "Профиль → Поиск"
+	profileMenuPublishHeader       = "Профиль → Публикация"
 )
 
 type profileHandler struct {
@@ -198,6 +199,8 @@ func (h *profileHandler) handleCallback(b *gotgbot.Bot, ctx *ext.Context) error 
 		return h.handleEditField(b, ctx, effectiveMsg, "новое имя", profileStateAwaitFirstname)
 	case constants.ProfileEditLastnameCallback:
 		return h.handleEditField(b, ctx, effectiveMsg, "новую фамилию", profileStateAwaitLastname)
+	case constants.ProfilePublishCallback:
+		return h.handlePublishProfile(b, ctx, effectiveMsg)
 	case constants.ProfileStartCallback:
 		return h.showProfileMenu(b, effectiveMsg, userId)
 	}
@@ -240,11 +243,26 @@ func (h *profileHandler) handleViewMyProfile(b *gotgbot.Bot, ctx *ext.Context, m
 
 func (h *profileHandler) handleEditMyProfile(b *gotgbot.Bot, ctx *ext.Context, msg *gotgbot.Message) error {
 	currentUser := ctx.Update.CallbackQuery.From
-	_, err := h.getOrCreateUser(&currentUser)
+	dbUser, err := h.getOrCreateUser(&currentUser)
 	if err != nil {
 		_ = h.messageSenderService.Reply(msg,
 			"Произошла ошибка при получении информации о пользователе.", nil)
 		return fmt.Errorf("ProfileHandler: failed to get user in handleEditMyProfile: %w", err)
+	}
+
+	// Get profile to check if it's complete
+	profile, err := h.profileRepository.GetByUserID(dbUser.ID)
+	isProfileComplete := false
+	if err == nil || err == sql.ErrNoRows {
+		if profile == nil {
+			// Create empty profile
+			profileID, createErr := h.profileRepository.Create(dbUser.ID, "", "", "", "")
+			if createErr == nil {
+				profile, _ = h.profileRepository.GetByID(profileID)
+			}
+		}
+		// Check if profile is complete to determine if we should show publish button
+		isProfileComplete = formatters.IsProfileComplete(dbUser, profile)
 	}
 
 	h.RemovePreviouseMessage(b, &currentUser.Id)
@@ -253,7 +271,7 @@ func (h *profileHandler) handleEditMyProfile(b *gotgbot.Bot, ctx *ext.Context, m
 		fmt.Sprintf("<b>%s</b>", profileMenuEditHeader)+
 			"\n\nВыбери, что бы ты хотел/а изменить:",
 		&gotgbot.SendMessageOpts{
-			ReplyMarkup: formatters.ProfileEditButtons(constants.ProfileStartCallback),
+			ReplyMarkup: formatters.ProfileEditButtons(constants.ProfileStartCallback, isProfileComplete),
 		})
 
 	if err != nil {
@@ -818,4 +836,109 @@ func (h *profileHandler) SavePreviousMessageInfo(userID int64, sentMsg *gotgbot.
 	}
 	h.userStore.SetPreviousMessageInfo(userID, sentMsg.MessageId, sentMsg.Chat.Id,
 		profileCtxDataKeyPreviousMessageID, profileCtxDataKeyPreviousChatID)
+}
+
+// handlePublishProfile publishes the user's profile to the intro topic
+func (h *profileHandler) handlePublishProfile(b *gotgbot.Bot, ctx *ext.Context, msg *gotgbot.Message) error {
+	user := ctx.Update.CallbackQuery.From
+	dbUser, err := h.getOrCreateUser(&user)
+	if err != nil {
+		_ = h.messageSenderService.Reply(msg,
+			"Произошла ошибка при получении информации о пользователе.", nil)
+		return fmt.Errorf("ProfileHandler: failed to get user in handlePublishProfile: %w", err)
+	}
+
+	// Get profile
+	profile, err := h.profileRepository.GetByUserID(dbUser.ID)
+	if err != nil && err != sql.ErrNoRows {
+		_ = h.messageSenderService.Reply(msg,
+			"Произошла ошибка при получении профиля.", nil)
+		return fmt.Errorf("ProfileHandler: failed to get profile in handlePublishProfile: %w", err)
+	}
+
+	// Check if profile is complete
+	if !formatters.IsProfileComplete(dbUser, profile) {
+		h.RemovePreviouseMessage(b, &user.Id)
+		editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
+			msg.Chat.Id,
+			fmt.Sprintf("<b>%s</b>", profileMenuPublishHeader)+
+				"\n\n⚠️ Твой профиль неполный. Для публикации необходимо указать имя, биографию и хотя бы одну ссылку (LinkedIn, GitHub или веб-ресурс).",
+			&gotgbot.SendMessageOpts{
+				ReplyMarkup: formatters.ProfileBackCancelButtons(constants.ProfileEditMyProfileCallback),
+			})
+
+		if err != nil {
+			return fmt.Errorf("ProfileHandler: failed to send message in handlePublishProfile: %w", err)
+		}
+
+		h.SavePreviousMessageInfo(user.Id, editedMsg)
+		return handlers.NextConversationState(profileStateViewOptions)
+	}
+
+	// Format profile text for publishing
+	profileText := fmt.Sprintf("👋 <b>Новый участник сообщества</b>\n\n%s", formatters.FormatProfileView(dbUser, profile, false))
+
+	var publishedMsg *gotgbot.Message
+	// Check if we need to update existing message or create a new one
+	if profile.PublishedMessageID.Valid {
+		// Try to edit existing message
+		_, _, err := b.EditMessageText(profileText, &gotgbot.EditMessageTextOpts{
+			ChatId:    h.config.SuperGroupChatID,
+			MessageId: profile.PublishedMessageID.Int64,
+			ParseMode: "HTML",
+		})
+
+		if err != nil {
+			// If editing fails, create a new message
+			publishedMsg, err = h.messageSenderService.SendHtmlWithReturnMessage(
+				h.config.SuperGroupChatID,
+				profileText,
+				&gotgbot.SendMessageOpts{
+					MessageThreadId: int64(h.config.IntroTopicID),
+				})
+			if err != nil {
+				return fmt.Errorf("ProfileHandler: failed to publish profile: %w", err)
+			}
+		} else {
+			// Message updated successfully, store the message ID for database update
+			messageID := profile.PublishedMessageID.Int64
+			publishedMsg = &gotgbot.Message{
+				MessageId: messageID,
+			}
+		}
+	} else {
+		// Create a new message
+		publishedMsg, err = h.messageSenderService.SendHtmlWithReturnMessage(
+			h.config.SuperGroupChatID,
+			profileText,
+			&gotgbot.SendMessageOpts{
+				MessageThreadId: int64(h.config.IntroTopicID),
+			})
+		if err != nil {
+			return fmt.Errorf("ProfileHandler: failed to publish profile: %w", err)
+		}
+	}
+
+	// Update profile with the published message ID
+	err = h.profileRepository.UpdatePublishedMessageID(profile.ID, publishedMsg.MessageId)
+	if err != nil {
+		return fmt.Errorf("ProfileHandler: failed to update published message ID: %w", err)
+	}
+
+	// Show success message
+	h.RemovePreviouseMessage(b, &user.Id)
+	editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
+		msg.Chat.Id,
+		fmt.Sprintf("<b>%s</b>", profileMenuPublishHeader)+
+			"\n\n✅ Твой профиль успешно опубликован в канале \"Интро\"!",
+		&gotgbot.SendMessageOpts{
+			ReplyMarkup: formatters.ProfileBackCancelButtons(constants.ProfileEditMyProfileCallback),
+		})
+
+	if err != nil {
+		return fmt.Errorf("ProfileHandler: failed to send success message: %w", err)
+	}
+
+	h.SavePreviousMessageInfo(user.Id, editedMsg)
+	return handlers.NextConversationState(profileStateViewOptions)
 }

@@ -17,6 +17,7 @@ func Registry() []implementations.Migration {
 		implementations.NewAddNewEventTypes(),
 		implementations.NewUpdateEventsConstraints(),
 		implementations.NewAddUsersAndProfilesTables(),
+		implementations.NewAddPublishedMessageIDToProfiles(),
 		// Add new migrations here
 	}
 }

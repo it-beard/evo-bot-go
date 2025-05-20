@@ -77,48 +77,82 @@ func ProfileBackCancelButtons(backCallbackData string) gotgbot.InlineKeyboardMar
 	}
 }
 
-func ProfileEditButtons(backCallbackData string) gotgbot.InlineKeyboardMarkup {
-	return gotgbot.InlineKeyboardMarkup{
-		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
+// IsProfileComplete checks if a profile has the minimum required fields for publishing
+func IsProfileComplete(user *repositories.User, profile *repositories.Profile) bool {
+	// Profile needs to have firstname, bio, and at least one link (LinkedIn, GitHub, or Website)
+	if user == nil || profile == nil {
+		return false
+	}
+
+	if user.Firstname == "" {
+		return false
+	}
+
+	if profile.Bio == "" {
+		return false
+	}
+
+	// Check if at least one link is set
+	hasLink := profile.LinkedIn != "" || profile.GitHub != "" || profile.Website != ""
+	return hasLink
+}
+
+func ProfileEditButtons(backCallbackData string, isProfileComplete bool) gotgbot.InlineKeyboardMarkup {
+	buttons := [][]gotgbot.InlineKeyboardButton{
+		{
 			{
-				{
-					Text:         "👤 Имя",
-					CallbackData: constants.ProfileEditFirstnameCallback,
-				},
-				{
-					Text:         "👤 Фамилия",
-					CallbackData: constants.ProfileEditLastnameCallback,
-				},
-				{
-					Text:         "📝 О себе",
-					CallbackData: constants.ProfileEditBioCallback,
-				},
+				Text:         "👤 Имя",
+				CallbackData: constants.ProfileEditFirstnameCallback,
 			},
 			{
-				{
-					Text:         "💼 LinkedIn",
-					CallbackData: constants.ProfileEditLinkedinCallback,
-				},
-				{
-					Text:         "💾 GitHub",
-					CallbackData: constants.ProfileEditGithubCallback,
-				},
-				{
-					Text:         "🌐 Веб-ресурс",
-					CallbackData: constants.ProfileEditWebsiteCallback,
-				},
+				Text:         "👤 Фамилия",
+				CallbackData: constants.ProfileEditLastnameCallback,
 			},
 			{
-				{
-					Text:         "◀️ Назад",
-					CallbackData: backCallbackData,
-				},
-				{
-					Text:         "❌ Отмена",
-					CallbackData: constants.ProfileFullCancel,
-				},
+				Text:         "📝 О себе",
+				CallbackData: constants.ProfileEditBioCallback,
 			},
 		},
+		{
+			{
+				Text:         "💼 LinkedIn",
+				CallbackData: constants.ProfileEditLinkedinCallback,
+			},
+			{
+				Text:         "💾 GitHub",
+				CallbackData: constants.ProfileEditGithubCallback,
+			},
+			{
+				Text:         "🌐 Веб-ресурс",
+				CallbackData: constants.ProfileEditWebsiteCallback,
+			},
+		},
+	}
+
+	// Add publish button if profile is complete
+	if isProfileComplete {
+		buttons = append(buttons, []gotgbot.InlineKeyboardButton{
+			{
+				Text:         "📢 Опубликовать профиль",
+				CallbackData: constants.ProfilePublishCallback,
+			},
+		})
+	}
+
+	// Add back and cancel buttons
+	buttons = append(buttons, []gotgbot.InlineKeyboardButton{
+		{
+			Text:         "◀️ Назад",
+			CallbackData: backCallbackData,
+		},
+		{
+			Text:         "❌ Отмена",
+			CallbackData: constants.ProfileFullCancel,
+		},
+	})
+
+	return gotgbot.InlineKeyboardMarkup{
+		InlineKeyboard: buttons,
 	}
 }
 

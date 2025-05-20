@@ -23,6 +23,7 @@ const (
 	ProfileEditWebsiteCallback   = ProfilePrefix + "edit_website"
 	ProfileEditFirstnameCallback = ProfilePrefix + "edit_firstname"
 	ProfileEditLastnameCallback  = ProfilePrefix + "edit_lastname"
+	ProfilePublishCallback       = ProfilePrefix + "publish"
 
 	ProfileStartCallback = ProfilePrefix + "start"
 	ProfileSaveCallback  = ProfilePrefix + "save"
