@@ -149,7 +149,7 @@ func (h *profileHandler) showProfileMenu(b *gotgbot.Bot, msg *gotgbot.Message, u
 		})
 
 	if err != nil {
-		return fmt.Errorf("failed to send message: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to send message in showProfileMenu: %w", err)
 	}
 
 	h.SavePreviousMessageInfo(userId, editedMsg)
@@ -178,12 +178,6 @@ func (h *profileHandler) handleCallback(b *gotgbot.Bot, ctx *ext.Context) error 
 
 	effectiveMsg := ctx.EffectiveMessage
 	userId := callback.From.Id
-
-	// Acknowledge the callback to stop loading animation
-	_, err := callback.Answer(b, nil)
-	if err != nil {
-		return fmt.Errorf("failed to answer callback: %w", err)
-	}
 
 	switch data {
 	case constants.ProfileViewMyProfileCallback:
@@ -218,7 +212,7 @@ func (h *profileHandler) handleViewMyProfile(b *gotgbot.Bot, ctx *ext.Context, m
 	if err != nil {
 		_ = h.messageSenderService.Reply(msg,
 			"Произошла ошибка при получении информации о пользователе.", nil)
-		return fmt.Errorf("failed to get user: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to get user in handleViewMyProfile: %w", err)
 	}
 
 	// Try to get profile
@@ -226,7 +220,7 @@ func (h *profileHandler) handleViewMyProfile(b *gotgbot.Bot, ctx *ext.Context, m
 	if err != nil && err != sql.ErrNoRows {
 		_ = h.messageSenderService.Reply(msg,
 			"Произошла ошибка при получении профиля.", nil)
-		return fmt.Errorf("failed to get profile: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to get profile in handleViewMyProfile: %w", err)
 	}
 
 	profileText := fmt.Sprintf("<b>%s</b>\n\n%s", profileMenuMyProfileHeader, formatters.FormatProfileView(dbUser, profile, true))
@@ -236,7 +230,7 @@ func (h *profileHandler) handleViewMyProfile(b *gotgbot.Bot, ctx *ext.Context, m
 		})
 
 	if err != nil {
-		return fmt.Errorf("failed to send message: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to send message in handleViewMyProfile: %w", err)
 	}
 
 	h.RemovePreviouseMessage(b, &user.Id)
@@ -250,7 +244,7 @@ func (h *profileHandler) handleEditMyProfile(b *gotgbot.Bot, ctx *ext.Context, m
 	if err != nil {
 		_ = h.messageSenderService.Reply(msg,
 			"Произошла ошибка при получении информации о пользователе.", nil)
-		return fmt.Errorf("failed to get user: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to get user in handleEditMyProfile: %w", err)
 	}
 
 	h.RemovePreviouseMessage(b, &currentUser.Id)
@@ -263,7 +257,7 @@ func (h *profileHandler) handleEditMyProfile(b *gotgbot.Bot, ctx *ext.Context, m
 		})
 
 	if err != nil {
-		return fmt.Errorf("failed to send message: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to send message in handleEditMyProfile: %w", err)
 	}
 
 	h.SavePreviousMessageInfo(currentUser.Id, editedMsg)
@@ -283,7 +277,7 @@ func (h *profileHandler) handleViewOtherProfile(b *gotgbot.Bot, ctx *ext.Context
 		})
 
 	if err != nil {
-		return fmt.Errorf("failed to send message: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to send message in handleViewOtherProfile: %w", err)
 	}
 	h.SavePreviousMessageInfo(user.Id, editedMsg)
 	return handlers.NextConversationState(profileStateAwaitUsernameForSearch)
@@ -301,7 +295,7 @@ func (h *profileHandler) handleUsernameInput(b *gotgbot.Bot, ctx *ext.Context) e
 	if err != nil && err != sql.ErrNoRows {
 		_ = h.messageSenderService.Reply(msg,
 			"Произошла ошибка при получении информации о пользователе.", nil)
-		return fmt.Errorf("failed to get user: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to get user in handleUsernameInput: %w", err)
 	}
 
 	// If user not found, show search again
@@ -316,7 +310,7 @@ func (h *profileHandler) handleUsernameInput(b *gotgbot.Bot, ctx *ext.Context) e
 				ReplyMarkup: formatters.ProfileBackCancelButtons(constants.ProfileStartCallback),
 			})
 		if err != nil {
-			return fmt.Errorf("failed to send message: %w", err)
+			return fmt.Errorf("ProfileHandler: failed to send message in handleUsernameInput: %w", err)
 		}
 
 		h.SavePreviousMessageInfo(userId, editedMsg)
@@ -328,7 +322,7 @@ func (h *profileHandler) handleUsernameInput(b *gotgbot.Bot, ctx *ext.Context) e
 	if err != nil && err != sql.ErrNoRows {
 		_ = h.messageSenderService.Reply(msg,
 			"Произошла ошибка при получении профиля.", nil)
-		return fmt.Errorf("failed to get profile: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to get profile in handleUsernameInput: %w", err)
 	}
 
 	h.RemovePreviouseMessage(b, &userId)
@@ -342,7 +336,7 @@ func (h *profileHandler) handleUsernameInput(b *gotgbot.Bot, ctx *ext.Context) e
 		})
 
 	if err != nil {
-		return fmt.Errorf("failed to send message: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to send message in handleUsernameInput: %w", err)
 	}
 
 	h.SavePreviousMessageInfo(ctx.EffectiveMessage.From.Id, editedMsg)
@@ -359,12 +353,12 @@ func (h *profileHandler) handleEditField(b *gotgbot.Bot, ctx *ext.Context, msg *
 
 	dbUser, err := h.getOrCreateUser(&user)
 	if err != nil {
-		return fmt.Errorf("failed to get user: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to get user in handleEditField: %w", err)
 	}
 
 	dbProfile, err := h.getOrCreateProfile(dbUser.ID)
 	if err != nil {
-		return fmt.Errorf("error getting/creating profile: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to get/create profile in handleEditField: %w", err)
 	}
 
 	switch nextState {
@@ -403,7 +397,7 @@ func (h *profileHandler) handleEditField(b *gotgbot.Bot, ctx *ext.Context, msg *
 		})
 
 	if err != nil {
-		return fmt.Errorf("failed to send message: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to send message in handleEditField: %w", err)
 	}
 
 	h.SavePreviousMessageInfo(user.Id, editedMsg)
@@ -432,7 +426,7 @@ func (h *profileHandler) handleBioInput(b *gotgbot.Bot, ctx *ext.Context) error 
 		_ = h.messageSenderService.ReplyMarkdown(msg,
 			fmt.Sprintf("*%s*", profileMenuEditBioHeader)+
 				"\n\nПроизошла ошибка при сохранении биографии.", nil)
-		return fmt.Errorf("failed to save bio: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to save bio in handleBioInput: %w", err)
 	}
 
 	h.RemovePreviouseMessage(b, &msg.From.Id)
@@ -444,7 +438,7 @@ func (h *profileHandler) handleBioInput(b *gotgbot.Bot, ctx *ext.Context) error 
 			ReplyMarkup: formatters.ProfileBackCancelButtons(constants.ProfileEditMyProfileCallback),
 		})
 	if err != nil {
-		return fmt.Errorf("failed to send message: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to send message in handleBioInput: %w", err)
 	}
 
 	h.SavePreviousMessageInfo(msg.From.Id, sendMsg)
@@ -473,7 +467,7 @@ func (h *profileHandler) handleFirstnameInput(b *gotgbot.Bot, ctx *ext.Context) 
 		_ = h.messageSenderService.ReplyMarkdown(msg,
 			fmt.Sprintf("*%s*", profileMenuEditFirstnameHeader)+
 				"\n\nПроизошла ошибка при сохранении имени.", nil)
-		return fmt.Errorf("failed to save firstname: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to save firstname in handleFirstnameInput: %w", err)
 	}
 
 	h.RemovePreviouseMessage(b, &msg.From.Id)
@@ -485,7 +479,7 @@ func (h *profileHandler) handleFirstnameInput(b *gotgbot.Bot, ctx *ext.Context) 
 			ReplyMarkup: formatters.ProfileBackCancelButtons(constants.ProfileEditMyProfileCallback),
 		})
 	if err != nil {
-		return fmt.Errorf("failed to send message: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to send message in handleFirstnameInput: %w", err)
 	}
 
 	h.SavePreviousMessageInfo(msg.From.Id, sendMsg)
@@ -514,7 +508,7 @@ func (h *profileHandler) handleLastnameInput(b *gotgbot.Bot, ctx *ext.Context) e
 		_ = h.messageSenderService.ReplyMarkdown(msg,
 			fmt.Sprintf("*%s*", profileMenuEditLastnameHeader)+
 				"\n\nПроизошла ошибка при сохранении фамилии.", nil)
-		return fmt.Errorf("failed to save lastname: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to save lastname in handleLastnameInput: %w", err)
 	}
 
 	h.RemovePreviouseMessage(b, &msg.From.Id)
@@ -526,7 +520,7 @@ func (h *profileHandler) handleLastnameInput(b *gotgbot.Bot, ctx *ext.Context) e
 			ReplyMarkup: formatters.ProfileBackCancelButtons(constants.ProfileEditMyProfileCallback),
 		})
 	if err != nil {
-		return fmt.Errorf("failed to send message: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to send message in handleLastnameInput: %w", err)
 	}
 
 	h.SavePreviousMessageInfo(msg.From.Id, sendMsg)
@@ -555,7 +549,7 @@ func (h *profileHandler) handleLinkedinInput(b *gotgbot.Bot, ctx *ext.Context) e
 		_ = h.messageSenderService.ReplyMarkdown(msg,
 			fmt.Sprintf("*%s*", profileMenuEditLinkedinHeader)+
 				"\n\nПроизошла ошибка при сохранении ссылки на LinkedIn.", nil)
-		return fmt.Errorf("failed to save LinkedIn: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to save LinkedIn in handleLinkedinInput: %w", err)
 	}
 
 	h.RemovePreviouseMessage(b, &msg.From.Id)
@@ -568,7 +562,7 @@ func (h *profileHandler) handleLinkedinInput(b *gotgbot.Bot, ctx *ext.Context) e
 			ReplyMarkup: formatters.ProfileBackCancelButtons(constants.ProfileEditMyProfileCallback),
 		})
 	if err != nil {
-		return fmt.Errorf("failed to send message: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to send message in handleLinkedinInput: %w", err)
 	}
 
 	h.SavePreviousMessageInfo(msg.From.Id, sendMsg)
@@ -597,7 +591,7 @@ func (h *profileHandler) handleGithubInput(b *gotgbot.Bot, ctx *ext.Context) err
 		_ = h.messageSenderService.ReplyMarkdown(msg,
 			fmt.Sprintf("*%s*", profileMenuEditGithubHeader)+
 				"\n\nПроизошла ошибка при сохранении ссылки на GitHub.", nil)
-		return fmt.Errorf("failed to save GitHub: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to save GitHub in handleGithubInput: %w", err)
 	}
 
 	h.RemovePreviouseMessage(b, &msg.From.Id)
@@ -609,7 +603,7 @@ func (h *profileHandler) handleGithubInput(b *gotgbot.Bot, ctx *ext.Context) err
 			ReplyMarkup: formatters.ProfileBackCancelButtons(constants.ProfileEditMyProfileCallback),
 		})
 	if err != nil {
-		return fmt.Errorf("failed to send message: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to send message in handleGithubInput: %w", err)
 	}
 
 	h.SavePreviousMessageInfo(msg.From.Id, sendMsg)
@@ -638,7 +632,7 @@ func (h *profileHandler) handleWebsiteInput(b *gotgbot.Bot, ctx *ext.Context) er
 		_ = h.messageSenderService.ReplyMarkdown(msg,
 			fmt.Sprintf("*%s*", profileMenuEditWebsiteHeader)+
 				"\n\nПроизошла ошибка при сохранении ссылки на вебсайт.", nil)
-		return fmt.Errorf("failed to save website: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to save website in handleWebsiteInput: %w", err)
 	}
 
 	h.RemovePreviouseMessage(b, &msg.From.Id)
@@ -650,7 +644,7 @@ func (h *profileHandler) handleWebsiteInput(b *gotgbot.Bot, ctx *ext.Context) er
 			ReplyMarkup: formatters.ProfileBackCancelButtons(constants.ProfileEditMyProfileCallback),
 		})
 	if err != nil {
-		return fmt.Errorf("failed to send message: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to send message in handleWebsiteInput: %w", err)
 	}
 
 	h.SavePreviousMessageInfo(msg.From.Id, sendMsg)
@@ -684,7 +678,7 @@ func (h *profileHandler) getOrCreateUser(tgUser *gotgbot.User) (*repositories.Us
 
 	// If error is not "no rows", it's a real error
 	if err != sql.ErrNoRows {
-		return nil, fmt.Errorf("error getting user: %w", err)
+		return nil, fmt.Errorf("ProfileHandler: failed to get user in getOrCreateUser: %w", err)
 	}
 
 	// User doesn't exist, create new user
@@ -695,13 +689,13 @@ func (h *profileHandler) getOrCreateUser(tgUser *gotgbot.User) (*repositories.Us
 		tgUser.Username,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("error creating user: %w", err)
+		return nil, fmt.Errorf("ProfileHandler: failed to create user in getOrCreateUser: %w", err)
 	}
 
 	// Get the newly created user
 	dbUser, err = h.userRepository.GetByID(userID)
 	if err != nil {
-		return nil, fmt.Errorf("error getting created user: %w", err)
+		return nil, fmt.Errorf("ProfileHandler: failed to get created user in getOrCreateUser: %w", err)
 	}
 
 	return dbUser, nil
@@ -711,7 +705,7 @@ func (h *profileHandler) getOrCreateProfile(dbUserID int) (*repositories.Profile
 	// Try to get profile
 	profile, err := h.profileRepository.GetByUserID(dbUserID)
 	if err != nil && err != sql.ErrNoRows {
-		return nil, fmt.Errorf("error getting profile: %w", err)
+		return nil, fmt.Errorf("ProfileHandler: failed to get profile in getOrCreateProfile: %w", err)
 	}
 
 	// If profile doesn't exist, create it
@@ -724,7 +718,7 @@ func (h *profileHandler) getOrCreateProfile(dbUserID int) (*repositories.Profile
 
 		_, err = h.profileRepository.Create(dbUserID, bio, linkedin, github, website)
 		if err != nil {
-			return nil, fmt.Errorf("error creating profile: %w", err)
+			return nil, fmt.Errorf("ProfileHandler: failed to create profile in getOrCreateProfile: %w", err)
 		}
 
 		return profile, nil
@@ -736,13 +730,13 @@ func (h *profileHandler) getOrCreateProfile(dbUserID int) (*repositories.Profile
 func (h *profileHandler) saveProfileField(tgUser *gotgbot.User, fieldName string, value string) error {
 	dbUser, err := h.getOrCreateUser(tgUser)
 	if err != nil {
-		return fmt.Errorf("error getting/creating user: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to get/create user in saveProfileField: %w", err)
 	}
 
 	// Try to get profile
 	profile, err := h.getOrCreateProfile(dbUser.ID)
 	if err != nil {
-		return fmt.Errorf("error getting/creating profile: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to get/create profile in saveProfileField: %w", err)
 	}
 
 	// Profile exists, update the specific field
@@ -752,7 +746,7 @@ func (h *profileHandler) saveProfileField(tgUser *gotgbot.User, fieldName string
 
 	err = h.profileRepository.Update(profile.ID, fields)
 	if err != nil {
-		return fmt.Errorf("error updating profile: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to update profile in saveProfileField: %w", err)
 	}
 
 	return nil
@@ -761,12 +755,12 @@ func (h *profileHandler) saveProfileField(tgUser *gotgbot.User, fieldName string
 func (h *profileHandler) saveUserField(tgUser *gotgbot.User, fieldName string, value string) error {
 	dbUser, err := h.getOrCreateUser(tgUser)
 	if err != nil {
-		return fmt.Errorf("error getting/creating user: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to get/create user in saveUserField: %w", err)
 	}
 
 	_, err = h.getOrCreateProfile(dbUser.ID)
 	if err != nil {
-		return fmt.Errorf("error getting/creating profile: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to get/create profile in saveUserField: %w", err)
 	}
 
 	// Update user with new field value
@@ -776,7 +770,7 @@ func (h *profileHandler) saveUserField(tgUser *gotgbot.User, fieldName string, v
 
 	err = h.userRepository.Update(dbUser.ID, fields)
 	if err != nil {
-		return fmt.Errorf("error updating user: %w", err)
+		return fmt.Errorf("ProfileHandler: failed to update user in saveUserField: %w", err)
 	}
 
 	return nil
