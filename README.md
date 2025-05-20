@@ -19,6 +19,19 @@ A Telegram bot for Evocoders Club management implemented in Go. Helps moderate d
   - Auto-posts at configured times
   - Manual trigger with `/summarize` (admin-only)
 
+### User Profile Management
+- 👤 **Profile Command** (`/profile`): Manage your personal profile
+  - Create and edit personal information (name, bio)
+  - Add social links (LinkedIn, GitHub, and custom links)
+  - Publish your profile to the designated "Intro" topic
+  - Search for other club members' profiles
+
+### Event Management
+- 📅 **Event Management**: Track and organize community events
+  - Support for different event types and statuses
+  - Event publishing with start times
+  - Topic organization within events
+
 ### Utility
 - ℹ️ **Help** (`/help`): Provides usage information
 - 🧩 **Dynamic Templates**: Customizable AI prompts stored in database
@@ -43,6 +56,11 @@ The bot uses PostgreSQL with automatically initialized tables:
 | **messages** | Stores chat data for summarization | `id`, `topic_id`, `message_text`, `created_at` |
 | **tg_sessions** | Manages Telegram User Client sessions | `id`, `data`, `updated_at` |
 | **prompting_templates** | Stores AI prompting templates | `template_key`, `template_text` |
+| **users** | Stores user information | `id`, `tg_id`, `firstname`, `lastname`, `tg_username`, `score`, `has_coffee_ban` |
+| **profiles** | Stores user profile data | `id`, `user_id`, `bio`, `linkedin`, `github`, `freelink`, `published_message_id`, `created_at`, `updated_at` |
+| **events** | Stores event information | `id`, `name`, `type`, `status`, `started_at`, `created_at`, `updated_at` |
+| **topics** | Stores topics related to events | `id`, `topic`, `user_nickname`, `event_id`, `created_at` |
+| **migrations** | Tracks database migrations | `id`, `name`, `timestamp`, `created_at` |
 
 ## Building the Executable
 
@@ -89,7 +107,8 @@ The bot uses environment variables for configuration, make sure to set them all:
 - `TG_EVO_BOT_FORWARDING_TOPIC_ID`: ID of the topic where forwarded replies will be sent (0 for General topic)
 - `TG_EVO_BOT_TOOL_TOPIC_ID`: Topic ID for the AI tools database
 - `TG_EVO_BOT_CONTENT_TOPIC_ID`: Topic ID for the content topic
-- `TG_EVO_BOT_INVITE_TOPIC_ID`: Topic ID for the club introductions and member information
+- `TG_EVO_BOT_INTRO_TOPIC_ID`: Topic ID for the club introductions and member information
+- `TG_EVO_BOT_ANNOUNCEMENT_TOPIC_ID`: Topic ID for announcements
 
 ### Telegram User Client
 - `TG_EVO_BOT_TGUSERCLIENT_APPID`: Telegram API App ID
@@ -122,7 +141,8 @@ set TG_EVO_BOT_CLOSED_TOPICS_IDS=topic_id_1,topic_id_2,topic_id_3
 set TG_EVO_BOT_FORWARDING_TOPIC_ID=forwarding_topic_id
 set TG_EVO_BOT_TOOL_TOPIC_ID=tool_topic_id
 set TG_EVO_BOT_CONTENT_TOPIC_ID=content_topic_id
-set TG_EVO_BOT_INVITE_TOPIC_ID=invite_topic_id
+set TG_EVO_BOT_INTRO_TOPIC_ID=intro_topic_id
+set TG_EVO_BOT_ANNOUNCEMENT_TOPIC_ID=announcement_topic_id
 
 # Telegram User Client
 set TG_EVO_BOT_TGUSERCLIENT_APPID=your_app_id
