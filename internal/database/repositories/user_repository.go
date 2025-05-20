@@ -9,15 +9,15 @@ import (
 
 // User represents a row in the users table
 type User struct {
-	ID          int
-	TgID        int64
-	Firstname   string
-	Lastname    string
-	TgUsername  string
-	Score       int
+	ID           int
+	TgID         int64
+	Firstname    string
+	Lastname     string
+	TgUsername   string
+	Score        int
 	HasCoffeeBan bool
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 // UserRepository handles database operations for users
@@ -51,7 +51,7 @@ func (r *UserRepository) GetByID(id int) (*User, error) {
 	)
 
 	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("no user found with ID %d", id)
+		return nil, sql.ErrNoRows
 	}
 
 	if err != nil {
@@ -82,11 +82,42 @@ func (r *UserRepository) GetByTelegramID(tgID int64) (*User, error) {
 	)
 
 	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("no user found with Telegram ID %d", tgID)
+		return nil, sql.ErrNoRows
 	}
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user with Telegram ID %d: %w", tgID, err)
+	}
+
+	return &user, nil
+}
+
+// GetByTelegramUsername retrieves a user by Telegram username
+func (r *UserRepository) GetByTelegramUsername(tgUsername string) (*User, error) {
+	query := `
+		SELECT id, tg_id, firstname, lastname, tg_username, score, has_coffee_ban, created_at, updated_at
+		FROM users
+		WHERE tg_username = $1`
+
+	var user User
+	err := r.db.QueryRow(query, tgUsername).Scan(
+		&user.ID,
+		&user.TgID,
+		&user.Firstname,
+		&user.Lastname,
+		&user.TgUsername,
+		&user.Score,
+		&user.HasCoffeeBan,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, sql.ErrNoRows
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user with Telegram username %s: %w", tgUsername, err)
 	}
 
 	return &user, nil

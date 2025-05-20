@@ -31,6 +31,8 @@ type HandlerDependencies struct {
 	EventRepository             *repositories.EventRepository
 	TopicRepository             *repositories.TopicRepository
 	PromptingTemplateRepository *repositories.PromptingTemplateRepository
+	UserRepository              *repositories.UserRepository
+	ProfileRepository           *repositories.ProfileRepository
 }
 
 // TgBotClient represents a Telegram bot client with all required dependencies
@@ -73,6 +75,8 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	eventRepository := repositories.NewEventRepository(db.DB)
 	topicRepository := repositories.NewTopicRepository(db.DB)
 	promptingTemplateRepository := repositories.NewPromptingTemplateRepository(db.DB)
+	userRepository := repositories.NewUserRepository(db.DB)
+	profileRepository := repositories.NewProfileRepository(db.DB)
 	// Initialize services
 	messageSenderService := services.NewMessageSenderService(bot)
 	permissionsService := services.NewPermissionsService(appConfig, bot, messageSenderService)
@@ -105,6 +109,8 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 		EventRepository:             eventRepository,
 		TopicRepository:             topicRepository,
 		PromptingTemplateRepository: promptingTemplateRepository,
+		UserRepository:              userRepository,
+		ProfileRepository:           profileRepository,
 	}
 
 	// Register all handlers
@@ -150,6 +156,7 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 		privatehandlers.NewContentHandler(deps.AppConfig, deps.OpenAiClient, deps.MessageSenderService, deps.PromptingTemplateRepository, deps.PermissionsService),
 		privatehandlers.NewIntroHandler(deps.AppConfig, deps.OpenAiClient, deps.MessageSenderService, deps.PromptingTemplateRepository, deps.PermissionsService),
 		privatehandlers.NewEventsHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
+		privatehandlers.NewProfileHandler(deps.AppConfig, deps.MessageSenderService, deps.PermissionsService, deps.UserRepository, deps.ProfileRepository),
 		topicshandlers.NewTopicsHandler(deps.AppConfig, deps.TopicRepository, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
 		topicshandlers.NewTopicAddHandler(deps.AppConfig, deps.TopicRepository, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
 	}

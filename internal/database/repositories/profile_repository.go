@@ -49,7 +49,7 @@ func (r *ProfileRepository) GetByID(id int) (*Profile, error) {
 	)
 
 	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("no profile found with ID %d", id)
+		return nil, sql.ErrNoRows
 	}
 
 	if err != nil {
@@ -79,7 +79,7 @@ func (r *ProfileRepository) GetByUserID(userID int) (*Profile, error) {
 	)
 
 	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("no profile found for user with ID %d", userID)
+		return nil, sql.ErrNoRows
 	}
 
 	if err != nil {
