@@ -100,7 +100,7 @@ func (h *RepliesFromClosedThreadsHandler) forwardReplyMessage(ctx *ext.Context) 
 	// Prepare the text with the topic name and user mention
 	username := msg.From.Username
 	prefixText := fmt.Sprintf(
-		"↩️ oтвет от @%s в канале ",
+		"↩️ oтвет @%s на сообщение в канале ",
 		username)
 	prefixLength := utf8.RuneCountInString(prefixText)
 	topicNameLength := utf8.RuneCountInString(topicName)
