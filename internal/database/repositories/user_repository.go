@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"time"
+
+	"github.com/PaulSonOfLars/gotgbot/v2"
 )
 
 // User represents a row in the users table
@@ -222,4 +224,37 @@ func (r *UserRepository) SetCoffeeBan(id int, banned bool) error {
 	}
 
 	return nil
+}
+
+func (h *UserRepository) GetOrCreateUser(tgUser *gotgbot.User) (*User, error) {
+	// Try to get user by Telegram ID
+	dbUser, err := h.GetByTelegramID(int64(tgUser.Id))
+	if err == nil {
+		// User exists, return it
+		return dbUser, nil
+	}
+
+	// If error is not "no rows", it's a real error
+	if err != sql.ErrNoRows {
+		return nil, fmt.Errorf("ProfileHandler: failed to get user in getOrCreateUser: %w", err)
+	}
+
+	// User doesn't exist, create new user
+	userID, err := h.Create(
+		int64(tgUser.Id),
+		tgUser.FirstName,
+		tgUser.LastName,
+		tgUser.Username,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("ProfileHandler: failed to create user in getOrCreateUser: %w", err)
+	}
+
+	// Get the newly created user
+	dbUser, err = h.GetByID(userID)
+	if err != nil {
+		return nil, fmt.Errorf("ProfileHandler: failed to get created user in getOrCreateUser: %w", err)
+	}
+
+	return dbUser, nil
 }

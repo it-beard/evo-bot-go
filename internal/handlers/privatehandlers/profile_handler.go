@@ -213,7 +213,7 @@ func (h *profileHandler) handleCallback(b *gotgbot.Bot, ctx *ext.Context) error 
 func (h *profileHandler) handleViewMyProfile(b *gotgbot.Bot, ctx *ext.Context, msg *gotgbot.Message) error {
 	// Get or create user in our DB
 	user := ctx.Update.CallbackQuery.From
-	dbUser, err := h.getOrCreateUser(&user)
+	dbUser, err := h.userRepository.GetOrCreateUser(&user)
 	if err != nil {
 		_ = h.messageSenderService.Reply(msg,
 			"Произошла ошибка при получении информации о пользователе.", nil)
@@ -350,12 +350,12 @@ func (h *profileHandler) handleEditField(b *gotgbot.Bot, ctx *ext.Context, msg *
 
 	h.userStore.Set(user.Id, profileCtxDataKeyField, fieldName)
 
-	dbUser, err := h.getOrCreateUser(&user)
+	dbUser, err := h.userRepository.GetOrCreateUser(&user)
 	if err != nil {
 		return fmt.Errorf("ProfileHandler: failed to get user in handleEditField: %w", err)
 	}
 
-	dbProfile, err := h.getOrCreateProfile(dbUser.ID)
+	dbProfile, err := h.profileRepository.GetOrCreateDefaultProfile(dbUser.ID)
 	if err != nil {
 		return fmt.Errorf("ProfileHandler: failed to get/create profile in handleEditField: %w", err)
 	}
@@ -671,7 +671,7 @@ func (h *profileHandler) handleFreeLinkInput(b *gotgbot.Bot, ctx *ext.Context) e
 // handlePublishProfile publishes the user's profile to the intro topic
 func (h *profileHandler) handlePublishProfile(b *gotgbot.Bot, ctx *ext.Context, msg *gotgbot.Message) error {
 	user := ctx.Update.CallbackQuery.From
-	dbUser, err := h.getOrCreateUser(&user)
+	dbUser, err := h.userRepository.GetOrCreateUser(&user)
 	if err != nil {
 		return fmt.Errorf("ProfileHandler: failed to get user in handlePublishProfile: %w", err)
 	}
@@ -822,73 +822,14 @@ func (h *profileHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	return handlers.EndConversation()
 }
 
-func (h *profileHandler) getOrCreateUser(tgUser *gotgbot.User) (*repositories.User, error) {
-	// Try to get user by Telegram ID
-	dbUser, err := h.userRepository.GetByTelegramID(int64(tgUser.Id))
-	if err == nil {
-		// User exists, return it
-		return dbUser, nil
-	}
-
-	// If error is not "no rows", it's a real error
-	if err != sql.ErrNoRows {
-		return nil, fmt.Errorf("ProfileHandler: failed to get user in getOrCreateUser: %w", err)
-	}
-
-	// User doesn't exist, create new user
-	userID, err := h.userRepository.Create(
-		int64(tgUser.Id),
-		tgUser.FirstName,
-		tgUser.LastName,
-		tgUser.Username,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("ProfileHandler: failed to create user in getOrCreateUser: %w", err)
-	}
-
-	// Get the newly created user
-	dbUser, err = h.userRepository.GetByID(userID)
-	if err != nil {
-		return nil, fmt.Errorf("ProfileHandler: failed to get created user in getOrCreateUser: %w", err)
-	}
-
-	return dbUser, nil
-}
-
-func (h *profileHandler) getOrCreateProfile(dbUserID int) (*repositories.Profile, error) {
-	// Try to get profile
-	profile, err := h.profileRepository.GetByUserID(dbUserID)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, fmt.Errorf("ProfileHandler: failed to get profile in getOrCreateProfile: %w", err)
-	}
-
-	// If profile doesn't exist, create it
-	if err == sql.ErrNoRows {
-		// Initialize defaults for all fields
-		bio := ""
-		linkedin := ""
-		github := ""
-		freeLink := ""
-
-		_, err = h.profileRepository.Create(dbUserID, bio, linkedin, github, freeLink)
-		if err != nil {
-			return nil, fmt.Errorf("ProfileHandler: failed to create profile in getOrCreateProfile: %w", err)
-		}
-
-		return profile, nil
-	}
-
-	return profile, nil
-}
-
 func (h *profileHandler) saveProfileField(tgUser *gotgbot.User, fieldName string, value string) error {
-	dbUser, err := h.getOrCreateUser(tgUser)
+	dbUser, err := h.userRepository.GetOrCreateUser(tgUser)
 	if err != nil {
 		return fmt.Errorf("ProfileHandler: failed to get/create user in saveProfileField: %w", err)
 	}
 
 	// Try to get profile
-	profile, err := h.getOrCreateProfile(dbUser.ID)
+	profile, err := h.profileRepository.GetOrCreateDefaultProfile(dbUser.ID)
 	if err != nil {
 		return fmt.Errorf("ProfileHandler: failed to get/create profile in saveProfileField: %w", err)
 	}
@@ -907,12 +848,12 @@ func (h *profileHandler) saveProfileField(tgUser *gotgbot.User, fieldName string
 }
 
 func (h *profileHandler) saveUserField(tgUser *gotgbot.User, fieldName string, value string) error {
-	dbUser, err := h.getOrCreateUser(tgUser)
+	dbUser, err := h.userRepository.GetOrCreateUser(tgUser)
 	if err != nil {
 		return fmt.Errorf("ProfileHandler: failed to get/create user in saveUserField: %w", err)
 	}
 
-	_, err = h.getOrCreateProfile(dbUser.ID)
+	_, err = h.profileRepository.GetOrCreateDefaultProfile(dbUser.ID)
 	if err != nil {
 		return fmt.Errorf("ProfileHandler: failed to get/create profile in saveUserField: %w", err)
 	}

@@ -174,3 +174,29 @@ func (r *ProfileRepository) UpdatePublishedMessageID(profileID int, messageID in
 
 	return nil
 }
+
+func (h *ProfileRepository) GetOrCreateDefaultProfile(dbUserID int) (*Profile, error) {
+	// Try to get profile
+	profile, err := h.GetByUserID(dbUserID)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, fmt.Errorf("ProfileHandler: failed to get profile in getOrCreateProfile: %w", err)
+	}
+
+	// If profile doesn't exist, create it
+	if err == sql.ErrNoRows {
+		// Initialize defaults for all fields
+		bio := ""
+		linkedin := ""
+		github := ""
+		freeLink := ""
+
+		_, err = h.Create(dbUserID, bio, linkedin, github, freeLink)
+		if err != nil {
+			return nil, fmt.Errorf("ProfileHandler: failed to create profile in getOrCreateProfile: %w", err)
+		}
+
+		return profile, nil
+	}
+
+	return profile, nil
+}
