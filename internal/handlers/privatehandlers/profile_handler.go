@@ -190,7 +190,7 @@ func (h *profileHandler) handleCallback(b *gotgbot.Bot, ctx *ext.Context) error 
 	case constants.ProfileViewOtherProfileCallback:
 		return h.handleViewOtherProfile(b, ctx, effectiveMsg)
 	case constants.ProfileEditBioCallback:
-		return h.handleEditField(b, ctx, effectiveMsg, "обновлённую биографию (до 2000 символов)", profileStateAwaitBio)
+		return h.handleEditField(b, ctx, effectiveMsg, "обновлённую биографию (до 4000 символов)", profileStateAwaitBio)
 	case constants.ProfileEditLinkedinCallback:
 		return h.handleEditField(b, ctx, effectiveMsg, "новую ссылку на LinkedIn", profileStateAwaitLinkedin)
 	case constants.ProfileEditGithubCallback:
@@ -408,13 +408,13 @@ func (h *profileHandler) handleBioInput(b *gotgbot.Bot, ctx *ext.Context) error 
 	msg := ctx.EffectiveMessage
 	bio := msg.Text
 
-	if len(bio) > 2000 {
+	if len(bio) > 4000 {
 		h.RemovePreviouseMessage(b, &msg.From.Id)
 		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
 		errMsg, _ := h.messageSenderService.SendMarkdownWithReturnMessage(
 			msg.Chat.Id,
 			fmt.Sprintf("*%s*", profileMenuEditBioHeader)+
-				"\n\nБиография слишком длинная. Пожалуйста, сократи до 2000 символов и пришли снова:",
+				"\n\nБиография слишком длинная. Пожалуйста, сократи до 4000 символов и пришли снова:",
 			&gotgbot.SendMessageOpts{
 				ReplyMarkup: formatters.ProfileBackCancelButtons(constants.ProfileEditMyProfileCallback),
 			})
