@@ -15,7 +15,7 @@ func NewAddPublishedMessageIDToProfiles() *AddPublishedMessageIDToProfiles {
 	return &AddPublishedMessageIDToProfiles{
 		BaseMigration: BaseMigration{
 			name:      "add_published_message_id_to_profiles",
-			timestamp: "20250720",
+			timestamp: "20250520",
 		},
 	}
 }

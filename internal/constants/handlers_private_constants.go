@@ -20,7 +20,7 @@ const (
 	ProfileEditBioCallback       = ProfilePrefix + "edit_bio"
 	ProfileEditLinkedinCallback  = ProfilePrefix + "edit_linkedin"
 	ProfileEditGithubCallback    = ProfilePrefix + "edit_github"
-	ProfileEditWebsiteCallback   = ProfilePrefix + "edit_website"
+	ProfileEditFreeLinkCallback  = ProfilePrefix + "edit_free_link"
 	ProfileEditFirstnameCallback = ProfilePrefix + "edit_firstname"
 	ProfileEditLastnameCallback  = ProfilePrefix + "edit_lastname"
 	ProfilePublishCallback       = ProfilePrefix + "publish"

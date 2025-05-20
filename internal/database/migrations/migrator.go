@@ -18,6 +18,7 @@ func Registry() []implementations.Migration {
 		implementations.NewUpdateEventsConstraints(),
 		implementations.NewAddUsersAndProfilesTables(),
 		implementations.NewAddPublishedMessageIDToProfiles(),
+		implementations.NewRenameWebsiteToFreelink(),
 		// Add new migrations here
 	}
 }

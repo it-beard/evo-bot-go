@@ -20,6 +20,10 @@ func ProfileMainButtons() gotgbot.InlineKeyboardMarkup {
 					Text:         "✏️ Редактировать",
 					CallbackData: constants.ProfileEditMyProfileCallback,
 				},
+				{
+					Text:         "📢 Опубликовать",
+					CallbackData: constants.ProfilePublishCallback,
+				},
 			},
 			{
 				{
@@ -42,14 +46,12 @@ func ProfileEditBackCancelButtons(backCallbackData string) gotgbot.InlineKeyboar
 		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
 			{
 				{
-					Text:         "✏️ Редактировать мой профиль",
-					CallbackData: constants.ProfileEditMyProfileCallback,
-				},
-			},
-			{
-				{
 					Text:         "◀️ Назад",
 					CallbackData: backCallbackData,
+				},
+				{
+					Text:         "✏️ Редактировать",
+					CallbackData: constants.ProfileEditMyProfileCallback,
 				},
 				{
 					Text:         "❌ Отмена",
@@ -77,27 +79,28 @@ func ProfileBackCancelButtons(backCallbackData string) gotgbot.InlineKeyboardMar
 	}
 }
 
-// IsProfileComplete checks if a profile has the minimum required fields for publishing
-func IsProfileComplete(user *repositories.User, profile *repositories.Profile) bool {
-	// Profile needs to have firstname, bio, and at least one link (LinkedIn, GitHub, or Website)
-	if user == nil || profile == nil {
-		return false
+func ProfileBackPublishCancelButtons(backCallbackData string) gotgbot.InlineKeyboardMarkup {
+	return gotgbot.InlineKeyboardMarkup{
+		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
+			{
+				{
+					Text:         "◀️ Назад",
+					CallbackData: backCallbackData,
+				},
+				{
+					Text:         "📢 Опубликовать",
+					CallbackData: constants.ProfilePublishCallback,
+				},
+				{
+					Text:         "❌ Отмена",
+					CallbackData: constants.ProfileFullCancel,
+				},
+			},
+		},
 	}
-
-	if user.Firstname == "" {
-		return false
-	}
-
-	if profile.Bio == "" {
-		return false
-	}
-
-	// Check if at least one link is set
-	hasLink := profile.LinkedIn != "" || profile.GitHub != "" || profile.Website != ""
-	return hasLink
 }
 
-func ProfileEditButtons(backCallbackData string, isProfileComplete bool) gotgbot.InlineKeyboardMarkup {
+func ProfileEditButtons(backCallbackData string) gotgbot.InlineKeyboardMarkup {
 	buttons := [][]gotgbot.InlineKeyboardButton{
 		{
 			{
@@ -123,33 +126,21 @@ func ProfileEditButtons(backCallbackData string, isProfileComplete bool) gotgbot
 				CallbackData: constants.ProfileEditGithubCallback,
 			},
 			{
-				Text:         "🌐 Веб-ресурс",
-				CallbackData: constants.ProfileEditWebsiteCallback,
+				Text:         "🌐 Ссылка",
+				CallbackData: constants.ProfileEditFreeLinkCallback,
 			},
 		},
-	}
-
-	// Add publish button if profile is complete
-	if isProfileComplete {
-		buttons = append(buttons, []gotgbot.InlineKeyboardButton{
+		{
 			{
-				Text:         "📢 Опубликовать профиль",
-				CallbackData: constants.ProfilePublishCallback,
+				Text:         "◀️ Назад",
+				CallbackData: backCallbackData,
 			},
-		})
+			{
+				Text:         "❌ Отмена",
+				CallbackData: constants.ProfileFullCancel,
+			},
+		},
 	}
-
-	// Add back and cancel buttons
-	buttons = append(buttons, []gotgbot.InlineKeyboardButton{
-		{
-			Text:         "◀️ Назад",
-			CallbackData: backCallbackData,
-		},
-		{
-			Text:         "❌ Отмена",
-			CallbackData: constants.ProfileFullCancel,
-		},
-	})
 
 	return gotgbot.InlineKeyboardMarkup{
 		InlineKeyboard: buttons,
@@ -175,24 +166,67 @@ func FormatProfileView(user *repositories.User, profile *repositories.Profile, s
 	text := fmt.Sprintf("👤 %s\n", username)
 
 	if profile.Bio != "" {
-		text += fmt.Sprintf("\n<b>О себе:</b>\n%s\n", profile.Bio)
+		text += fmt.Sprintf("\n<blockquote>О себе</blockquote>\n%s\n", profile.Bio)
 	}
 
 	// Add social links section if any exists
-	hasLinks := profile.LinkedIn != "" || profile.GitHub != "" || profile.Website != ""
+	hasLinks := profile.LinkedIn != "" || profile.GitHub != "" || profile.FreeLink != ""
 	if hasLinks {
-		text += "\n<b>Ссылки:</b>\n"
+		text += "\n<blockquote>Ссылки</blockquote>\n"
 
 		if profile.LinkedIn != "" {
-			text += fmt.Sprintf("• LinkedIn: %s\n", profile.LinkedIn)
+			text += fmt.Sprintf("🔸 LinkedIn: %s\n", profile.LinkedIn)
 		}
 
 		if profile.GitHub != "" {
-			text += fmt.Sprintf("• GitHub: %s\n", profile.GitHub)
+			text += fmt.Sprintf("🔸 GitHub: %s\n", profile.GitHub)
 		}
 
-		if profile.Website != "" {
-			text += fmt.Sprintf("• Вебсайт: %s\n", profile.Website)
+		if profile.FreeLink != "" {
+			text += fmt.Sprintf("🔸 Ссылка: %s\n", profile.FreeLink)
+		}
+	}
+
+	if showScore && user.Score > 100 {
+		text += fmt.Sprintf("\n<b>%d</b> <i>(что это? хм...)</i>\n", user.Score)
+	}
+
+	return text
+}
+
+func FormatPublicProfileForMessage(user *repositories.User, profile *repositories.Profile, showScore bool) string {
+
+	// Format username
+	username := "<b>" + user.Firstname + "</b>"
+	if user.Lastname != "" {
+		username += " " + "<b>" + user.Lastname + "</b>"
+	}
+	if user.TgUsername != "" {
+		username += " (@" + user.TgUsername + ")"
+	}
+
+	// Build profile text
+	text := fmt.Sprintf("🖐 %s\n", username)
+
+	if profile.Bio != "" {
+		text += fmt.Sprintf("\n<blockquote>О себе</blockquote>\n%s\n", profile.Bio)
+	}
+
+	// Add social links section if any exists
+	hasLinks := profile.LinkedIn != "" || profile.GitHub != "" || profile.FreeLink != ""
+	if hasLinks {
+		text += "\n<blockquote>Ссылки</blockquote>\n"
+
+		if profile.LinkedIn != "" {
+			text += fmt.Sprintf("🔸 LinkedIn: %s\n", profile.LinkedIn)
+		}
+
+		if profile.GitHub != "" {
+			text += fmt.Sprintf("🔸 GitHub: %s\n", profile.GitHub)
+		}
+
+		if profile.FreeLink != "" {
+			text += fmt.Sprintf("🔸 Ссылка: %s\n", profile.FreeLink)
 		}
 	}
 
