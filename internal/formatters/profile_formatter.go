@@ -104,7 +104,7 @@ func ProfileEditButtons(backCallbackData string) gotgbot.InlineKeyboardMarkup {
 					CallbackData: constants.ProfileEditGithubCallback,
 				},
 				{
-					Text:         "🌐 Ссылка",
+					Text:         "🌐 Веб-ресурс",
 					CallbackData: constants.ProfileEditWebsiteCallback,
 				},
 			},

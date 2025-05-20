@@ -44,7 +44,7 @@ const (
 	profileMenuEditBioHeader       = "Профиль → Редактирование → О себе"
 	profileMenuEditLinkedinHeader  = "Профиль → Редактирование → LinkedIn"
 	profileMenuEditGithubHeader    = "Профиль → Редактирование → GitHub"
-	profileMenuEditWebsiteHeader   = "Профиль → Редактирование → Сайт"
+	profileMenuEditWebsiteHeader   = "Профиль → Редактирование → Веб-ресурс"
 	profileMenuSearchHeader        = "Профиль → Поиск"
 )
 
@@ -621,7 +621,7 @@ func (h *profileHandler) handleWebsiteInput(b *gotgbot.Bot, ctx *ext.Context) er
 		errMsg, _ := h.messageSenderService.SendMarkdownWithReturnMessage(
 			msg.Chat.Id,
 			fmt.Sprintf("*%s*", profileMenuEditWebsiteHeader)+
-				"\n\nПожалуйста, введите корректную ссылку:", nil)
+				"\n\nПожалуйста, введите корректный веб-ресурс:", nil)
 
 		h.SavePreviousMessageInfo(msg.From.Id, errMsg)
 		return nil
@@ -631,7 +631,7 @@ func (h *profileHandler) handleWebsiteInput(b *gotgbot.Bot, ctx *ext.Context) er
 	if err != nil {
 		_ = h.messageSenderService.ReplyMarkdown(msg,
 			fmt.Sprintf("*%s*", profileMenuEditWebsiteHeader)+
-				"\n\nПроизошла ошибка при сохранении ссылки на вебсайт.", nil)
+				"\n\nПроизошла ошибка при сохранении веб-ресурса.", nil)
 		return fmt.Errorf("ProfileHandler: failed to save website in handleWebsiteInput: %w", err)
 	}
 
@@ -639,7 +639,7 @@ func (h *profileHandler) handleWebsiteInput(b *gotgbot.Bot, ctx *ext.Context) er
 	b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
 	sendMsg, err := h.messageSenderService.SendMarkdownWithReturnMessage(msg.Chat.Id,
 		fmt.Sprintf("*%s*", profileMenuEditWebsiteHeader)+
-			"\n\n✅ Ссылка сохранена!",
+			"\n\n✅ Веб-ресурс сохранен!",
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: formatters.ProfileBackCancelButtons(constants.ProfileEditMyProfileCallback),
 		})
@@ -662,7 +662,7 @@ func (h *profileHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
 	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
-	_ = h.messageSenderService.Reply(msg, "Диалог о профилях завершен.", nil)
+	_ = h.messageSenderService.Reply(msg, "Сессия работы с профилями завершена.", nil)
 	h.userStore.Clear(ctx.EffectiveUser.Id)
 
 	return handlers.EndConversation()
