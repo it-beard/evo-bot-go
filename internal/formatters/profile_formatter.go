@@ -77,28 +77,6 @@ func ProfileBackCancelButtons(backCallbackData string) gotgbot.InlineKeyboardMar
 	}
 }
 
-func ProfileSearchBackCancelButtons(backCallbackData string) gotgbot.InlineKeyboardMarkup {
-	return gotgbot.InlineKeyboardMarkup{
-		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
-			{
-				{
-					Text:         "🔎 Ещё раз",
-					CallbackData: constants.ProfileViewOtherProfileCallback,
-				},
-			}, {
-				{
-					Text:         "◀️ Назад",
-					CallbackData: backCallbackData,
-				},
-				{
-					Text:         "❌ Отмена",
-					CallbackData: constants.ProfileFullCancel,
-				},
-			},
-		},
-	}
-}
-
 func ProfileEditButtons(backCallbackData string) gotgbot.InlineKeyboardMarkup {
 	return gotgbot.InlineKeyboardMarkup{
 		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
@@ -111,10 +89,8 @@ func ProfileEditButtons(backCallbackData string) gotgbot.InlineKeyboardMarkup {
 					Text:         "👤 Фамилия",
 					CallbackData: constants.ProfileEditLastnameCallback,
 				},
-			},
-			{
 				{
-					Text:         "📝 Биография",
+					Text:         "📝 О себе",
 					CallbackData: constants.ProfileEditBioCallback,
 				},
 			},
@@ -149,20 +125,20 @@ func ProfileEditButtons(backCallbackData string) gotgbot.InlineKeyboardMarkup {
 // Format a readable view of a user profile
 func FormatProfileView(user *repositories.User, profile *repositories.Profile, showScore bool) string {
 	if profile == nil {
-		return "Ваш профиль не найден.\n\nСоздайте профиль через кнопку \"Редактировать мой профиль\"."
+		return "Твой профиль не найден.\n\nСоздай профиль через кнопку \"Редактировать мой профиль\"."
 	}
 
 	// Format username
-	username := user.Firstname
+	username := "<b>" + user.Firstname + "</b>"
 	if user.Lastname != "" {
-		username += " " + user.Lastname
+		username += " " + "<b>" + user.Lastname + "</b>"
 	}
 	if user.TgUsername != "" {
 		username += " (@" + user.TgUsername + ")"
 	}
 
 	// Build profile text
-	text := fmt.Sprintf("<b>Профиль пользователя:</b> %s\n", username)
+	text := fmt.Sprintf("👤 %s\n", username)
 
 	if profile.Bio != "" {
 		text += fmt.Sprintf("\n<b>О себе:</b>\n%s\n", profile.Bio)

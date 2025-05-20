@@ -21,12 +21,6 @@ func NewMessageSenderService(bot *gotgbot.Bot) *MessageSenderService {
 }
 
 // Send message to chat
-func (s *MessageSenderService) Send(chatId int64, text string, opts *gotgbot.SendMessageOpts) error {
-	_, err := s.SendWithReturnMessage(chatId, text, opts)
-	return err
-}
-
-// Send message to chat
 func (s *MessageSenderService) SendWithReturnMessage(chatId int64, text string, opts *gotgbot.SendMessageOpts) (*gotgbot.Message, error) {
 	// default link preview options are disabled
 	if opts == nil {
@@ -57,39 +51,9 @@ func (s *MessageSenderService) SendWithReturnMessage(chatId int64, text string, 
 	return sentMsg, err
 }
 
-// Send markdown message to chat
-func (s *MessageSenderService) SendMarkdown(chatId int64, text string, opts *gotgbot.SendMessageOpts) error {
-	// default options for markdown messages
-	if opts == nil {
-		opts = &gotgbot.SendMessageOpts{
-			ParseMode: "Markdown",
-			LinkPreviewOptions: &gotgbot.LinkPreviewOptions{
-				IsDisabled: true,
-			},
-		}
-	} else {
-		opts.ParseMode = "Markdown"
-		// default link preview options are disabled
-		if opts.LinkPreviewOptions == nil {
-			opts.LinkPreviewOptions = &gotgbot.LinkPreviewOptions{
-				IsDisabled: true,
-			}
-		}
-	}
-
-	_, err := s.bot.SendMessage(chatId, text, opts)
-
-	if err != nil {
-		// If topic is closed, try to reopen it and send again
-		if s.isTopicClosedError(err) && opts != nil && opts.MessageThreadId != 0 {
-			err = s.handleClosedTopic(chatId, text, opts, "SendMarkdown", err)
-		}
-
-		if err != nil {
-			log.Printf("%s: SendMarkdown: Failed to send message: %v", utils.GetCurrentTypeName(), err)
-		}
-	}
-
+// Send message to chat
+func (s *MessageSenderService) Send(chatId int64, text string, opts *gotgbot.SendMessageOpts) error {
+	_, err := s.SendWithReturnMessage(chatId, text, opts)
 	return err
 }
 
@@ -129,8 +93,14 @@ func (s *MessageSenderService) SendMarkdownWithReturnMessage(chatId int64, text 
 	return sentMsg, err
 }
 
+// Send markdown message to chat
+func (s *MessageSenderService) SendMarkdown(chatId int64, text string, opts *gotgbot.SendMessageOpts) error {
+	_, err := s.SendMarkdownWithReturnMessage(chatId, text, opts)
+	return err
+}
+
 // Send html message to chat
-func (s *MessageSenderService) SendHtml(chatId int64, text string, opts *gotgbot.SendMessageOpts) error {
+func (s *MessageSenderService) SendHtmlWithReturnMessage(chatId int64, text string, opts *gotgbot.SendMessageOpts) (*gotgbot.Message, error) {
 	// default options for html messages
 	if opts == nil {
 		opts = &gotgbot.SendMessageOpts{
@@ -149,12 +119,12 @@ func (s *MessageSenderService) SendHtml(chatId int64, text string, opts *gotgbot
 		}
 	}
 
-	_, err := s.bot.SendMessage(chatId, text, opts)
+	sentMsg, err := s.bot.SendMessage(chatId, text, opts)
 
 	if err != nil {
 		// If topic is closed, try to reopen it and send again
 		if s.isTopicClosedError(err) && opts != nil && opts.MessageThreadId != 0 {
-			err = s.handleClosedTopic(chatId, text, opts, "SendHtml", err)
+			sentMsg, err = s.handleClosedTopicReturnMessage(chatId, text, opts, "SendHtml", err)
 		}
 
 		if err != nil {
@@ -162,6 +132,11 @@ func (s *MessageSenderService) SendHtml(chatId int64, text string, opts *gotgbot
 		}
 	}
 
+	return sentMsg, err
+}
+
+func (s *MessageSenderService) SendHtml(chatId int64, text string, opts *gotgbot.SendMessageOpts) error {
+	_, err := s.SendHtmlWithReturnMessage(chatId, text, opts)
 	return err
 }
 
