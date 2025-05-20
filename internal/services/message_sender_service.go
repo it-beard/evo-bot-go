@@ -301,8 +301,8 @@ func (s *MessageSenderService) SendCopy(
 	var captionEntities []gotgbot.MessageEntity
 	var trimmedPartOfCaptionEntities []gotgbot.MessageEntity
 	if originalMessage != nil {
-		if utf16CodeUnitCount(text) > 1000 {
-			caption = cutStringByUTF16Units(text, 996)
+		if utils.Utf16CodeUnitCount(text) > 1000 {
+			caption = utils.CutStringByUTF16Units(text, 996)
 			trimmedPartOfCaption = "..." + text[len(caption):]
 
 			// Adjust entities for the caption
@@ -321,7 +321,7 @@ func (s *MessageSenderService) SendCopy(
 			// Adjust entities for the trimmed part
 			for _, entity := range originalMessage.CaptionEntities {
 				if entity.Offset+entity.Length > 996 {
-					offsetInTrimmed := entity.Offset - int64(utf16CodeUnitCount(caption)) + 3 // +3 for "..."
+					offsetInTrimmed := entity.Offset - int64(utils.Utf16CodeUnitCount(caption)) + 3 // +3 for "..."
 					trimmedEntity := gotgbot.MessageEntity{
 						Type:   entity.Type,
 						Offset: offsetInTrimmed,
@@ -407,44 +407,6 @@ func (s *MessageSenderService) SendTypingAction(chatId int64) error {
 		log.Printf("%s: SendTypingAction: Failed to send typing action: %v", utils.GetCurrentTypeName(), err)
 	}
 	return err
-}
-
-// CutStringByUTF16Units cuts the string s so that its length in UTF-16 code units is at most limit.
-// It returns the prefix of s that satisfies this condition.
-func cutStringByUTF16Units(s string, limit int) string {
-	var cuCount int   // Cumulative UTF-16 code units
-	var byteIndex int // Byte index in the string
-	for i, r := range s {
-		// Determine the number of UTF-16 code units for this rune
-		cuLen := 0
-		if r <= 0xFFFF {
-			cuLen = 1
-		} else {
-			cuLen = 2
-		}
-
-		// Check if adding this rune exceeds the limit
-		if cuCount+cuLen > limit {
-			break
-		}
-
-		cuCount += cuLen
-		byteIndex = i + len(string(r))
-	}
-
-	return s[:byteIndex]
-}
-
-func utf16CodeUnitCount(s string) int {
-	count := 0
-	for _, r := range s {
-		if r <= 0xFFFF {
-			count += 1
-		} else {
-			count += 2
-		}
-	}
-	return count
 }
 
 // RemoveInlineKeyboard removes the inline keyboard from a message

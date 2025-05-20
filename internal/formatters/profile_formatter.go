@@ -21,9 +21,15 @@ func ProfileMainButtons() gotgbot.InlineKeyboardMarkup {
 					Text:         "✏️ Редактировать",
 					CallbackData: constants.ProfileEditMyProfileCallback,
 				},
+			},
+			{
 				{
 					Text:         "📢 Опубликовать",
 					CallbackData: constants.ProfilePublishCallback,
+				},
+				{
+					Text:         "📢 Опубликовать (без превью)",
+					CallbackData: constants.ProfilePublishWithoutPreviewCallback,
 				},
 			},
 			{

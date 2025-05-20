@@ -47,6 +47,9 @@ const (
 	profileMenuEditFreeLinkHeader  = "Профиль → Редактирование → Ссылка"
 	profileMenuPublishHeader       = "Профиль → Публикация"
 	profileMenuSearchHeader        = "Профиль → Поиск"
+
+	// Other
+	profileBioLengthLimit = 4000
 )
 
 type profileHandler struct {
@@ -190,7 +193,7 @@ func (h *profileHandler) handleCallback(b *gotgbot.Bot, ctx *ext.Context) error 
 	case constants.ProfileViewOtherProfileCallback:
 		return h.handleViewOtherProfile(b, ctx, effectiveMsg)
 	case constants.ProfileEditBioCallback:
-		return h.handleEditField(b, ctx, effectiveMsg, "обновлённую биографию (до 4000 символов)", profileStateAwaitBio)
+		return h.handleEditField(b, ctx, effectiveMsg, fmt.Sprintf("обновлённую биографию (до %d символов)", profileBioLengthLimit), profileStateAwaitBio)
 	case constants.ProfileEditLinkedinCallback:
 		return h.handleEditField(b, ctx, effectiveMsg, "новую ссылку на LinkedIn", profileStateAwaitLinkedin)
 	case constants.ProfileEditGithubCallback:
@@ -202,7 +205,9 @@ func (h *profileHandler) handleCallback(b *gotgbot.Bot, ctx *ext.Context) error 
 	case constants.ProfileEditLastnameCallback:
 		return h.handleEditField(b, ctx, effectiveMsg, "новую фамилию", profileStateAwaitLastname)
 	case constants.ProfilePublishCallback:
-		return h.handlePublishProfile(b, ctx, effectiveMsg)
+		return h.handlePublishProfile(b, ctx, effectiveMsg, false)
+	case constants.ProfilePublishWithoutPreviewCallback:
+		return h.handlePublishProfile(b, ctx, effectiveMsg, true)
 	case constants.ProfileStartCallback:
 		return h.showProfileMenu(b, effectiveMsg, userId)
 	}
@@ -407,14 +412,16 @@ func (h *profileHandler) handleEditField(b *gotgbot.Bot, ctx *ext.Context, msg *
 func (h *profileHandler) handleBioInput(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	bio := msg.Text
+	bioLength := utils.Utf16CodeUnitCount(bio)
 
-	if len(bio) > 4000 {
+	if bioLength > profileBioLengthLimit {
 		h.RemovePreviouseMessage(b, &msg.From.Id)
 		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
 		errMsg, _ := h.messageSenderService.SendMarkdownWithReturnMessage(
 			msg.Chat.Id,
 			fmt.Sprintf("*%s*", profileMenuEditBioHeader)+
-				"\n\nБиография слишком длинная. Пожалуйста, сократи до 4000 символов и пришли снова:",
+				fmt.Sprintf("\n\nТекущая длина: %d символов", bioLength)+
+				fmt.Sprintf("\n\nПожалуйста, сократи до %d символов и пришли снова:", profileBioLengthLimit),
 			&gotgbot.SendMessageOpts{
 				ReplyMarkup: formatters.ProfileBackCancelButtons(constants.ProfileEditMyProfileCallback),
 			})
@@ -669,7 +676,7 @@ func (h *profileHandler) handleFreeLinkInput(b *gotgbot.Bot, ctx *ext.Context) e
 }
 
 // handlePublishProfile publishes the user's profile to the intro topic
-func (h *profileHandler) handlePublishProfile(b *gotgbot.Bot, ctx *ext.Context, msg *gotgbot.Message) error {
+func (h *profileHandler) handlePublishProfile(b *gotgbot.Bot, ctx *ext.Context, msg *gotgbot.Message, withoutPreview bool) error {
 	user := ctx.Update.CallbackQuery.From
 	dbUser, err := h.userRepository.GetOrCreateUser(&user)
 	if err != nil {
@@ -751,7 +758,7 @@ func (h *profileHandler) handlePublishProfile(b *gotgbot.Bot, ctx *ext.Context, 
 				MessageId: profile.PublishedMessageID.Int64,
 				ParseMode: "HTML",
 				LinkPreviewOptions: &gotgbot.LinkPreviewOptions{
-					IsDisabled: false,
+					IsDisabled: withoutPreview,
 				},
 			})
 		// If editing fails, create a new message if the error is not about the message being exactly the same
@@ -762,7 +769,7 @@ func (h *profileHandler) handlePublishProfile(b *gotgbot.Bot, ctx *ext.Context, 
 				&gotgbot.SendMessageOpts{
 					MessageThreadId: int64(h.config.IntroTopicID),
 					LinkPreviewOptions: &gotgbot.LinkPreviewOptions{
-						IsDisabled: false,
+						IsDisabled: withoutPreview,
 					},
 				})
 			if err != nil {
@@ -783,7 +790,7 @@ func (h *profileHandler) handlePublishProfile(b *gotgbot.Bot, ctx *ext.Context, 
 			&gotgbot.SendMessageOpts{
 				MessageThreadId: int64(h.config.IntroTopicID),
 				LinkPreviewOptions: &gotgbot.LinkPreviewOptions{
-					IsDisabled: false,
+					IsDisabled: withoutPreview,
 				},
 			})
 		if err != nil {
