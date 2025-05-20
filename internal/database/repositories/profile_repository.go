@@ -195,7 +195,13 @@ func (h *ProfileRepository) GetOrCreateDefaultProfile(dbUserID int) (*Profile, e
 			return nil, fmt.Errorf("ProfileHandler: failed to create profile in getOrCreateProfile: %w", err)
 		}
 
-		return profile, nil
+		// Get the newly created profile
+		newProfile, err := h.GetByUserID(dbUserID)
+		if err != nil {
+			return nil, fmt.Errorf("ProfileHandler: failed to get created profile in getOrCreateProfile: %w", err)
+		}
+
+		return newProfile, nil
 	}
 
 	return profile, nil
