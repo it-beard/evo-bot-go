@@ -17,10 +17,12 @@ const (
 	ProfileEditMyProfileCallback    = ProfilePrefix + "edit_my"
 	ProfileViewOtherProfileCallback = ProfilePrefix + "view_other"
 
-	ProfileEditBioCallback      = ProfilePrefix + "edit_bio"
-	ProfileEditLinkedinCallback = ProfilePrefix + "edit_linkedin"
-	ProfileEditGithubCallback   = ProfilePrefix + "edit_github"
-	ProfileEditWebsiteCallback  = ProfilePrefix + "edit_website"
+	ProfileEditBioCallback       = ProfilePrefix + "edit_bio"
+	ProfileEditLinkedinCallback  = ProfilePrefix + "edit_linkedin"
+	ProfileEditGithubCallback    = ProfilePrefix + "edit_github"
+	ProfileEditWebsiteCallback   = ProfilePrefix + "edit_website"
+	ProfileEditFirstnameCallback = ProfilePrefix + "edit_firstname"
+	ProfileEditLastnameCallback  = ProfilePrefix + "edit_lastname"
 
 	ProfileStartCallback = ProfilePrefix + "start"
 	ProfileSaveCallback  = ProfilePrefix + "save"

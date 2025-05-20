@@ -20,13 +20,15 @@ import (
 
 const (
 	// Conversation states
-	profileStateViewOptions   = "profile_state_view_options"
-	profileStateEditMyProfile = "profile_state_edit_my_profile"
-	profileStateAwaitUsername = "profile_state_await_username"
-	profileStateAwaitBio      = "profile_state_await_bio"
-	profileStateAwaitLinkedin = "profile_state_await_linkedin"
-	profileStateAwaitGithub   = "profile_state_await_github"
-	profileStateAwaitWebsite  = "profile_state_await_website"
+	profileStateViewOptions    = "profile_state_view_options"
+	profileStateEditMyProfile  = "profile_state_edit_my_profile"
+	profileStateAwaitUsername  = "profile_state_await_username"
+	profileStateAwaitBio       = "profile_state_await_bio"
+	profileStateAwaitLinkedin  = "profile_state_await_linkedin"
+	profileStateAwaitGithub    = "profile_state_await_github"
+	profileStateAwaitWebsite   = "profile_state_await_website"
+	profileStateAwaitFirstname = "profile_state_await_firstname"
+	profileStateAwaitLastname  = "profile_state_await_lastname"
 
 	// UserStore keys
 	profileCtxDataKeyField             = "profile_ctx_data_field"
@@ -99,6 +101,16 @@ func NewProfileHandler(
 				handlers.NewCallback(callbackquery.Equal(constants.ProfileEditMyProfileCallback), h.handleCallback),
 				handlers.NewCallback(callbackquery.Equal(constants.ProfileFullCancel), h.handleCallbackCancel),
 			},
+			profileStateAwaitFirstname: {
+				handlers.NewMessage(message.Text, h.handleFirstnameInput),
+				handlers.NewCallback(callbackquery.Equal(constants.ProfileEditMyProfileCallback), h.handleCallback),
+				handlers.NewCallback(callbackquery.Equal(constants.ProfileFullCancel), h.handleCallbackCancel),
+			},
+			profileStateAwaitLastname: {
+				handlers.NewMessage(message.Text, h.handleLastnameInput),
+				handlers.NewCallback(callbackquery.Equal(constants.ProfileEditMyProfileCallback), h.handleCallback),
+				handlers.NewCallback(callbackquery.Equal(constants.ProfileFullCancel), h.handleCallbackCancel),
+			},
 		},
 		&handlers.ConversationOpts{
 			Exits: []ext.Handler{handlers.NewCommand(constants.CancelCommand, h.handleCancel)},
@@ -168,6 +180,10 @@ func (h *profileHandler) handleCallback(b *gotgbot.Bot, ctx *ext.Context) error 
 		return h.handleEditField(b, ctx, effectiveMsg, "ссылку на GitHub", profileStateAwaitGithub)
 	case constants.ProfileEditWebsiteCallback:
 		return h.handleEditField(b, ctx, effectiveMsg, "ссылку на ваш ресурс", profileStateAwaitWebsite)
+	case constants.ProfileEditFirstnameCallback:
+		return h.handleEditUserField(b, ctx, effectiveMsg, "имя", "firstname", profileStateAwaitFirstname)
+	case constants.ProfileEditLastnameCallback:
+		return h.handleEditUserField(b, ctx, effectiveMsg, "фамилию", "lastname", profileStateAwaitLastname)
 	case constants.ProfileStartCallback:
 		return h.showProfileMenu(b, effectiveMsg, userId)
 	}
@@ -671,4 +687,143 @@ func (h *profileHandler) SavePreviousMessageInfo(userID int64, sentMsg *gotgbot.
 	}
 	h.userStore.SetPreviousMessageInfo(userID, sentMsg.MessageId, sentMsg.Chat.Id,
 		profileCtxDataKeyPreviousMessageID, profileCtxDataKeyPreviousChatID)
+}
+
+func (h *profileHandler) handleEditUserField(b *gotgbot.Bot, ctx *ext.Context, msg *gotgbot.Message, fieldName string, fieldKey string, nextState string) error {
+	user := ctx.Update.CallbackQuery.From
+	oldFieldValue := ""
+
+	h.userStore.Set(user.Id, profileCtxDataKeyField, fieldKey)
+
+	dbUser, err := h.userRepository.GetByTelegramID(user.Id)
+	if err != nil {
+		return fmt.Errorf("failed to get user: %w", err)
+	}
+
+	if dbUser != nil {
+		switch fieldKey {
+		case "firstname":
+			oldFieldValue = dbUser.Firstname
+		case "lastname":
+			oldFieldValue = dbUser.Lastname
+		}
+
+		if oldFieldValue == "" || oldFieldValue == " " {
+			oldFieldValue = "отсутствует"
+		}
+	}
+
+	h.RemovePreviouseMessage(b, &user.Id)
+	editedMsg, err := h.messageSenderService.SendMarkdownWithReturnMessage(
+		msg.Chat.Id,
+		"*Редактирование профиля*"+
+			fmt.Sprintf("\n\nТекущее значение: `%s`", oldFieldValue)+
+			fmt.Sprintf("\n\nВведите новое %s:", fieldName),
+		&gotgbot.SendMessageOpts{
+			ReplyMarkup: formatters.ProfileBackCancelButtons(constants.ProfileEditMyProfileCallback),
+		})
+
+	if err != nil {
+		return fmt.Errorf("failed to send message: %w", err)
+	}
+
+	h.SavePreviousMessageInfo(user.Id, editedMsg)
+	return handlers.NextConversationState(nextState)
+}
+
+// Firstname handler
+func (h *profileHandler) handleFirstnameInput(b *gotgbot.Bot, ctx *ext.Context) error {
+	msg := ctx.EffectiveMessage
+	firstname := msg.Text
+
+	if len(firstname) > 255 {
+		h.RemovePreviouseMessage(b, &msg.From.Id)
+		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
+		errMsg, _ := h.messageSenderService.SendMarkdownWithReturnMessage(
+			msg.Chat.Id,
+			"Имя слишком длинное. Пожалуйста, введите более короткое имя:", nil)
+
+		h.SavePreviousMessageInfo(msg.From.Id, errMsg)
+		return nil
+	}
+
+	err := h.saveUserField(ctx.EffectiveUser, "firstname", firstname)
+	if err != nil {
+		_ = h.messageSenderService.ReplyMarkdown(msg,
+			"Произошла ошибка при сохранении имени.", nil)
+		return fmt.Errorf("failed to save firstname: %w", err)
+	}
+
+	h.RemovePreviouseMessage(b, &msg.From.Id)
+	b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
+	sendMsg, err := h.messageSenderService.SendMarkdownWithReturnMessage(msg.Chat.Id,
+		"✅ Имя сохранено!",
+		&gotgbot.SendMessageOpts{
+			ReplyMarkup: formatters.ProfileBackCancelButtons(constants.ProfileEditMyProfileCallback),
+		})
+	if err != nil {
+		return fmt.Errorf("failed to send message: %w", err)
+	}
+
+	h.SavePreviousMessageInfo(msg.From.Id, sendMsg)
+	return handlers.NextConversationState(profileStateEditMyProfile)
+}
+
+// Lastname handler
+func (h *profileHandler) handleLastnameInput(b *gotgbot.Bot, ctx *ext.Context) error {
+	msg := ctx.EffectiveMessage
+	lastname := msg.Text
+
+	if len(lastname) > 255 {
+		h.RemovePreviouseMessage(b, &msg.From.Id)
+		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
+		errMsg, _ := h.messageSenderService.SendMarkdownWithReturnMessage(
+			msg.Chat.Id,
+			"Фамилия слишком длинная. Пожалуйста, введите более короткую фамилию:", nil)
+
+		h.SavePreviousMessageInfo(msg.From.Id, errMsg)
+		return nil
+	}
+
+	err := h.saveUserField(ctx.EffectiveUser, "lastname", lastname)
+	if err != nil {
+		_ = h.messageSenderService.ReplyMarkdown(msg,
+			"Произошла ошибка при сохранении фамилии.", nil)
+		return fmt.Errorf("failed to save lastname: %w", err)
+	}
+
+	h.RemovePreviouseMessage(b, &msg.From.Id)
+	b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
+	sendMsg, err := h.messageSenderService.SendMarkdownWithReturnMessage(msg.Chat.Id,
+		"✅ Фамилия сохранена!",
+		&gotgbot.SendMessageOpts{
+			ReplyMarkup: formatters.ProfileBackCancelButtons(constants.ProfileEditMyProfileCallback),
+		})
+	if err != nil {
+		return fmt.Errorf("failed to send message: %w", err)
+	}
+
+	h.SavePreviousMessageInfo(msg.From.Id, sendMsg)
+	return handlers.NextConversationState(profileStateEditMyProfile)
+}
+
+func (h *profileHandler) saveUserField(tgUser *gotgbot.User, fieldName string, value string) error {
+	// Get or create user
+	dbUser, err := h.getOrCreateUser(tgUser)
+	if err != nil {
+		return fmt.Errorf("error getting/creating user: %w", err)
+	}
+
+	// Update user with new field value
+	fields := map[string]interface{}{
+		fieldName: value,
+	}
+
+	// Update user
+	err = h.userRepository.Update(dbUser.ID, fields)
+	if err != nil {
+		return fmt.Errorf("error updating user: %w", err)
+	}
+
+	return nil
 }

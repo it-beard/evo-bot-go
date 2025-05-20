@@ -104,6 +104,16 @@ func ProfileEditButtons(backCallbackData string) gotgbot.InlineKeyboardMarkup {
 		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
 			{
 				{
+					Text:         "👤 Имя",
+					CallbackData: constants.ProfileEditFirstnameCallback,
+				},
+				{
+					Text:         "👤 Фамилия",
+					CallbackData: constants.ProfileEditLastnameCallback,
+				},
+			},
+			{
+				{
 					Text:         "📝 Биография",
 					CallbackData: constants.ProfileEditBioCallback,
 				},
