@@ -67,6 +67,7 @@ func FormatProfileManagerView(user *repositories.User, profile *repositories.Pro
 		coffeeBanStatus = "❌ Запрещено"
 	}
 	text += fmt.Sprintf("\n<i>Кофейные встречи:</i> %s", coffeeBanStatus)
+	text += fmt.Sprintf("\n<i>Telegram ID:</i> <code>%d</code>", user.TgID)
 	return text
 }
 

@@ -88,22 +88,28 @@ func ProfilesEditMenuButtons(backCallbackData string) gotgbot.InlineKeyboardMark
 					CallbackData: constants.AdminProfilesEditLastnameCallback,
 				},
 				{
-					Text:         "📝 О себе",
-					CallbackData: constants.AdminProfilesEditBioCallback,
+					Text:         "👤 Username",
+					CallbackData: constants.AdminProfilesEditUsernameCallback,
 				},
 			},
 			{
 				{
-					Text:         "📢 Го! (превью)",
-					CallbackData: constants.AdminProfilesPublishCallback,
-				},
-				{
-					Text:         "📢 Го! (без превью)",
-					CallbackData: constants.AdminProfilesPublishNoPreviewCallback,
+					Text:         "📝 О себе",
+					CallbackData: constants.AdminProfilesEditBioCallback,
 				},
 				{
 					Text:         "☕️ Кофе?",
 					CallbackData: constants.AdminProfilesEditCoffeeBanCallback,
+				},
+			},
+			{
+				{
+					Text:         "📢 Го! (+ превью)",
+					CallbackData: constants.AdminProfilesPublishCallback,
+				},
+				{
+					Text:         "📢 Го! (- превью)",
+					CallbackData: constants.AdminProfilesPublishNoPreviewCallback,
 				},
 			},
 			{

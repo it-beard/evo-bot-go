@@ -35,6 +35,7 @@ const (
 	adminProfilesStateAwaitFirstname                = "admin_profiles_state_await_firstname"
 	adminProfilesStateAwaitLastname                 = "admin_profiles_state_await_lastname"
 	adminProfilesStateAwaitCoffeeBan                = "admin_profiles_state_await_coffee_ban"
+	adminProfilesStateAwaitUsername                 = "admin_profiles_state_await_username"
 
 	// UserStore keys
 	adminProfilesCtxDataKeyField             = "admin_profiles_ctx_data_field"
@@ -54,6 +55,7 @@ const (
 	adminProfilesMenuEditFirstnameHeader = "Менеджер профилей → Редактирование → Имя"
 	adminProfilesMenuEditLastnameHeader  = "Менеджер профилей → Редактирование → Фамилия"
 	adminProfilesMenuEditBioHeader       = "Менеджер профилей → Редактирование → О себе"
+	adminProfilesMenuEditUsernameHeader  = "Менеджер профилей → Редактирование → Username"
 	adminProfilesMenuPublishHeader       = "Менеджер профилей → Публикация"
 	adminProfilesMenuCoffeeBanHeader     = "Менеджер профилей → Бан на кофейные встречи"
 )
@@ -125,6 +127,7 @@ func NewAdminProfilesHandler(
 				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditBioCallback), h.handleEditFieldCallback),
 				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditFirstnameCallback), h.handleEditFieldCallback),
 				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditLastnameCallback), h.handleEditFieldCallback),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditUsernameCallback), h.handleEditFieldCallback),
 				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditCoffeeBanCallback), h.handleEditFieldCallback),
 				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditMenuCallback), h.handleEditMenuCallback),
 				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesPublishCallback), h.handlePublishCallback),
@@ -144,6 +147,11 @@ func NewAdminProfilesHandler(
 			},
 			adminProfilesStateAwaitLastname: {
 				handlers.NewMessage(message.Text, h.handleLastnameInput),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditMenuCallback), h.handleEditMenuCallback),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), h.handleCancelCallback),
+			},
+			adminProfilesStateAwaitUsername: {
+				handlers.NewMessage(message.Text, h.handleUsernameInput),
 				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditMenuCallback), h.handleEditMenuCallback),
 				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), h.handleCancelCallback),
 			},
@@ -749,6 +757,11 @@ func (h *adminProfilesHandler) handleEditFieldCallback(b *gotgbot.Bot, ctx *ext.
 		menuHeader = adminProfilesMenuEditLastnameHeader
 		nextState = adminProfilesStateAwaitLastname
 		oldField = "Текущее значение: <code>" + dbUser.Lastname + "</code>"
+	case constants.AdminProfilesEditUsernameCallback:
+		callToAction = "Введи новое значение для поля <b>username</b> (без @)"
+		menuHeader = adminProfilesMenuEditUsernameHeader
+		nextState = adminProfilesStateAwaitUsername
+		oldField = "Текущее значение: <code>" + dbUser.TgUsername + "</code>"
 	case constants.AdminProfilesEditBioCallback:
 		callToAction = fmt.Sprintf("Введи новое значение для поля <b>биографию</b> (до %d символов)", constants.ProfileBioLengthLimit)
 		menuHeader = adminProfilesMenuEditBioHeader
@@ -1071,6 +1084,50 @@ func (h *adminProfilesHandler) handleLastnameInput(b *gotgbot.Bot, ctx *ext.Cont
 	})
 	if err != nil {
 		return fmt.Errorf("AdminProfilesHandler: failed to update lastname: %w", err)
+	}
+
+	return h.returnToProfileView(b, ctx)
+}
+
+// Handle username input
+func (h *adminProfilesHandler) handleUsernameInput(b *gotgbot.Bot, ctx *ext.Context) error {
+	msg := ctx.EffectiveMessage
+	username := msg.Text
+	userId := ctx.EffectiveUser.Id
+
+	// Remove @ prefix if present
+	if len(username) > 0 && username[0] == '@' {
+		username = username[1:]
+	}
+
+	if len(username) > 32 {
+		h.RemovePreviousMessage(b, &userId)
+		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
+		errMsg, _ := h.messageSenderService.SendHtmlWithReturnMessage(
+			msg.Chat.Id,
+			fmt.Sprintf("<b>%s</b>", adminProfilesMenuEditUsernameHeader)+
+				"\n\nUsername слишком длинный. Пожалуйста, введи более короткий username (не более 32 символов):",
+			&gotgbot.SendMessageOpts{
+				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesEditMenuCallback),
+			})
+
+		h.SavePreviousMessageInfo(userId, errMsg)
+		return nil // Stay in current state
+	}
+
+	// Get user ID from store
+	userIDVal, ok := h.userStore.Get(userId, adminProfilesCtxDataKeyUserID)
+	if !ok {
+		return fmt.Errorf("AdminProfilesHandler: user ID not found in user store")
+	}
+	dbUserID := userIDVal.(int)
+
+	// Save the username
+	err := h.userRepository.Update(dbUserID, map[string]interface{}{
+		"tg_username": username,
+	})
+	if err != nil {
+		return fmt.Errorf("AdminProfilesHandler: failed to update username: %w", err)
 	}
 
 	return h.returnToProfileView(b, ctx)
