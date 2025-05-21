@@ -19,9 +19,10 @@ const AdminProfilesCommand = "profilesManager"
 
 // Callback data constants for admin "/profilesManager" handler
 const (
-	AdminProfilesPrefix         = "admin_profiles_"
-	AdminProfilesEditCallback   = AdminProfilesPrefix + "edit"
-	AdminProfilesCreateCallback = AdminProfilesPrefix + "create"
+	AdminProfilesPrefix           = "admin_profiles_"
+	AdminProfilesEditCallback     = AdminProfilesPrefix + "edit"
+	AdminProfilesCreateCallback   = AdminProfilesPrefix + "create"
+	AdminProfilesEditMenuCallback = AdminProfilesPrefix + "edit_menu"
 
 	AdminProfilesEditBioCallback          = AdminProfilesPrefix + "edit_bio"
 	AdminProfilesEditFirstnameCallback    = AdminProfilesPrefix + "edit_firstname"
