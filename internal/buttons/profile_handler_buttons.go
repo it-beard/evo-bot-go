@@ -21,11 +21,11 @@ func ProfileMainButtons() gotgbot.InlineKeyboardMarkup {
 			},
 			{
 				{
-					Text:         "📢 Опубликовать",
+					Text:         "📢 Опублик. (+ превью)",
 					CallbackData: constants.ProfilePublishCallback,
 				},
 				{
-					Text:         "📢 Опубликовать (без превью)",
+					Text:         "📢 Опублик. (- превью)",
 					CallbackData: constants.ProfilePublishWithoutPreviewCallback,
 				},
 			},
