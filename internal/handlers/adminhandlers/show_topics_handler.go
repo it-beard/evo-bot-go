@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"evo-bot-go/internal/buttons"
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/repositories"
@@ -115,7 +116,7 @@ func (h *showTopicsHandler) startShowTopics(b *gotgbot.Bot, ctx *ext.Context) er
 		msg,
 		formattedEvents,
 		&gotgbot.SendMessageOpts{
-			ReplyMarkup: formatters.CancelButton(showTopicsCallbackConfirmCancel),
+			ReplyMarkup: buttons.CancelButton(showTopicsCallbackConfirmCancel),
 		},
 	)
 
@@ -173,7 +174,7 @@ func (h *showTopicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Contex
 			msg.Chat.Id,
 			fmt.Sprintf("\nДля удаления темы отправь ID темы, которую нужно удалить:"),
 			&gotgbot.SendMessageOpts{
-				ReplyMarkup: formatters.CancelButton(showTopicsCallbackConfirmCancel),
+				ReplyMarkup: buttons.CancelButton(showTopicsCallbackConfirmCancel),
 			},
 		)
 		h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
@@ -275,7 +276,7 @@ func (h *showTopicsHandler) handleTopicDeletion(b *gotgbot.Bot, ctx *ext.Context
 			msg.Chat.Id,
 			fmt.Sprintf("\nДля удаления еще одной темы отправь ID темы:"),
 			&gotgbot.SendMessageOpts{
-				ReplyMarkup: formatters.CancelButton(showTopicsCallbackConfirmCancel),
+				ReplyMarkup: buttons.CancelButton(showTopicsCallbackConfirmCancel),
 			},
 		)
 		h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)

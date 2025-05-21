@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"evo-bot-go/internal/buttons"
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/repositories"
@@ -117,7 +118,7 @@ func (h *eventStartHandler) startEvent(b *gotgbot.Bot, ctx *ext.Context) error {
 	formattedResponse := formatters.FormatEventListForAdmin(events, title, constants.CancelCommand, actionDescription)
 
 	sentMsg, _ := h.messageSenderService.ReplyMarkdownWithReturnMessage(msg, formattedResponse, &gotgbot.SendMessageOpts{
-		ReplyMarkup: formatters.CancelButton(eventStartCallbackConfirmCancel),
+		ReplyMarkup: buttons.CancelButton(eventStartCallbackConfirmCancel),
 	})
 
 	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
@@ -154,7 +155,7 @@ func (h *eventStartHandler) handleSelectEvent(b *gotgbot.Bot, ctx *ext.Context) 
 			event.Name, event.ID,
 		),
 		&gotgbot.SendMessageOpts{
-			ReplyMarkup: formatters.CancelButton(eventStartCallbackConfirmCancel),
+			ReplyMarkup: buttons.CancelButton(eventStartCallbackConfirmCancel),
 		},
 	)
 
@@ -215,7 +216,7 @@ func (h *eventStartHandler) handleEnterLink(b *gotgbot.Bot, ctx *ext.Context) er
 		"*Подтверждение запуска мероприятия*\n\n🎯 *%s* _(ID: %d)_\n\n🔗 Ссылка: `%s`\n\nЭта ссылка будет отправлена в чат объявлений.\n\nНажми на кнопку ниже для подтверждения или отмены",
 		event.Name, event.ID, eventLink,
 	), &gotgbot.SendMessageOpts{
-		ReplyMarkup: formatters.ConfirmAndCancelButton(eventStartCallbackConfirmYes, eventStartCallbackConfirmCancel),
+		ReplyMarkup: buttons.ConfirmAndCancelButton(eventStartCallbackConfirmYes, eventStartCallbackConfirmCancel),
 	})
 
 	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)

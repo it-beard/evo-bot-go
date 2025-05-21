@@ -21,12 +21,6 @@ func NewMessageSenderService(bot *gotgbot.Bot) *MessageSenderService {
 }
 
 // Send message to chat
-func (s *MessageSenderService) Send(chatId int64, text string, opts *gotgbot.SendMessageOpts) error {
-	_, err := s.SendWithReturnMessage(chatId, text, opts)
-	return err
-}
-
-// Send message to chat
 func (s *MessageSenderService) SendWithReturnMessage(chatId int64, text string, opts *gotgbot.SendMessageOpts) (*gotgbot.Message, error) {
 	// default link preview options are disabled
 	if opts == nil {
@@ -57,39 +51,9 @@ func (s *MessageSenderService) SendWithReturnMessage(chatId int64, text string, 
 	return sentMsg, err
 }
 
-// Send markdown message to chat
-func (s *MessageSenderService) SendMarkdown(chatId int64, text string, opts *gotgbot.SendMessageOpts) error {
-	// default options for markdown messages
-	if opts == nil {
-		opts = &gotgbot.SendMessageOpts{
-			ParseMode: "Markdown",
-			LinkPreviewOptions: &gotgbot.LinkPreviewOptions{
-				IsDisabled: true,
-			},
-		}
-	} else {
-		opts.ParseMode = "Markdown"
-		// default link preview options are disabled
-		if opts.LinkPreviewOptions == nil {
-			opts.LinkPreviewOptions = &gotgbot.LinkPreviewOptions{
-				IsDisabled: true,
-			}
-		}
-	}
-
-	_, err := s.bot.SendMessage(chatId, text, opts)
-
-	if err != nil {
-		// If topic is closed, try to reopen it and send again
-		if s.isTopicClosedError(err) && opts != nil && opts.MessageThreadId != 0 {
-			err = s.handleClosedTopic(chatId, text, opts, "SendMarkdown", err)
-		}
-
-		if err != nil {
-			log.Printf("%s: SendMarkdown: Failed to send message: %v", utils.GetCurrentTypeName(), err)
-		}
-	}
-
+// Send message to chat
+func (s *MessageSenderService) Send(chatId int64, text string, opts *gotgbot.SendMessageOpts) error {
+	_, err := s.SendWithReturnMessage(chatId, text, opts)
 	return err
 }
 
@@ -129,8 +93,14 @@ func (s *MessageSenderService) SendMarkdownWithReturnMessage(chatId int64, text 
 	return sentMsg, err
 }
 
+// Send markdown message to chat
+func (s *MessageSenderService) SendMarkdown(chatId int64, text string, opts *gotgbot.SendMessageOpts) error {
+	_, err := s.SendMarkdownWithReturnMessage(chatId, text, opts)
+	return err
+}
+
 // Send html message to chat
-func (s *MessageSenderService) SendHtml(chatId int64, text string, opts *gotgbot.SendMessageOpts) error {
+func (s *MessageSenderService) SendHtmlWithReturnMessage(chatId int64, text string, opts *gotgbot.SendMessageOpts) (*gotgbot.Message, error) {
 	// default options for html messages
 	if opts == nil {
 		opts = &gotgbot.SendMessageOpts{
@@ -149,12 +119,12 @@ func (s *MessageSenderService) SendHtml(chatId int64, text string, opts *gotgbot
 		}
 	}
 
-	_, err := s.bot.SendMessage(chatId, text, opts)
+	sentMsg, err := s.bot.SendMessage(chatId, text, opts)
 
 	if err != nil {
 		// If topic is closed, try to reopen it and send again
 		if s.isTopicClosedError(err) && opts != nil && opts.MessageThreadId != 0 {
-			err = s.handleClosedTopic(chatId, text, opts, "SendHtml", err)
+			sentMsg, err = s.handleClosedTopicReturnMessage(chatId, text, opts, "SendHtml", err)
 		}
 
 		if err != nil {
@@ -162,6 +132,11 @@ func (s *MessageSenderService) SendHtml(chatId int64, text string, opts *gotgbot
 		}
 	}
 
+	return sentMsg, err
+}
+
+func (s *MessageSenderService) SendHtml(chatId int64, text string, opts *gotgbot.SendMessageOpts) error {
+	_, err := s.SendHtmlWithReturnMessage(chatId, text, opts)
 	return err
 }
 
@@ -326,8 +301,8 @@ func (s *MessageSenderService) SendCopy(
 	var captionEntities []gotgbot.MessageEntity
 	var trimmedPartOfCaptionEntities []gotgbot.MessageEntity
 	if originalMessage != nil {
-		if utf16CodeUnitCount(text) > 1000 {
-			caption = cutStringByUTF16Units(text, 996)
+		if utils.Utf16CodeUnitCount(text) > 1000 {
+			caption = utils.CutStringByUTF16Units(text, 996)
 			trimmedPartOfCaption = "..." + text[len(caption):]
 
 			// Adjust entities for the caption
@@ -346,7 +321,7 @@ func (s *MessageSenderService) SendCopy(
 			// Adjust entities for the trimmed part
 			for _, entity := range originalMessage.CaptionEntities {
 				if entity.Offset+entity.Length > 996 {
-					offsetInTrimmed := entity.Offset - int64(utf16CodeUnitCount(caption)) + 3 // +3 for "..."
+					offsetInTrimmed := entity.Offset - int64(utils.Utf16CodeUnitCount(caption)) + 3 // +3 for "..."
 					trimmedEntity := gotgbot.MessageEntity{
 						Type:   entity.Type,
 						Offset: offsetInTrimmed,
@@ -432,44 +407,6 @@ func (s *MessageSenderService) SendTypingAction(chatId int64) error {
 		log.Printf("%s: SendTypingAction: Failed to send typing action: %v", utils.GetCurrentTypeName(), err)
 	}
 	return err
-}
-
-// CutStringByUTF16Units cuts the string s so that its length in UTF-16 code units is at most limit.
-// It returns the prefix of s that satisfies this condition.
-func cutStringByUTF16Units(s string, limit int) string {
-	var cuCount int   // Cumulative UTF-16 code units
-	var byteIndex int // Byte index in the string
-	for i, r := range s {
-		// Determine the number of UTF-16 code units for this rune
-		cuLen := 0
-		if r <= 0xFFFF {
-			cuLen = 1
-		} else {
-			cuLen = 2
-		}
-
-		// Check if adding this rune exceeds the limit
-		if cuCount+cuLen > limit {
-			break
-		}
-
-		cuCount += cuLen
-		byteIndex = i + len(string(r))
-	}
-
-	return s[:byteIndex]
-}
-
-func utf16CodeUnitCount(s string) int {
-	count := 0
-	for _, r := range s {
-		if r <= 0xFFFF {
-			count += 1
-		} else {
-			count += 2
-		}
-	}
-	return count
 }
 
 // RemoveInlineKeyboard removes the inline keyboard from a message

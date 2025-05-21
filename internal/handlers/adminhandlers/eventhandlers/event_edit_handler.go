@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"evo-bot-go/internal/buttons"
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/repositories"
@@ -129,7 +130,7 @@ func (h *eventEditHandler) startEdit(b *gotgbot.Bot, ctx *ext.Context) error {
 		msg,
 		formattedResponse,
 		&gotgbot.SendMessageOpts{
-			ReplyMarkup: formatters.CancelButton(eventEditCallbackConfirmCancel),
+			ReplyMarkup: buttons.CancelButton(eventEditCallbackConfirmCancel),
 		},
 	)
 
@@ -170,7 +171,7 @@ func (h *eventEditHandler) handleSelectEvent(b *gotgbot.Bot, ctx *ext.Context) e
 		msg,
 		fmt.Sprintf("Что ты хочешь отредактировать?\n/1. Название\n/2. Дату начала\n/3. Тип\n\nВведи номер:"),
 		&gotgbot.SendMessageOpts{
-			ReplyMarkup: formatters.CancelButton(eventEditCallbackConfirmCancel),
+			ReplyMarkup: buttons.CancelButton(eventEditCallbackConfirmCancel),
 		},
 	)
 
@@ -267,7 +268,7 @@ func (h *eventEditHandler) handleSelectEditType(b *gotgbot.Bot, ctx *ext.Context
 		msg,
 		message,
 		&gotgbot.SendMessageOpts{
-			ReplyMarkup: formatters.CancelButton(eventEditCallbackConfirmCancel),
+			ReplyMarkup: buttons.CancelButton(eventEditCallbackConfirmCancel),
 		},
 	)
 

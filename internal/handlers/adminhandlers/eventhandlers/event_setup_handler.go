@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"evo-bot-go/internal/buttons"
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/repositories"
-	"evo-bot-go/internal/formatters"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
@@ -96,7 +96,7 @@ func (h *eventSetupHandler) startSetup(b *gotgbot.Bot, ctx *ext.Context) error {
 		msg,
 		"Пожалуйста, введи название для нового мероприятия:",
 		&gotgbot.SendMessageOpts{
-			ReplyMarkup: formatters.CancelButton(eventSetupCallbackConfirmCancel),
+			ReplyMarkup: buttons.CancelButton(eventSetupCallbackConfirmCancel),
 		},
 	)
 
@@ -136,7 +136,7 @@ func (h *eventSetupHandler) handleEventName(b *gotgbot.Bot, ctx *ext.Context) er
 		msg,
 		typeOptions,
 		&gotgbot.SendMessageOpts{
-			ReplyMarkup: formatters.CancelButton(eventSetupCallbackConfirmCancel),
+			ReplyMarkup: buttons.CancelButton(eventSetupCallbackConfirmCancel),
 		},
 	)
 
@@ -210,7 +210,7 @@ func (h *eventSetupHandler) handleEventType(b *gotgbot.Bot, ctx *ext.Context) er
 		msg,
 		"Когда стартует мероприятие? Введи дату и время в формате DD.MM.YYYY HH:MM:",
 		&gotgbot.SendMessageOpts{
-			ReplyMarkup: formatters.CancelButton(eventSetupCallbackConfirmCancel),
+			ReplyMarkup: buttons.CancelButton(eventSetupCallbackConfirmCancel),
 		},
 	)
 

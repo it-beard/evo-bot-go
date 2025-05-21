@@ -57,6 +57,37 @@ const (
 			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 		)
 	`
+
+	createUsersTableSQL = `
+		CREATE TABLE IF NOT EXISTS users (
+			id SERIAL PRIMARY KEY,
+			tg_id BIGINT NOT NULL UNIQUE,
+			firstname TEXT NOT NULL,
+			lastname TEXT,
+			tg_username TEXT,
+			score INTEGER NOT NULL DEFAULT 0,
+			has_coffee_ban BOOLEAN NOT NULL DEFAULT false,
+			created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+		)
+	`
+
+	createProfilesTableSQL = `
+		CREATE TABLE IF NOT EXISTS profiles (
+			id SERIAL PRIMARY KEY,
+			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			bio TEXT,
+			linkedin TEXT,
+			github TEXT,
+			website TEXT,
+			created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+		)
+	`
+
+	createProfilesIndexSQL = `
+		CREATE INDEX IF NOT EXISTS profiles_user_id_idx ON profiles(user_id)
+	`
 )
 
 // DB represents a database connection
@@ -98,6 +129,14 @@ func (db *DB) InitSchema() error {
 	}
 
 	if err := db.initMigrationsSchema(); err != nil {
+		return err
+	}
+
+	if err := db.initUsersSchema(); err != nil {
+		return err
+	}
+
+	if err := db.initProfilesSchema(); err != nil {
 		return err
 	}
 
@@ -197,6 +236,30 @@ func (db *DB) initTopicsSchema() error {
 func (db *DB) initMigrationsSchema() error {
 	if _, err := db.Exec(createMigrationsTableSQL); err != nil {
 		return fmt.Errorf("failed to create migrations table: %w", err)
+	}
+
+	return nil
+}
+
+// initUsersSchema initializes the users schema
+func (db *DB) initUsersSchema() error {
+	if _, err := db.Exec(createUsersTableSQL); err != nil {
+		return fmt.Errorf("failed to create users table: %w", err)
+	}
+
+	return nil
+}
+
+// initProfilesSchema initializes the profiles schema
+func (db *DB) initProfilesSchema() error {
+	// First create the profiles table
+	if _, err := db.Exec(createProfilesTableSQL); err != nil {
+		return fmt.Errorf("failed to create profiles table: %w", err)
+	}
+
+	// Then create the index
+	if _, err := db.Exec(createProfilesIndexSQL); err != nil {
+		return fmt.Errorf("failed to create profiles index: %w", err)
 	}
 
 	return nil
