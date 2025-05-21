@@ -5,5 +5,5 @@ const CancelCommand = "cancel"
 
 // Profile fields
 const (
-	ProfileBioLengthLimit = 4000 //max Telegram message length
+	ProfileBioLengthLimit = 3900 //max Telegram message length
 )

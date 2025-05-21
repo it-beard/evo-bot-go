@@ -29,9 +29,10 @@ const (
 	profileStateAwaitLastname          = "profile_state_await_lastname"
 
 	// UserStore keys
-	profileCtxDataKeyField             = "profile_ctx_data_field"
-	profileCtxDataKeyPreviousMessageID = "profile_ctx_data_previous_message_id"
-	profileCtxDataKeyPreviousChatID    = "profile_ctx_data_previous_chat_id"
+	profileCtxDataKeyField                   = "profile_ctx_data_field"
+	profileCtxDataKeyPreviousMessageID       = "profile_ctx_data_previous_message_id"
+	profileCtxDataKeyPreviousChatID          = "profile_ctx_data_previous_chat_id"
+	profileCtxDataKeyLastMessageTimeFromUser = "profile_ctx_data_last_message_time_from_user"
 
 	// Menu headers
 	profileMenuHeader              = "Меню \"Профиль\""
@@ -388,6 +389,16 @@ func (h *profileHandler) handleBioInput(b *gotgbot.Bot, ctx *ext.Context) error 
 	msg := ctx.EffectiveMessage
 	bio := msg.Text
 	bioLength := utils.Utf16CodeUnitCount(bio)
+
+	// skip if it is sequential message from user with the same date
+	lastMessageDate, ok := h.userStore.Get(msg.From.Id, profileCtxDataKeyLastMessageTimeFromUser)
+	if ok && lastMessageDate == msg.Date {
+		// Skip processing - same message date detected
+		return nil
+	}
+
+	// Store current message date to avoid duplicate processing
+	h.userStore.Set(msg.From.Id, profileCtxDataKeyLastMessageTimeFromUser, msg.Date)
 
 	if bioLength > constants.ProfileBioLengthLimit {
 		h.RemovePreviouseMessage(b, &msg.From.Id)
