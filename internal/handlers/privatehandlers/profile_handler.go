@@ -119,11 +119,28 @@ func NewProfileHandler(
 func (h *profileHandler) showProfileMenu(b *gotgbot.Bot, msg *gotgbot.Message, userId int64) error {
 	h.RemovePreviouseMessage(b, &userId)
 
+	dbUser, err := h.userRepository.GetByTelegramID(userId)
+	if err != nil {
+		return fmt.Errorf("ProfileHandler: failed to get user in showProfileMenu: %w", err)
+	}
+
+	profile, err := h.profileRepository.GetByUserID(dbUser.ID)
+	if err != nil {
+		return fmt.Errorf("ProfileHandler: failed to get profile in showProfileMenu: %w", err)
+	}
+
+	profileText := fmt.Sprintf("<b>%s</b>", profileMenuHeader) +
+		fmt.Sprintf("\n\nТут ты можешь просматривать и редактировать свой профиль, публиковать его на канал \"<a href='%s'>Интро</a>\" и просматривать профили других пользователей.",
+			utils.GetIntroTopicLink(h.config))
+
+	if profile.PublishedMessageID.Valid {
+		profileText += fmt.Sprintf("\n\n👉 <a href='%s'>Ссылка</a> на твой профиль на канале \"Интро\".",
+			utils.GetIntroMessageLink(h.config, profile.PublishedMessageID.Int64))
+	}
+
 	editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
 		msg.Chat.Id,
-		fmt.Sprintf("<b>%s</b>", profileMenuHeader)+
-			fmt.Sprintf("\n\nТут ты можешь просматривать и редактировать свой профиль, публиковать его на канал \"<a href='%s'>Интро</a>\" и просматривать профили других пользователей.",
-				utils.GetIntroTopicLink(h.config)),
+		profileText,
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: buttons.ProfileMainButtons(),
 		})
