@@ -22,7 +22,7 @@ func FormatProfileView(user *repositories.User, profile *repositories.Profile, s
 	fullName = "<b><a href=\"tg://user?id=" + strconv.FormatInt(user.TgID, 10) + "\">" + fullName + "</a></b>"
 
 	if user.TgUsername != "" {
-		username = " (@" + user.TgUsername + ")"
+		username = "(@" + user.TgUsername + ")"
 	}
 
 	// Build profile text
@@ -53,7 +53,7 @@ func FormatProfileManagerView(user *repositories.User, profile *repositories.Pro
 	fullName = "<b><a href=\"tg://user?id=" + strconv.FormatInt(user.TgID, 10) + "\">" + fullName + "</a></b>"
 
 	if user.TgUsername != "" {
-		username = " (@" + user.TgUsername + ")"
+		username = "(@" + user.TgUsername + ")"
 	}
 
 	// Build profile text
