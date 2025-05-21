@@ -125,20 +125,32 @@ func ProfilesMainMenuButtons() gotgbot.InlineKeyboardMarkup {
 		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
 			{
 				{
-					Text:         "📝 Редактировать профиль",
-					CallbackData: constants.AdminProfilesEditCallback,
+					Text:         "🔍 Поиск по Telegram Username",
+					CallbackData: constants.AdminProfilesSearchByUsernameCallback,
 				},
 			},
 			{
 				{
-					Text:         "➕ Создать профиль",
-					CallbackData: constants.AdminProfilesCreateCallback,
+					Text:         "🔍 Поиск по Telegram ID",
+					CallbackData: constants.AdminProfilesSearchByTelegramIDCallback,
 				},
 			},
 			{
 				{
-					Text:         "🆔 Создать профиль по ID",
-					CallbackData: constants.AdminProfilesCreateByIDCallback,
+					Text:         "🔍 Поиск по имени и фамилии",
+					CallbackData: constants.AdminProfilesSearchByFullNameCallback,
+				},
+			},
+			{
+				{
+					Text:         "➕ Создать профиль (через реплай)",
+					CallbackData: constants.AdminProfilesCreateByForwardedMessageCallback,
+				},
+			},
+			{
+				{
+					Text:         "🆔 Создать профиль по TelegramID",
+					CallbackData: constants.AdminProfilesCreateByTelegramIDCallback,
 				},
 			},
 			{

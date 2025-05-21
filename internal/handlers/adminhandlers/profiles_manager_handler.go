@@ -23,16 +23,18 @@ import (
 
 const (
 	// Conversation states
-	adminProfilesStateStart               = "admin_profiles_state_start"
-	adminProfilesStateEdit                = "admin_profiles_state_edit"
-	adminProfilesStateAwaitUsername       = "admin_profiles_state_await_username"
-	adminProfilesStateAwaitForwardMessage = "admin_profiles_state_await_forward_message"
-	adminProfilesStateAwaitUserID         = "admin_profiles_state_await_user_id"
-	adminProfilesStateEditProfile         = "admin_profiles_state_edit_profile"
-	adminProfilesStateAwaitBio            = "admin_profiles_state_await_bio"
-	adminProfilesStateAwaitFirstname      = "admin_profiles_state_await_firstname"
-	adminProfilesStateAwaitLastname       = "admin_profiles_state_await_lastname"
-	adminProfilesStateAwaitCoffeeBan      = "admin_profiles_state_await_coffee_ban"
+	adminProfilesStateStart                         = "admin_profiles_state_start"
+	adminProfilesStateEdit                          = "admin_profiles_state_edit"
+	adminProfilesStateAwaitSearchByUsername         = "admin_profiles_state_await_search_by_username"
+	adminProfilesStateAwaitSearchUserID             = "admin_profiles_state_await_search_user_id"
+	adminProfilesStateAwaitSearchByFullName         = "admin_profiles_state_await_search_by_full_name"
+	adminProfilesStateAwaitCreateByForwardedMessage = "admin_profiles_state_await_create_by_forwarded_message"
+	adminProfilesStateAwaitCreateByTelegramID       = "admin_profiles_state_await_create_by_telegram_id"
+	adminProfilesStateEditProfile                   = "admin_profiles_state_edit_profile"
+	adminProfilesStateAwaitBio                      = "admin_profiles_state_await_bio"
+	adminProfilesStateAwaitFirstname                = "admin_profiles_state_await_firstname"
+	adminProfilesStateAwaitLastname                 = "admin_profiles_state_await_lastname"
+	adminProfilesStateAwaitCoffeeBan                = "admin_profiles_state_await_coffee_ban"
 
 	// UserStore keys
 	adminProfilesCtxDataKeyField             = "admin_profiles_ctx_data_field"
@@ -47,6 +49,8 @@ const (
 	adminProfilesMenuHeader              = "Админ-меню \"Менеджер профилей\""
 	adminProfilesMenuEditHeader          = "Менеджер профилей → Редактирование"
 	adminProfilesMenuCreateByIDHeader    = "Менеджер профилей → Создание по ID"
+	adminProfilesMenuSearchByIDHeader    = "Менеджер профилей → Поиск по ID"
+	adminProfilesMenuSearchByNameHeader  = "Менеджер профилей → Поиск по имени"
 	adminProfilesMenuEditFirstnameHeader = "Менеджер профилей → Редактирование → Имя"
 	adminProfilesMenuEditLastnameHeader  = "Менеджер профилей → Редактирование → Фамилия"
 	adminProfilesMenuEditBioHeader       = "Менеджер профилей → Редактирование → О себе"
@@ -85,23 +89,35 @@ func NewAdminProfilesHandler(
 		},
 		map[string][]ext.Handler{
 			adminProfilesStateStart: {
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditCallback), h.handleEditCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCreateCallback), h.handleCreateCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCreateByIDCallback), h.handleCreateByIDCallback),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesSearchByUsernameCallback), h.handleSearchByUsernameCallback),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCreateByForwardedMessageCallback), h.handleCreateByForwardedMessageCallback),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCreateByTelegramIDCallback), h.handleCreateByTelegramIDCallback),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesSearchByTelegramIDCallback), h.handleSearchByTelegramIDCallback),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesSearchByFullNameCallback), h.handleSearchByFullNameCallback),
 				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), h.handleCancelCallback),
 			},
-			adminProfilesStateAwaitUsername: {
-				handlers.NewMessage(message.Text, h.handleUsernameInput),
+			adminProfilesStateAwaitSearchByUsername: {
+				handlers.NewMessage(message.Text, h.handleSearchByUsernameInput),
 				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesStartCallback), h.handleStartCallback),
 				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), h.handleCancelCallback),
 			},
-			adminProfilesStateAwaitForwardMessage: {
-				handlers.NewMessage(message.All, h.handleForwardedMessage),
+			adminProfilesStateAwaitSearchUserID: {
+				handlers.NewMessage(message.Text, h.handleSearchUserIDInput),
 				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesStartCallback), h.handleStartCallback),
 				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), h.handleCancelCallback),
 			},
-			adminProfilesStateAwaitUserID: {
-				handlers.NewMessage(message.Text, h.handleUserIDInput),
+			adminProfilesStateAwaitSearchByFullName: {
+				handlers.NewMessage(message.Text, h.handleSearchByFullNameInput),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesStartCallback), h.handleStartCallback),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), h.handleCancelCallback),
+			},
+			adminProfilesStateAwaitCreateByForwardedMessage: {
+				handlers.NewMessage(message.All, h.handleCreateByForwardedMessageInput),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesStartCallback), h.handleStartCallback),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), h.handleCancelCallback),
+			},
+			adminProfilesStateAwaitCreateByTelegramID: {
+				handlers.NewMessage(message.Text, h.handleCreateByTelegramIDInput),
 				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesStartCallback), h.handleStartCallback),
 				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), h.handleCancelCallback),
 			},
@@ -162,6 +178,11 @@ func (h *adminProfilesHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) e
 	return h.showMainMenu(b, ctx.EffectiveMessage, ctx.EffectiveUser.Id)
 }
 
+// Handle the "Start" button click - goes back to the main menu
+func (h *adminProfilesHandler) handleStartCallback(b *gotgbot.Bot, ctx *ext.Context) error {
+	return h.showMainMenu(b, ctx.EffectiveMessage, ctx.EffectiveUser.Id)
+}
+
 // Shows the main profiles menu for admin
 func (h *adminProfilesHandler) showMainMenu(b *gotgbot.Bot, msg *gotgbot.Message, userId int64) error {
 	h.RemovePreviousMessage(b, &userId)
@@ -182,8 +203,8 @@ func (h *adminProfilesHandler) showMainMenu(b *gotgbot.Bot, msg *gotgbot.Message
 	return handlers.NextConversationState(adminProfilesStateStart)
 }
 
-// Handle the "Edit profile" button click
-func (h *adminProfilesHandler) handleEditCallback(b *gotgbot.Bot, ctx *ext.Context) error {
+// Handle the "Search by Telegram Username" button click
+func (h *adminProfilesHandler) handleSearchByUsernameCallback(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	userId := ctx.EffectiveUser.Id
 
@@ -201,11 +222,55 @@ func (h *adminProfilesHandler) handleEditCallback(b *gotgbot.Bot, ctx *ext.Conte
 	}
 
 	h.SavePreviousMessageInfo(userId, editedMsg)
-	return handlers.NextConversationState(adminProfilesStateAwaitUsername)
+	return handlers.NextConversationState(adminProfilesStateAwaitSearchByUsername)
+}
+
+// Handle the "Search by Telegram ID" button click
+func (h *adminProfilesHandler) handleSearchByTelegramIDCallback(b *gotgbot.Bot, ctx *ext.Context) error {
+	msg := ctx.EffectiveMessage
+	userId := ctx.EffectiveUser.Id
+
+	h.RemovePreviousMessage(b, &userId)
+	editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
+		msg.Chat.Id,
+		fmt.Sprintf("<b>%s</b>", adminProfilesMenuSearchByIDHeader)+
+			"\n\nВведи ID пользователя Telegram для поиска профиля:",
+		&gotgbot.SendMessageOpts{
+			ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
+		})
+
+	if err != nil {
+		return fmt.Errorf("AdminProfilesHandler: failed to send message in handleSearchByIDCallback: %w", err)
+	}
+
+	h.SavePreviousMessageInfo(userId, editedMsg)
+	return handlers.NextConversationState(adminProfilesStateAwaitSearchUserID)
+}
+
+// Handle the "Search by Name" button click
+func (h *adminProfilesHandler) handleSearchByFullNameCallback(b *gotgbot.Bot, ctx *ext.Context) error {
+	msg := ctx.EffectiveMessage
+	userId := ctx.EffectiveUser.Id
+
+	h.RemovePreviousMessage(b, &userId)
+	editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
+		msg.Chat.Id,
+		fmt.Sprintf("<b>%s</b>", adminProfilesMenuSearchByNameHeader)+
+			"\n\nВведи имя и фамилию пользователя (через пробел) для поиска профиля:",
+		&gotgbot.SendMessageOpts{
+			ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
+		})
+
+	if err != nil {
+		return fmt.Errorf("AdminProfilesHandler: failed to send message in handleSearchByNameCallback: %w", err)
+	}
+
+	h.SavePreviousMessageInfo(userId, editedMsg)
+	return handlers.NextConversationState(adminProfilesStateAwaitSearchByFullName)
 }
 
 // Handle the "Create profile" button click
-func (h *adminProfilesHandler) handleCreateCallback(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *adminProfilesHandler) handleCreateByForwardedMessageCallback(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	userId := ctx.EffectiveUser.Id
 
@@ -223,16 +288,101 @@ func (h *adminProfilesHandler) handleCreateCallback(b *gotgbot.Bot, ctx *ext.Con
 	}
 
 	h.SavePreviousMessageInfo(userId, editedMsg)
-	return handlers.NextConversationState(adminProfilesStateAwaitForwardMessage)
+	return handlers.NextConversationState(adminProfilesStateAwaitCreateByForwardedMessage)
 }
 
-// Handle the "Start" button click - goes back to the main menu
-func (h *adminProfilesHandler) handleStartCallback(b *gotgbot.Bot, ctx *ext.Context) error {
-	return h.showMainMenu(b, ctx.EffectiveMessage, ctx.EffectiveUser.Id)
+// Handle the "Create profile by ID" button click
+func (h *adminProfilesHandler) handleCreateByTelegramIDCallback(b *gotgbot.Bot, ctx *ext.Context) error {
+	msg := ctx.EffectiveMessage
+	userId := ctx.EffectiveUser.Id
+
+	h.RemovePreviousMessage(b, &userId)
+	editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
+		msg.Chat.Id,
+		fmt.Sprintf("<b>%s</b>", adminProfilesMenuCreateByIDHeader)+
+			"\n\nВведи ID пользователя Telegram для создания профиля:",
+		&gotgbot.SendMessageOpts{
+			ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
+		})
+
+	if err != nil {
+		return fmt.Errorf("AdminProfilesHandler: failed to send message in handleCreateByIDCallback: %w", err)
+	}
+
+	h.SavePreviousMessageInfo(userId, editedMsg)
+	return handlers.NextConversationState(adminProfilesStateAwaitCreateByTelegramID)
+}
+
+// Handle the userID input for profile creation
+func (h *adminProfilesHandler) handleCreateByTelegramIDInput(b *gotgbot.Bot, ctx *ext.Context) error {
+	msg := ctx.EffectiveMessage
+	userIDStr := msg.Text
+	userId := ctx.EffectiveUser.Id
+
+	// Convert user ID string to int64
+	telegramID, err := strconv.ParseInt(userIDStr, 10, 64)
+	if err != nil {
+		h.RemovePreviousMessage(b, &userId)
+		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
+		editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
+			msg.Chat.Id,
+			fmt.Sprintf("<b>%s</b>", adminProfilesMenuCreateByIDHeader)+
+				fmt.Sprintf("\n\nНекорректный формат ID: <b>%s</b>. Введи числовой ID пользователя Telegram:", userIDStr),
+			&gotgbot.SendMessageOpts{
+				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
+			})
+		if err != nil {
+			return fmt.Errorf("AdminProfilesHandler: failed to send message in handleUserIDInput: %w", err)
+		}
+
+		h.SavePreviousMessageInfo(userId, editedMsg)
+		return nil
+	}
+
+	// Check if user exists, create if not
+	dbUser, err := h.userRepository.GetByTelegramID(telegramID)
+	if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("AdminProfilesHandler: failed to get user in handleUserIDInput: %w", err)
+	}
+
+	// If user not found, create a new user with minimal info
+	if err == sql.ErrNoRows {
+		userID, err := h.userRepository.Create(telegramID, "", "", "")
+		if err != nil {
+			return fmt.Errorf("AdminProfilesHandler: failed to create user in handleUserIDInput: %w", err)
+		}
+
+		dbUser, err = h.userRepository.GetByID(userID)
+		if err != nil {
+			return fmt.Errorf("AdminProfilesHandler: failed to get created user in handleUserIDInput: %w", err)
+		}
+	}
+
+	// Store the user ID for future use
+	h.userStore.Set(userId, adminProfilesCtxDataKeyUserID, dbUser.ID)
+	h.userStore.Set(userId, adminProfilesCtxDataKeyTelegramID, dbUser.TgID)
+	h.userStore.Set(userId, adminProfilesCtxDataKeyTelegramUsername, dbUser.TgUsername)
+
+	// Find or create the profile
+	profile, err := h.profileRepository.GetOrCreateDefaultProfile(dbUser.ID)
+	if err != nil {
+		_ = h.messageSenderService.Reply(msg,
+			"Произошла ошибка при получении или создании профиля.", nil)
+		return fmt.Errorf("AdminProfilesHandler: failed to get/create profile in handleUserIDInput: %w", err)
+	}
+
+	h.userStore.Set(userId, adminProfilesCtxDataKeyProfileID, profile.ID)
+
+	// Delete the input message
+	b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
+	h.RemovePreviousMessage(b, &userId)
+
+	// Show the profile edit menu
+	return h.showProfileEditMenu(b, msg, userId, dbUser, profile)
 }
 
 // Handle the username input for profile search
-func (h *adminProfilesHandler) handleUsernameInput(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *adminProfilesHandler) handleSearchByUsernameInput(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	username := msg.Text
 	userId := ctx.EffectiveUser.Id
@@ -289,7 +439,7 @@ func (h *adminProfilesHandler) handleUsernameInput(b *gotgbot.Bot, ctx *ext.Cont
 }
 
 // Handle forwarded message for profile creation
-func (h *adminProfilesHandler) handleForwardedMessage(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *adminProfilesHandler) handleCreateByForwardedMessageInput(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	userId := ctx.EffectiveUser.Id
 	msgType := msg.ForwardOrigin.GetType()
@@ -374,6 +524,160 @@ func (h *adminProfilesHandler) handleEditMenuCallback(b *gotgbot.Bot, ctx *ext.C
 		return fmt.Errorf("AdminProfilesHandler: failed to get profile in handleEditMenuCallback: %w", err)
 	}
 
+	return h.showProfileEditMenu(b, msg, userId, user, profile)
+}
+
+// Handle the user ID input for profile search
+func (h *adminProfilesHandler) handleSearchUserIDInput(b *gotgbot.Bot, ctx *ext.Context) error {
+	msg := ctx.EffectiveMessage
+	userIDStr := msg.Text
+	userId := ctx.EffectiveUser.Id
+
+	// Convert user ID string to int64
+	telegramID, err := strconv.ParseInt(userIDStr, 10, 64)
+	if err != nil {
+		h.RemovePreviousMessage(b, &userId)
+		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
+		editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
+			msg.Chat.Id,
+			fmt.Sprintf("<b>%s</b>", adminProfilesMenuSearchByIDHeader)+
+				fmt.Sprintf("\n\nНекорректный формат ID: <b>%s</b>. Введи числовой ID пользователя Telegram:", userIDStr),
+			&gotgbot.SendMessageOpts{
+				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
+			})
+		if err != nil {
+			return fmt.Errorf("AdminProfilesHandler: failed to send message in handleSearchUserIDInput: %w", err)
+		}
+
+		h.SavePreviousMessageInfo(userId, editedMsg)
+		return nil
+	}
+
+	// Check if user exists
+	dbUser, err := h.userRepository.GetByTelegramID(telegramID)
+	if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("AdminProfilesHandler: failed to get user in handleSearchUserIDInput: %w", err)
+	}
+
+	// If user not found, show search again
+	if err == sql.ErrNoRows {
+		h.RemovePreviousMessage(b, &userId)
+		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
+		editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
+			msg.Chat.Id,
+			fmt.Sprintf("<b>%s</b>", adminProfilesMenuSearchByIDHeader)+
+				fmt.Sprintf("\n\nПользователь с ID <b>%d</b> не найден.", telegramID)+
+				"\n\nПопробуй ещё раз, или вернись назад:",
+			&gotgbot.SendMessageOpts{
+				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
+			})
+		if err != nil {
+			return fmt.Errorf("AdminProfilesHandler: failed to send message in handleSearchUserIDInput: %w", err)
+		}
+
+		h.SavePreviousMessageInfo(userId, editedMsg)
+		return nil
+	}
+
+	// Store the user ID for future use
+	h.userStore.Set(userId, adminProfilesCtxDataKeyUserID, dbUser.ID)
+	h.userStore.Set(userId, adminProfilesCtxDataKeyTelegramID, dbUser.TgID)
+	h.userStore.Set(userId, adminProfilesCtxDataKeyTelegramUsername, dbUser.TgUsername)
+
+	// Find or create the profile
+	profile, err := h.profileRepository.GetOrCreateDefaultProfile(dbUser.ID)
+	if err != nil {
+		_ = h.messageSenderService.Reply(msg,
+			"Произошла ошибка при получении профиля.", nil)
+		return fmt.Errorf("AdminProfilesHandler: failed to get profile in handleSearchUserIDInput: %w", err)
+	}
+
+	h.userStore.Set(userId, adminProfilesCtxDataKeyProfileID, profile.ID)
+
+	// Delete the input message
+	b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
+	h.RemovePreviousMessage(b, &userId)
+
+	// Show the profile edit menu
+	return h.showProfileEditMenu(b, msg, userId, dbUser, profile)
+}
+
+// Handle the name input for profile search
+func (h *adminProfilesHandler) handleSearchByFullNameInput(b *gotgbot.Bot, ctx *ext.Context) error {
+	msg := ctx.EffectiveMessage
+	fullName := msg.Text
+	userId := ctx.EffectiveUser.Id
+
+	// Split into first and last name
+	parts := strings.Fields(fullName)
+	if len(parts) < 2 {
+		h.RemovePreviousMessage(b, &userId)
+		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
+		editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
+			msg.Chat.Id,
+			fmt.Sprintf("<b>%s</b>", adminProfilesMenuSearchByNameHeader)+
+				fmt.Sprintf("\n\nНекорректный формат имени: <b>%s</b>.", fullName)+
+				"\n\nПожалуйста, введи имя и фамилию пользователя через пробел:",
+			&gotgbot.SendMessageOpts{
+				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
+			})
+		if err != nil {
+			return fmt.Errorf("AdminProfilesHandler: failed to send message in handleSearchByFullNameInput: %w", err)
+		}
+
+		h.SavePreviousMessageInfo(userId, editedMsg)
+		return nil
+	}
+
+	firstname := parts[0]
+	lastname := strings.Join(parts[1:], " ")
+
+	// Search for the user by first and last name
+	user, err := h.userRepository.SearchByName(firstname, lastname)
+	if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("AdminProfilesHandler: failed to search user in handleSearchNameInput: %w", err)
+	}
+
+	// If user not found, show search again
+	if err == sql.ErrNoRows {
+		h.RemovePreviousMessage(b, &userId)
+		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
+		editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
+			msg.Chat.Id,
+			fmt.Sprintf("<b>%s</b>", adminProfilesMenuSearchByNameHeader)+
+				fmt.Sprintf("\n\nПользователь с именем <b>%s %s</b> не найден.", firstname, lastname)+
+				"\n\nПопробуй ещё раз, или вернись назад:",
+			&gotgbot.SendMessageOpts{
+				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
+			})
+		if err != nil {
+			return fmt.Errorf("AdminProfilesHandler: failed to send message in handleSearchNameInput: %w", err)
+		}
+
+		h.SavePreviousMessageInfo(userId, editedMsg)
+		return nil
+	}
+
+	// Store the user ID for future use
+	h.userStore.Set(userId, adminProfilesCtxDataKeyUserID, user.ID)
+	h.userStore.Set(userId, adminProfilesCtxDataKeyTelegramID, user.TgID)
+	h.userStore.Set(userId, adminProfilesCtxDataKeyTelegramUsername, user.TgUsername)
+
+	// Find or create the profile
+	profile, err := h.profileRepository.GetOrCreateDefaultProfile(user.ID)
+	if err != nil {
+		_ = h.messageSenderService.Reply(msg,
+			"Произошла ошибка при получении профиля.", nil)
+		return fmt.Errorf("AdminProfilesHandler: failed to get profile in handleSearchNameInput: %w", err)
+	}
+
+	h.userStore.Set(userId, adminProfilesCtxDataKeyProfileID, profile.ID)
+
+	// Delete the input message
+	b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
+	h.RemovePreviousMessage(b, &userId)
+
+	// Show the profile edit menu
 	return h.showProfileEditMenu(b, msg, userId, user, profile)
 }
 
@@ -873,96 +1177,6 @@ func (h *adminProfilesHandler) handleToggleCoffeeBanCallback(b *gotgbot.Bot, ctx
 
 	h.SavePreviousMessageInfo(userId, editedMsg)
 	return nil // Stay in current state
-}
-
-// Handle the "Create profile by ID" button click
-func (h *adminProfilesHandler) handleCreateByIDCallback(b *gotgbot.Bot, ctx *ext.Context) error {
-	msg := ctx.EffectiveMessage
-	userId := ctx.EffectiveUser.Id
-
-	h.RemovePreviousMessage(b, &userId)
-	editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
-		msg.Chat.Id,
-		fmt.Sprintf("<b>%s</b>", adminProfilesMenuCreateByIDHeader)+
-			"\n\nВведи ID пользователя Telegram для создания профиля:",
-		&gotgbot.SendMessageOpts{
-			ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
-		})
-
-	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to send message in handleCreateByIDCallback: %w", err)
-	}
-
-	h.SavePreviousMessageInfo(userId, editedMsg)
-	return handlers.NextConversationState(adminProfilesStateAwaitUserID)
-}
-
-// Handle the userID input for profile creation
-func (h *adminProfilesHandler) handleUserIDInput(b *gotgbot.Bot, ctx *ext.Context) error {
-	msg := ctx.EffectiveMessage
-	userIDStr := msg.Text
-	userId := ctx.EffectiveUser.Id
-
-	// Convert user ID string to int64
-	telegramID, err := strconv.ParseInt(userIDStr, 10, 64)
-	if err != nil {
-		h.RemovePreviousMessage(b, &userId)
-		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
-		editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
-			msg.Chat.Id,
-			fmt.Sprintf("<b>%s</b>", adminProfilesMenuCreateByIDHeader)+
-				fmt.Sprintf("\n\nНекорректный формат ID: <b>%s</b>. Введи числовой ID пользователя Telegram:", userIDStr),
-			&gotgbot.SendMessageOpts{
-				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
-			})
-		if err != nil {
-			return fmt.Errorf("AdminProfilesHandler: failed to send message in handleUserIDInput: %w", err)
-		}
-
-		h.SavePreviousMessageInfo(userId, editedMsg)
-		return nil
-	}
-
-	// Check if user exists, create if not
-	dbUser, err := h.userRepository.GetByTelegramID(telegramID)
-	if err != nil && err != sql.ErrNoRows {
-		return fmt.Errorf("AdminProfilesHandler: failed to get user in handleUserIDInput: %w", err)
-	}
-
-	// If user not found, create a new user with minimal info
-	if err == sql.ErrNoRows {
-		userID, err := h.userRepository.Create(telegramID, "", "", "")
-		if err != nil {
-			return fmt.Errorf("AdminProfilesHandler: failed to create user in handleUserIDInput: %w", err)
-		}
-
-		dbUser, err = h.userRepository.GetByID(userID)
-		if err != nil {
-			return fmt.Errorf("AdminProfilesHandler: failed to get created user in handleUserIDInput: %w", err)
-		}
-	}
-
-	// Store the user ID for future use
-	h.userStore.Set(userId, adminProfilesCtxDataKeyUserID, dbUser.ID)
-	h.userStore.Set(userId, adminProfilesCtxDataKeyTelegramID, dbUser.TgID)
-	h.userStore.Set(userId, adminProfilesCtxDataKeyTelegramUsername, dbUser.TgUsername)
-
-	// Find or create the profile
-	profile, err := h.profileRepository.GetOrCreateDefaultProfile(dbUser.ID)
-	if err != nil {
-		_ = h.messageSenderService.Reply(msg,
-			"Произошла ошибка при получении или создании профиля.", nil)
-		return fmt.Errorf("AdminProfilesHandler: failed to get/create profile in handleUserIDInput: %w", err)
-	}
-
-	h.userStore.Set(userId, adminProfilesCtxDataKeyProfileID, profile.ID)
-
-	// Delete the input message
-	b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
-	h.RemovePreviousMessage(b, &userId)
-
-	// Show the profile edit menu
-	return h.showProfileEditMenu(b, msg, userId, dbUser, profile)
 }
 
 func (h *adminProfilesHandler) handleCancelCallback(b *gotgbot.Bot, ctx *ext.Context) error {
