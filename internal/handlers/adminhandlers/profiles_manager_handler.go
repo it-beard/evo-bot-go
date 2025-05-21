@@ -38,13 +38,14 @@ const (
 	adminProfilesStateAwaitUsername                 = "admin_profiles_state_await_username"
 
 	// UserStore keys
-	adminProfilesCtxDataKeyField             = "admin_profiles_ctx_data_field"
-	adminProfilesCtxDataKeyUserID            = "admin_profiles_ctx_data_user_id"
-	adminProfilesCtxDataKeyPreviousMessageID = "admin_profiles_ctx_data_previous_message_id"
-	adminProfilesCtxDataKeyPreviousChatID    = "admin_profiles_ctx_data_previous_chat_id"
-	adminProfilesCtxDataKeyProfileID         = "admin_profiles_ctx_data_profile_id"
-	adminProfilesCtxDataKeyTelegramID        = "admin_profiles_ctx_data_telegram_id"
-	adminProfilesCtxDataKeyTelegramUsername  = "admin_profiles_ctx_data_telegram_username"
+	adminProfilesCtxDataKeyField                   = "admin_profiles_ctx_data_field"
+	adminProfilesCtxDataKeyUserID                  = "admin_profiles_ctx_data_user_id"
+	adminProfilesCtxDataKeyPreviousMessageID       = "admin_profiles_ctx_data_previous_message_id"
+	adminProfilesCtxDataKeyPreviousChatID          = "admin_profiles_ctx_data_previous_chat_id"
+	adminProfilesCtxDataKeyProfileID               = "admin_profiles_ctx_data_profile_id"
+	adminProfilesCtxDataKeyTelegramID              = "admin_profiles_ctx_data_telegram_id"
+	adminProfilesCtxDataKeyTelegramUsername        = "admin_profiles_ctx_data_telegram_username"
+	adminProfilesCtxDataKeyLastMessageTimeFromUser = "admin_profiles_ctx_data_last_message_time_from_user"
 
 	// Menu headers
 	adminProfilesMenuHeader              = "Админ-меню \"Менеджер профилей\""
@@ -978,6 +979,16 @@ func (h *adminProfilesHandler) handleBioInput(b *gotgbot.Bot, ctx *ext.Context) 
 	bio := msg.Text
 	userId := ctx.EffectiveUser.Id
 	bioLength := utils.Utf16CodeUnitCount(bio)
+
+	// skip if it is sequential message from user with the same date
+	lastMessageDate, ok := h.userStore.Get(msg.From.Id, adminProfilesCtxDataKeyLastMessageTimeFromUser)
+	if ok && lastMessageDate == msg.Date {
+		// Skip processing - same message date detected
+		return nil
+	}
+
+	// Store current message date to avoid duplicate processing
+	h.userStore.Set(msg.From.Id, adminProfilesCtxDataKeyLastMessageTimeFromUser, msg.Date)
 
 	if bioLength > constants.ProfileBioLengthLimit {
 		h.RemovePreviousMessage(b, &userId)

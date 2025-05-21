@@ -131,7 +131,7 @@ func ProfilesMainMenuButtons() gotgbot.InlineKeyboardMarkup {
 		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
 			{
 				{
-					Text:         "🔍 Поиск по Telegram Username",
+					Text:         "📝 Поиск по Telegram Username",
 					CallbackData: constants.AdminProfilesSearchByUsernameCallback,
 				},
 			},
