@@ -283,15 +283,20 @@ func (h *adminProfilesHandler) handleUsernameInput(b *gotgbot.Bot, ctx *ext.Cont
 func (h *adminProfilesHandler) handleForwardedMessage(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	userId := ctx.EffectiveUser.Id
+	msgType := msg.ForwardOrigin.GetType()
 
 	// Check if this is a forwarded message with user origin
-	if msg.ForwardOrigin == nil || msg.ForwardOrigin.GetType() != "user" {
+	if msg.ForwardOrigin == nil || msgType != "user" {
 		h.RemovePreviousMessage(b, &userId)
 		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
+		msgText := fmt.Sprintf("<b>%s</b>", adminProfilesMenuHeader) +
+			"\n\nЭто не пересланное сообщение от пользователя. Пожалуйста, перешли сообщение от пользователя, для которого нужно создать профиль:"
+		if msgType == "hidden_user" {
+			msgText += "\n\n<i>Сообщение от скрытого пользователя не может быть использовано для создания профиля.</i>"
+		}
 		editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
 			msg.Chat.Id,
-			fmt.Sprintf("<b>%s</b>", adminProfilesMenuHeader)+
-				"\n\nЭто не пересланное сообщение от пользователя. Пожалуйста, перешли сообщение от пользователя, для которого нужно создать профиль:",
+			msgText,
 			&gotgbot.SendMessageOpts{
 				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
 			})
