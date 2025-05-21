@@ -336,13 +336,13 @@ func (h *profileHandler) handleEditField(b *gotgbot.Bot, ctx *ext.Context, msg *
 
 	switch nextState {
 	case profileStateAwaitBio:
-		oldFieldValue = dbProfile.Bio
+		oldFieldValue = "Текущее значение: <blockquote expandable>" + dbProfile.Bio + "</blockquote>"
 		menuHeader = profileMenuEditBioHeader
 	case profileStateAwaitFirstname:
-		oldFieldValue = dbUser.Firstname
+		oldFieldValue = "Текущее значение: <code>" + dbUser.Firstname + "</code>"
 		menuHeader = profileMenuEditFirstnameHeader
 	case profileStateAwaitLastname:
-		oldFieldValue = dbUser.Lastname
+		oldFieldValue = "Текущее значение: <code>" + dbUser.Lastname + "</code>"
 		menuHeader = profileMenuEditLastnameHeader
 	}
 
@@ -351,10 +351,10 @@ func (h *profileHandler) handleEditField(b *gotgbot.Bot, ctx *ext.Context, msg *
 	}
 
 	h.RemovePreviouseMessage(b, &user.Id)
-	editedMsg, err := h.messageSenderService.SendMarkdownWithReturnMessage(
+	editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
 		msg.Chat.Id,
-		fmt.Sprintf("*%s*", menuHeader)+
-			fmt.Sprintf("\n\nТекущее значение: `%s`", oldFieldValue)+
+		fmt.Sprintf("<b>%s</b>", menuHeader)+
+			fmt.Sprintf("\n\n%s", oldFieldValue)+
 			fmt.Sprintf("\n\nВведи %s:", fieldName),
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: buttons.ProfileBackCancelButtons(constants.ProfileEditMyProfileCallback),

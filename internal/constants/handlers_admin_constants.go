@@ -15,7 +15,7 @@ const EventStartCommand = "eventStart"
 const ShowTopicsCommand = "showTopics"
 
 // Profiles Handler
-const AdminProfilesCommand = "profiles"
+const AdminProfilesCommand = "profilesManager"
 
 // Callback data constants for admin "/profiles" handler
 const (

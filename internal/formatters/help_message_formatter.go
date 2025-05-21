@@ -27,7 +27,8 @@ func FormatHelpMessage(isAdmin bool) string {
 			"└ /eventDelete - Удалить мероприятие\n" +
 			"└ /showTopics - Просмотреть темы и вопросы к предстоящим мероприятиям *с возможностью удаления*\n" +
 			"└ /code - Ввести код для авторизации TG-клиента (задом наперед)\n" +
-			"└ /trySummarize - Тестирование саммаризации общения в клубе\n"
+			"└ /trySummarize - Тестирование саммаризации общения в клубе\n" +
+			"└ /profilesManager - Управление профилями клубчан\n"
 
 		helpText += adminHelpText
 	}

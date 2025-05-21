@@ -42,13 +42,13 @@ const (
 	adminProfilesCtxDataKeyTelegramUsername  = "admin_profiles_ctx_data_telegram_username"
 
 	// Menu headers
-	adminProfilesMenuHeader              = "Админ-меню \"Профили\""
-	adminProfilesMenuEditHeader          = "Профили → Редактирование"
-	adminProfilesMenuEditFirstnameHeader = "Профили → Редактирование → Имя"
-	adminProfilesMenuEditLastnameHeader  = "Профили → Редактирование → Фамилия"
-	adminProfilesMenuEditBioHeader       = "Профили → Редактирование → О себе"
-	adminProfilesMenuPublishHeader       = "Профили → Публикация"
-	adminProfilesMenuCoffeeBanHeader     = "Профили → Бан на кофейные встречи"
+	adminProfilesMenuHeader              = "Админ-меню \"Менеджер профилей\""
+	adminProfilesMenuEditHeader          = "Менеджер профилей → Редактирование"
+	adminProfilesMenuEditFirstnameHeader = "Менеджер профилей → Редактирование → Имя"
+	adminProfilesMenuEditLastnameHeader  = "Менеджер профилей → Редактирование → Фамилия"
+	adminProfilesMenuEditBioHeader       = "Менеджер профилей → Редактирование → О себе"
+	adminProfilesMenuPublishHeader       = "Менеджер профилей → Публикация"
+	adminProfilesMenuCoffeeBanHeader     = "Менеджер профилей → Бан на кофейные встречи"
 
 	// Other
 	adminProfilesBioLengthLimit = 4000
