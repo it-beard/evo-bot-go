@@ -633,7 +633,7 @@ func (h *adminProfilesHandler) handlePublishProfile(b *gotgbot.Bot, ctx *ext.Con
 		fmt.Sprintf("<b>%s</b>", adminProfilesMenuPublishHeader)+
 			fmt.Sprintf("\n\n✅ Профиль пользователя успешно опубликован в канале \"<a href='%s'>Интро</a>\"!", utils.GetIntroMessageLink(h.config, profile.PublishedMessageID.Int64)),
 		&gotgbot.SendMessageOpts{
-			ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesEditMenuCallback),
+			ReplyMarkup: buttons.ProfilesBackStartCancelButtons(constants.AdminProfilesEditMenuCallback),
 		})
 
 	if err != nil {
