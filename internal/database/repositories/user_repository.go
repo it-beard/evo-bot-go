@@ -32,6 +32,11 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	return &UserRepository{db: db}
 }
 
+// GetDB returns the database connection
+func (r *UserRepository) GetDB() *sql.DB {
+	return r.db
+}
+
 // GetByID retrieves a user by ID
 func (r *UserRepository) GetByID(id int) (*User, error) {
 	query := `
@@ -257,4 +262,36 @@ func (h *UserRepository) GetOrCreateUser(tgUser *gotgbot.User) (*User, error) {
 	}
 
 	return dbUser, nil
+}
+
+// SearchByName searches for users with matching first and last name
+func (r *UserRepository) SearchByName(firstname, lastname string) (*User, error) {
+	query := `
+		SELECT id, tg_id, firstname, lastname, tg_username, score, has_coffee_ban, created_at, updated_at
+		FROM users
+		WHERE LOWER(firstname) = LOWER($1) AND LOWER(lastname) = LOWER($2)
+		LIMIT 1`
+
+	var user User
+	err := r.db.QueryRow(query, firstname, lastname).Scan(
+		&user.ID,
+		&user.TgID,
+		&user.Firstname,
+		&user.Lastname,
+		&user.TgUsername,
+		&user.Score,
+		&user.HasCoffeeBan,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, sql.ErrNoRows
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to search user by name: %w", err)
+	}
+
+	return &user, nil
 }

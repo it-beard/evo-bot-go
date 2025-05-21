@@ -67,6 +67,7 @@ func FormatProfileManagerView(user *repositories.User, profile *repositories.Pro
 		coffeeBanStatus = "❌ Запрещено"
 	}
 	text += fmt.Sprintf("\n<i>Кофейные встречи:</i> %s", coffeeBanStatus)
+	text += fmt.Sprintf("\n<i>Telegram ID:</i> <code>%d</code>", user.TgID)
 	return text
 }
 
@@ -81,7 +82,7 @@ func FormatPublicProfileForMessage(user *repositories.User, profile *repositorie
 	fullName = "<b><a href=\"tg://user?id=" + strconv.FormatInt(user.TgID, 10) + "\">" + fullName + "</a></b>"
 
 	if user.TgUsername != "" {
-		username = " (@" + user.TgUsername + ")"
+		username = "(@" + user.TgUsername + ")"
 	}
 
 	// Build profile text
