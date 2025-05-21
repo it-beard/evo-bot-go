@@ -17,7 +17,7 @@ const ShowTopicsCommand = "showTopics"
 // Profiles Handler
 const AdminProfilesCommand = "profilesManager"
 
-// Callback data constants for admin "/profiles" handler
+// Callback data constants for admin "/profilesManager" handler
 const (
 	AdminProfilesPrefix         = "admin_profiles_"
 	AdminProfilesEditCallback   = AdminProfilesPrefix + "edit"

@@ -132,6 +132,13 @@ func NewAdminProfilesHandler(
 		},
 		&handlers.ConversationOpts{
 			Exits: []ext.Handler{handlers.NewCommand(constants.CancelCommand, h.handleCancel)},
+			Fallbacks: []ext.Handler{
+				handlers.NewMessage(message.Text, func(b *gotgbot.Bot, ctx *ext.Context) error {
+					// Delete the message that not matched any state
+					b.DeleteMessage(ctx.EffectiveMessage.Chat.Id, ctx.EffectiveMessage.MessageId, nil)
+					return nil
+				}),
+			},
 		},
 	)
 }
@@ -335,13 +342,7 @@ func (h *adminProfilesHandler) handleForwardedMessage(b *gotgbot.Bot, ctx *ext.C
 
 // Shows the profile edit menu
 func (h *adminProfilesHandler) showProfileEditMenu(b *gotgbot.Bot, msg *gotgbot.Message, userId int64, user *repositories.User, profile *repositories.Profile) error {
-	profileText := fmt.Sprintf("<b>%s</b>\n\n%s", adminProfilesMenuEditHeader, formatters.FormatProfileView(user, profile, true))
-
-	coffeeBanStatus := "✅ Разрешено"
-	if user.HasCoffeeBan {
-		coffeeBanStatus = "❌ Запрещено"
-	}
-	profileText += fmt.Sprintf("\n\n<b>Кофейные встречи:</b> %s", coffeeBanStatus)
+	profileText := fmt.Sprintf("<b>%s</b>\n\n%s", adminProfilesMenuEditHeader, formatters.FormatProfileManagerView(user, profile, user.HasCoffeeBan))
 
 	editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
 		msg.Chat.Id,
