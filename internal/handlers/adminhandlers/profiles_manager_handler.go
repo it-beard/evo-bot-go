@@ -766,7 +766,9 @@ func (h *adminProfilesHandler) handleEditFieldCallback(b *gotgbot.Bot, ctx *ext.
 		callToAction = fmt.Sprintf("Введи новое значение для поля <b>биографию</b> (до %d символов)", constants.ProfileBioLengthLimit)
 		menuHeader = adminProfilesMenuEditBioHeader
 		nextState = adminProfilesStateAwaitBio
-		oldField = "Текущее значение: <blockquote expandable>" + profile.Bio + "</blockquote>"
+		profile.Bio = strings.ReplaceAll(profile.Bio, "<", "&lt;")
+		profile.Bio = strings.ReplaceAll(profile.Bio, ">", "&gt;")
+		oldField = "Текущее значение: <pre>" + profile.Bio + "</pre>"
 	case constants.AdminProfilesEditCoffeeBanCallback:
 		callToAction = "Нажмите на кнопку, чтобы изменить статус кофейных встреч"
 		menuHeader = adminProfilesMenuCoffeeBanHeader
