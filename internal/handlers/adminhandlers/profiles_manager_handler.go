@@ -126,7 +126,7 @@ func NewAdminProfilesHandler(
 				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), h.handleCancelCallback),
 			},
 			adminProfilesStateAwaitCoffeeBan: {
-				handlers.NewMessage(message.Text, h.handleCoffeeBanInput),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesToggleCoffeeBanCallback), h.handleToggleCoffeeBanCallback),
 				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditMenuCallback), h.handleEditMenuCallback),
 				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), h.handleCancelCallback),
 			},
@@ -417,36 +417,36 @@ func (h *adminProfilesHandler) handleEditFieldCallback(b *gotgbot.Bot, ctx *ext.
 		return fmt.Errorf("AdminProfilesHandler: failed to get profile in handleCallbackEditField: %w", err)
 	}
 
-	var fieldName string
+	var callToAction string
 	var menuHeader string
 	var nextState string
-	var oldFieldValue string
+	var oldField string
 
 	// Determine which field is being edited
 	switch data {
 	case constants.AdminProfilesEditFirstnameCallback:
-		fieldName = "имя"
+		callToAction = "Введи новое значение для поля <b>имя</b>"
 		menuHeader = adminProfilesMenuEditFirstnameHeader
 		nextState = adminProfilesStateAwaitFirstname
-		oldFieldValue = "Текущее значение: <code>" + dbUser.Firstname + "</code>"
+		oldField = "Текущее значение: <code>" + dbUser.Firstname + "</code>"
 	case constants.AdminProfilesEditLastnameCallback:
-		fieldName = "фамилию"
+		callToAction = "Введи новое значение для поля <b>фамилия</b>"
 		menuHeader = adminProfilesMenuEditLastnameHeader
 		nextState = adminProfilesStateAwaitLastname
-		oldFieldValue = "Текущее значение: <code>" + dbUser.Lastname + "</code>"
+		oldField = "Текущее значение: <code>" + dbUser.Lastname + "</code>"
 	case constants.AdminProfilesEditBioCallback:
-		fieldName = fmt.Sprintf("биографию (до %d символов)", adminProfilesBioLengthLimit)
+		callToAction = fmt.Sprintf("Введи новое значение для поля <b>биографию</b> (до %d символов)", adminProfilesBioLengthLimit)
 		menuHeader = adminProfilesMenuEditBioHeader
 		nextState = adminProfilesStateAwaitBio
-		oldFieldValue = "Текущее значение: <blockquote expandable>" + profile.Bio + "</blockquote>"
+		oldField = "Текущее значение: <blockquote expandable>" + profile.Bio + "</blockquote>"
 	case constants.AdminProfilesEditCoffeeBanCallback:
-		fieldName = "статус кофейных встреч"
+		callToAction = "Нажмите на кнопку, чтобы изменить статус кофейных встреч"
 		menuHeader = adminProfilesMenuCoffeeBanHeader
 		nextState = adminProfilesStateAwaitCoffeeBan
 		if dbUser.HasCoffeeBan {
-			oldFieldValue = "Текущее значение: ❌ Запрещено"
+			oldField = "Текущее значение: ❌ Запрещено"
 		} else {
-			oldFieldValue = "Текущее значение: ✅ Разрешено"
+			oldField = "Текущее значение: ✅ Разрешено"
 		}
 	default:
 		return fmt.Errorf("AdminProfilesHandler: unknown callback data: %s", data)
@@ -455,18 +455,24 @@ func (h *adminProfilesHandler) handleEditFieldCallback(b *gotgbot.Bot, ctx *ext.
 	// Store field being edited for use in input handlers
 	h.userStore.Set(userId, adminProfilesCtxDataKeyField, data)
 
-	if oldFieldValue == "" || oldFieldValue == " " {
-		oldFieldValue = "отсутствует"
+	h.RemovePreviousMessage(b, &userId)
+
+	var replyMarkup gotgbot.InlineKeyboardMarkup
+	if data == constants.AdminProfilesEditCoffeeBanCallback {
+		// For coffee ban, use toggle buttons
+		replyMarkup = buttons.ProfilesCoffeeBanButtons(constants.AdminProfilesEditMenuCallback, dbUser.HasCoffeeBan)
+	} else {
+		// For other fields, use standard back/cancel buttons
+		replyMarkup = buttons.ProfilesBackCancelButtons(constants.AdminProfilesEditMenuCallback)
 	}
 
-	h.RemovePreviousMessage(b, &userId)
 	editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
 		msg.Chat.Id,
 		fmt.Sprintf("<b>%s</b>", menuHeader)+
-			fmt.Sprintf("\n\n%s", oldFieldValue)+
-			fmt.Sprintf("\n\nВведи новое значение для поля <b>%s</b>:", fieldName),
+			fmt.Sprintf("\n\n%s", oldField)+
+			fmt.Sprintf("\n\n%s", callToAction),
 		&gotgbot.SendMessageOpts{
-			ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesEditMenuCallback),
+			ReplyMarkup: replyMarkup,
 		})
 
 	if err != nil {
@@ -652,7 +658,7 @@ func (h *adminProfilesHandler) handleBioInput(b *gotgbot.Bot, ctx *ext.Context) 
 				fmt.Sprintf("\n\nТекущая длина: %d символов", bioLength)+
 				fmt.Sprintf("\n\nПожалуйста, сократи до %d символов и пришли снова:", adminProfilesBioLengthLimit),
 			&gotgbot.SendMessageOpts{
-				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
+				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesEditMenuCallback),
 			})
 
 		h.SavePreviousMessageInfo(userId, errMsg)
@@ -691,7 +697,7 @@ func (h *adminProfilesHandler) handleFirstnameInput(b *gotgbot.Bot, ctx *ext.Con
 			fmt.Sprintf("<b>%s</b>", adminProfilesMenuEditFirstnameHeader)+
 				"\n\nИмя слишком длинное. Пожалуйста, введи более короткое имя (не более 30 символов):",
 			&gotgbot.SendMessageOpts{
-				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
+				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesEditMenuCallback),
 			})
 
 		h.SavePreviousMessageInfo(userId, errMsg)
@@ -730,7 +736,7 @@ func (h *adminProfilesHandler) handleLastnameInput(b *gotgbot.Bot, ctx *ext.Cont
 			fmt.Sprintf("<b>%s</b>", adminProfilesMenuEditLastnameHeader)+
 				"\n\nФамилия слишком длинная. Пожалуйста, введи более короткую фамилию (не более 30 символов):",
 			&gotgbot.SendMessageOpts{
-				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
+				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesEditMenuCallback),
 			})
 
 		h.SavePreviousMessageInfo(userId, errMsg)
@@ -750,50 +756,6 @@ func (h *adminProfilesHandler) handleLastnameInput(b *gotgbot.Bot, ctx *ext.Cont
 	})
 	if err != nil {
 		return fmt.Errorf("AdminProfilesHandler: failed to update lastname: %w", err)
-	}
-
-	return h.returnToProfileView(b, ctx)
-}
-
-// Handle coffee ban input
-func (h *adminProfilesHandler) handleCoffeeBanInput(b *gotgbot.Bot, ctx *ext.Context) error {
-	msg := ctx.EffectiveMessage
-	coffeeInput := strings.ToLower(strings.TrimSpace(msg.Text))
-	userId := ctx.EffectiveUser.Id
-
-	var coffeeValue bool
-	if coffeeInput == "0" || coffeeInput == "нет" || coffeeInput == "разрешить" || coffeeInput == "разрешено" {
-		coffeeValue = false
-	} else if coffeeInput == "1" || coffeeInput == "да" || coffeeInput == "запретить" || coffeeInput == "запрещено" {
-		coffeeValue = true
-	} else {
-		h.RemovePreviousMessage(b, &userId)
-		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
-		errMsg, _ := h.messageSenderService.SendHtmlWithReturnMessage(
-			msg.Chat.Id,
-			fmt.Sprintf("<b>%s</b>", adminProfilesMenuCoffeeBanHeader)+
-				"\n\nПожалуйста, введи корректное значение:"+
-				"\n- 0, нет, разрешить, разрешено - чтобы разрешить кофейные встречи"+
-				"\n- 1, да, запретить, запрещено - чтобы запретить кофейные встречи",
-			&gotgbot.SendMessageOpts{
-				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
-			})
-
-		h.SavePreviousMessageInfo(userId, errMsg)
-		return nil // Stay in current state
-	}
-
-	// Get user ID from store
-	userIDVal, ok := h.userStore.Get(userId, adminProfilesCtxDataKeyUserID)
-	if !ok {
-		return fmt.Errorf("AdminProfilesHandler: user ID not found in user store")
-	}
-	dbUserID := userIDVal.(int)
-
-	// Update coffee ban status
-	err := h.userRepository.SetCoffeeBan(dbUserID, coffeeValue)
-	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to update coffee ban status: %w", err)
 	}
 
 	return h.returnToProfileView(b, ctx)
@@ -848,6 +810,58 @@ func (h *adminProfilesHandler) returnToProfileView(b *gotgbot.Bot, ctx *ext.Cont
 
 	// Show profile edit menu with updated data
 	return h.showProfileEditMenu(b, msg, userId, dbUser, profile)
+}
+
+// Handle the toggle coffee ban button click
+func (h *adminProfilesHandler) handleToggleCoffeeBanCallback(b *gotgbot.Bot, ctx *ext.Context) error {
+	userId := ctx.EffectiveUser.Id
+	msg := ctx.EffectiveMessage
+
+	// Get user data
+	userIDVal, ok := h.userStore.Get(userId, adminProfilesCtxDataKeyUserID)
+	if !ok {
+		return fmt.Errorf("AdminProfilesHandler: user ID not found in user store")
+	}
+	dbUserID := userIDVal.(int)
+
+	// Get user from database
+	dbUser, err := h.userRepository.GetByID(dbUserID)
+	if err != nil {
+		return fmt.Errorf("AdminProfilesHandler: failed to get user in handleToggleCoffeeBanCallback: %w", err)
+	}
+
+	// Toggle the coffee ban status
+	newStatus := !dbUser.HasCoffeeBan
+	err = h.userRepository.SetCoffeeBan(dbUserID, newStatus)
+	if err != nil {
+		return fmt.Errorf("AdminProfilesHandler: failed to update coffee ban status: %w", err)
+	}
+
+	// Update the message with new buttons
+	h.RemovePreviousMessage(b, &userId)
+
+	var statusText string
+	if newStatus {
+		statusText = "❌ Запретить"
+	} else {
+		statusText = "✅ Разрешить"
+	}
+
+	editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
+		msg.Chat.Id,
+		fmt.Sprintf("<b>%s</b>", adminProfilesMenuCoffeeBanHeader)+
+			fmt.Sprintf("\n\nТекущее значение: %s", statusText)+
+			"\n\nВведи новое значение для поля <b>статус кофейных встреч</b>:",
+		&gotgbot.SendMessageOpts{
+			ReplyMarkup: buttons.ProfilesCoffeeBanButtons(constants.AdminProfilesEditMenuCallback, newStatus),
+		})
+
+	if err != nil {
+		return fmt.Errorf("AdminProfilesHandler: failed to send message in handleToggleCoffeeBanCallback: %w", err)
+	}
+
+	h.SavePreviousMessageInfo(userId, editedMsg)
+	return nil // Stay in current state
 }
 
 func (h *adminProfilesHandler) handleCancelCallback(b *gotgbot.Bot, ctx *ext.Context) error {

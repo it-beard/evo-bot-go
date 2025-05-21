@@ -23,6 +23,37 @@ func ProfilesBackCancelButtons(backCallbackData string) gotgbot.InlineKeyboardMa
 	}
 }
 
+// ProfilesCoffeeBanButtons returns buttons for managing coffee ban status
+func ProfilesCoffeeBanButtons(backCallbackData string, hasCoffeeBan bool) gotgbot.InlineKeyboardMarkup {
+	var toggleButtonText string
+	if hasCoffeeBan {
+		toggleButtonText = "✅ Разрешить"
+	} else {
+		toggleButtonText = "❌ Запретить"
+	}
+
+	return gotgbot.InlineKeyboardMarkup{
+		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
+			{
+				{
+					Text:         toggleButtonText,
+					CallbackData: constants.AdminProfilesToggleCoffeeBanCallback,
+				},
+			},
+			{
+				{
+					Text:         "◀️ Назад",
+					CallbackData: backCallbackData,
+				},
+				{
+					Text:         "❌ Отмена",
+					CallbackData: constants.AdminProfilesCancelCallback,
+				},
+			},
+		},
+	}
+}
+
 func ProfilesEditMenuButtons(backCallbackData string) gotgbot.InlineKeyboardMarkup {
 	return gotgbot.InlineKeyboardMarkup{
 		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{

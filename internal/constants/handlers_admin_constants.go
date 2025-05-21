@@ -28,6 +28,7 @@ const (
 	AdminProfilesEditFirstnameCallback    = AdminProfilesPrefix + "edit_firstname"
 	AdminProfilesEditLastnameCallback     = AdminProfilesPrefix + "edit_lastname"
 	AdminProfilesEditCoffeeBanCallback    = AdminProfilesPrefix + "edit_coffee_ban"
+	AdminProfilesToggleCoffeeBanCallback  = AdminProfilesPrefix + "toggle_coffee_ban"
 	AdminProfilesPublishCallback          = AdminProfilesPrefix + "publish"
 	AdminProfilesPublishNoPreviewCallback = AdminProfilesPrefix + "publish_without_preview"
 
