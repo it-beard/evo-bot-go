@@ -297,8 +297,6 @@ func (h *profileHandler) handleUsernameInput(b *gotgbot.Bot, ctx *ext.Context) e
 
 	dbUser, err := h.userRepository.GetByTelegramUsername(username)
 	if err != nil && err != sql.ErrNoRows {
-		_ = h.messageSenderService.Reply(msg,
-			"Произошла ошибка при получении информации о пользователе.", nil)
 		return fmt.Errorf("ProfileHandler: failed to get user in handleUsernameInput: %w", err)
 	}
 

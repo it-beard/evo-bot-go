@@ -27,6 +27,5 @@ const (
 	ProfilePublishWithoutPreviewCallback = ProfilePrefix + "publish_without_preview"
 
 	ProfileStartCallback = ProfilePrefix + "start"
-	ProfileSaveCallback  = ProfilePrefix + "save"
 	ProfileFullCancel    = "full_cancel" + ProfilePrefix
 )

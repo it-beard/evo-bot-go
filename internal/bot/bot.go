@@ -143,6 +143,7 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 		adminhandlers.NewCodeHandler(deps.AppConfig, deps.MessageSenderService, deps.PermissionsService),
 		adminhandlers.NewTrySummarizeHandler(deps.AppConfig, deps.SummarizationService, deps.MessageSenderService, deps.PermissionsService),
 		adminhandlers.NewShowTopicsHandler(deps.AppConfig, deps.TopicRepository, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
+		adminhandlers.NewAdminProfilesHandler(deps.AppConfig, deps.MessageSenderService, deps.PermissionsService, deps.UserRepository, deps.ProfileRepository),
 		eventhandlers.NewEventEditHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
 		eventhandlers.NewEventSetupHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
 		eventhandlers.NewEventDeleteHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),

@@ -13,3 +13,26 @@ const EventStartCommand = "eventStart"
 
 // Topics Handlers
 const ShowTopicsCommand = "showTopics"
+
+// Profiles Handler
+const AdminProfilesCommand = "profiles"
+
+// Callback data constants for admin "/profiles" handler
+const (
+	AdminProfilesPrefix         = "admin_profiles_"
+	AdminProfilesEditCallback   = AdminProfilesPrefix + "edit"
+	AdminProfilesCreateCallback = AdminProfilesPrefix + "create"
+
+	AdminProfilesEditBioCallback          = AdminProfilesPrefix + "edit_bio"
+	AdminProfilesEditLinkedinCallback     = AdminProfilesPrefix + "edit_linkedin"
+	AdminProfilesEditGithubCallback       = AdminProfilesPrefix + "edit_github"
+	AdminProfilesEditFreeLinkCallback     = AdminProfilesPrefix + "edit_free_link"
+	AdminProfilesEditFirstnameCallback    = AdminProfilesPrefix + "edit_firstname"
+	AdminProfilesEditLastnameCallback     = AdminProfilesPrefix + "edit_lastname"
+	AdminProfilesEditCoffeeBanCallback    = AdminProfilesPrefix + "edit_coffee_ban"
+	AdminProfilesPublishCallback          = AdminProfilesPrefix + "publish"
+	AdminProfilesPublishNoPreviewCallback = AdminProfilesPrefix + "publish_without_preview"
+
+	AdminProfilesStartCallback  = AdminProfilesPrefix + "start"
+	AdminProfilesCancelCallback = AdminProfilesPrefix + "cancel"
+)
