@@ -24,9 +24,6 @@ const (
 	AdminProfilesCreateCallback = AdminProfilesPrefix + "create"
 
 	AdminProfilesEditBioCallback          = AdminProfilesPrefix + "edit_bio"
-	AdminProfilesEditLinkedinCallback     = AdminProfilesPrefix + "edit_linkedin"
-	AdminProfilesEditGithubCallback       = AdminProfilesPrefix + "edit_github"
-	AdminProfilesEditFreeLinkCallback     = AdminProfilesPrefix + "edit_free_link"
 	AdminProfilesEditFirstnameCallback    = AdminProfilesPrefix + "edit_firstname"
 	AdminProfilesEditLastnameCallback     = AdminProfilesPrefix + "edit_lastname"
 	AdminProfilesEditCoffeeBanCallback    = AdminProfilesPrefix + "edit_coffee_ban"

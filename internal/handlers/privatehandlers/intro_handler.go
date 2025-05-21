@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
+	"evo-bot-go/internal/buttons"
 	"evo-bot-go/internal/clients"
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/prompts"
 	"evo-bot-go/internal/database/repositories"
-	"evo-bot-go/internal/formatters"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
@@ -103,7 +103,7 @@ func (h *introHandler) startIntroSearch(b *gotgbot.Bot, ctx *ext.Context) error 
 		msg,
 		fmt.Sprintf("Введите поисковый запрос по участникам клуба или нажмите /%s для получения общей информации:", constants.CancelCommand),
 		&gotgbot.SendMessageOpts{
-			ReplyMarkup: formatters.CancelButton(introCallbackConfirmCancel),
+			ReplyMarkup: buttons.CancelButton(introCallbackConfirmCancel),
 		},
 	)
 
@@ -149,11 +149,11 @@ func (h *introHandler) processIntroSearch(b *gotgbot.Bot, ctx *ext.Context) erro
 	var sentMsg *gotgbot.Message
 	if query == "" {
 		sentMsg, _ = h.messageSenderService.ReplyWithReturnMessage(msg, "Генерирую вводную информацию о клубе...", &gotgbot.SendMessageOpts{
-			ReplyMarkup: formatters.CancelButton(introCallbackConfirmCancel),
+			ReplyMarkup: buttons.CancelButton(introCallbackConfirmCancel),
 		})
 	} else {
 		sentMsg, _ = h.messageSenderService.ReplyWithReturnMessage(msg, fmt.Sprintf("Ищу информацию по запросу: \"%s\"...", query), &gotgbot.SendMessageOpts{
-			ReplyMarkup: formatters.CancelButton(introCallbackConfirmCancel),
+			ReplyMarkup: buttons.CancelButton(introCallbackConfirmCancel),
 		})
 	}
 	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)

@@ -20,7 +20,5 @@ func IsProfileComplete(user *repositories.User, profile *repositories.Profile) b
 		return false
 	}
 
-	// Check if at least one link is set
-	hasLink := profile.LinkedIn != "" || profile.GitHub != "" || profile.FreeLink != ""
-	return hasLink
+	return true
 }

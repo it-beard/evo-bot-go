@@ -2,6 +2,7 @@ package adminhandlers
 
 import (
 	"database/sql"
+	"evo-bot-go/internal/buttons"
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/repositories"
@@ -27,9 +28,6 @@ const (
 	adminProfilesStateAwaitForwardMessage = "admin_profiles_state_await_forward_message"
 	adminProfilesStateEditProfile         = "admin_profiles_state_edit_profile"
 	adminProfilesStateAwaitBio            = "admin_profiles_state_await_bio"
-	adminProfilesStateAwaitLinkedin       = "admin_profiles_state_await_linkedin"
-	adminProfilesStateAwaitGithub         = "admin_profiles_state_await_github"
-	adminProfilesStateAwaitFreeLink       = "admin_profiles_state_await_free_link"
 	adminProfilesStateAwaitFirstname      = "admin_profiles_state_await_firstname"
 	adminProfilesStateAwaitLastname       = "admin_profiles_state_await_lastname"
 	adminProfilesStateAwaitCoffeeBan      = "admin_profiles_state_await_coffee_ban"
@@ -49,9 +47,6 @@ const (
 	adminProfilesMenuEditFirstnameHeader = "Профили → Редактирование → Имя"
 	adminProfilesMenuEditLastnameHeader  = "Профили → Редактирование → Фамилия"
 	adminProfilesMenuEditBioHeader       = "Профили → Редактирование → О себе"
-	adminProfilesMenuEditLinkedinHeader  = "Профили → Редактирование → LinkedIn"
-	adminProfilesMenuEditGithubHeader    = "Профили → Редактирование → GitHub"
-	adminProfilesMenuEditFreeLinkHeader  = "Профили → Редактирование → Ссылка"
 	adminProfilesMenuPublishHeader       = "Профили → Публикация"
 	adminProfilesMenuCoffeeBanHeader     = "Профили → Бан на кофейные встречи"
 
@@ -106,9 +101,6 @@ func NewAdminProfilesHandler(
 			},
 			adminProfilesStateEditProfile: {
 				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditBioCallback), h.handleEditFieldCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditLinkedinCallback), h.handleEditFieldCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditGithubCallback), h.handleEditFieldCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditFreeLinkCallback), h.handleEditFieldCallback),
 				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditFirstnameCallback), h.handleEditFieldCallback),
 				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditLastnameCallback), h.handleEditFieldCallback),
 				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditCoffeeBanCallback), h.handleEditFieldCallback),
@@ -119,21 +111,6 @@ func NewAdminProfilesHandler(
 			},
 			adminProfilesStateAwaitBio: {
 				handlers.NewMessage(message.Text, h.handleBioInput),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesStartCallback), h.handleStartCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), h.handleCancelCallback),
-			},
-			adminProfilesStateAwaitLinkedin: {
-				handlers.NewMessage(message.Text, h.handleLinkedinInput),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesStartCallback), h.handleStartCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), h.handleCancelCallback),
-			},
-			adminProfilesStateAwaitGithub: {
-				handlers.NewMessage(message.Text, h.handleGithubInput),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesStartCallback), h.handleStartCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), h.handleCancelCallback),
-			},
-			adminProfilesStateAwaitFreeLink: {
-				handlers.NewMessage(message.Text, h.handleFreeLinkInput),
 				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesStartCallback), h.handleStartCallback),
 				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), h.handleCancelCallback),
 			},
@@ -180,7 +157,7 @@ func (h *adminProfilesHandler) showMainMenu(b *gotgbot.Bot, msg *gotgbot.Message
 		fmt.Sprintf("<b>%s</b>", adminProfilesMenuHeader)+
 			"\n\nЗдесь ты можешь редактировать профили пользователей или создать новый профиль на основе пересланного сообщения.",
 		&gotgbot.SendMessageOpts{
-			ReplyMarkup: formatters.ProfilesMainMenuButtons(),
+			ReplyMarkup: buttons.ProfilesMainMenuButtons(),
 		})
 
 	if err != nil {
@@ -202,7 +179,7 @@ func (h *adminProfilesHandler) handleEditCallback(b *gotgbot.Bot, ctx *ext.Conte
 		fmt.Sprintf("<b>%s</b>", adminProfilesMenuHeader)+
 			"\n\nВведи имя пользователя (с @ или без) для поиска:",
 		&gotgbot.SendMessageOpts{
-			ReplyMarkup: formatters.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
+			ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
 		})
 
 	if err != nil {
@@ -224,7 +201,7 @@ func (h *adminProfilesHandler) handleCreateCallback(b *gotgbot.Bot, ctx *ext.Con
 		fmt.Sprintf("<b>%s</b>", adminProfilesMenuHeader)+
 			"\n\nПерешли мне сообщение от пользователя, для которого нужно создать профиль:",
 		&gotgbot.SendMessageOpts{
-			ReplyMarkup: formatters.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
+			ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
 		})
 
 	if err != nil {
@@ -264,7 +241,7 @@ func (h *adminProfilesHandler) handleUsernameInput(b *gotgbot.Bot, ctx *ext.Cont
 				fmt.Sprintf("\n\nПользователь <b>%s</b> не найден.", username)+
 				"\n\nПопробуй ещё раз, или вернись назад:",
 			&gotgbot.SendMessageOpts{
-				ReplyMarkup: formatters.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
+				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
 			})
 		if err != nil {
 			return fmt.Errorf("AdminProfilesHandler: failed to send message in handleUsernameInput: %w", err)
@@ -311,7 +288,7 @@ func (h *adminProfilesHandler) handleForwardedMessage(b *gotgbot.Bot, ctx *ext.C
 			fmt.Sprintf("<b>%s</b>", adminProfilesMenuHeader)+
 				"\n\nЭто не пересланное сообщение от пользователя. Пожалуйста, перешли сообщение от пользователя, для которого нужно создать профиль:",
 			&gotgbot.SendMessageOpts{
-				ReplyMarkup: formatters.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
+				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
 			})
 
 		if err != nil {
@@ -370,7 +347,7 @@ func (h *adminProfilesHandler) showProfileEditMenu(b *gotgbot.Bot, msg *gotgbot.
 		msg.Chat.Id,
 		profileText,
 		&gotgbot.SendMessageOpts{
-			ReplyMarkup: formatters.ProfilesEditMenuButtons(constants.AdminProfilesStartCallback),
+			ReplyMarkup: buttons.ProfilesEditMenuButtons(constants.AdminProfilesStartCallback),
 		})
 
 	if err != nil {
@@ -435,21 +412,6 @@ func (h *adminProfilesHandler) handleEditFieldCallback(b *gotgbot.Bot, ctx *ext.
 		menuHeader = adminProfilesMenuEditBioHeader
 		nextState = adminProfilesStateAwaitBio
 		oldFieldValue = profile.Bio
-	case constants.AdminProfilesEditLinkedinCallback:
-		fieldName = "ссылку на LinkedIn"
-		menuHeader = adminProfilesMenuEditLinkedinHeader
-		nextState = adminProfilesStateAwaitLinkedin
-		oldFieldValue = profile.LinkedIn
-	case constants.AdminProfilesEditGithubCallback:
-		fieldName = "ссылку на GitHub"
-		menuHeader = adminProfilesMenuEditGithubHeader
-		nextState = adminProfilesStateAwaitGithub
-		oldFieldValue = profile.GitHub
-	case constants.AdminProfilesEditFreeLinkCallback:
-		fieldName = "произвольную ссылку"
-		menuHeader = adminProfilesMenuEditFreeLinkHeader
-		nextState = adminProfilesStateAwaitFreeLink
-		oldFieldValue = profile.FreeLink
 	case constants.AdminProfilesEditCoffeeBanCallback:
 		fieldName = "статус кофейных встреч"
 		menuHeader = adminProfilesMenuCoffeeBanHeader
@@ -477,7 +439,7 @@ func (h *adminProfilesHandler) handleEditFieldCallback(b *gotgbot.Bot, ctx *ext.
 			fmt.Sprintf("\n\nТекущее значение: <code>%s</code>", oldFieldValue)+
 			fmt.Sprintf("\n\nВведи новое значение для поля <b>%s</b>:", fieldName),
 		&gotgbot.SendMessageOpts{
-			ReplyMarkup: formatters.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
+			ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
 		})
 
 	if err != nil {
@@ -528,9 +490,9 @@ func (h *adminProfilesHandler) handlePublishProfile(b *gotgbot.Bot, ctx *ext.Con
 		return fmt.Errorf("AdminProfilesHandler: failed to get profile in handlePublishProfile: %w", err)
 	}
 
-	// Check if profile is complete
 	firstNameString := "└ ❌ Имя"
 	lastNameString := "└ ❌ Фамилию"
+	bioString := "└ ❌ Биографию"
 	if dbUser != nil {
 		if dbUser.Firstname != "" {
 			firstNameString = "└ ✅ Имя"
@@ -540,22 +502,9 @@ func (h *adminProfilesHandler) handlePublishProfile(b *gotgbot.Bot, ctx *ext.Con
 		}
 	}
 
-	bioString := "└ ❌ Биографию"
-	linkedInString := "└ ❌ LinkedIn"
-	gitHubString := "└ ❌ GitHub"
-	freeLinkString := "└ ❌ Ссылка"
 	if profile != nil {
 		if profile.Bio != "" {
 			bioString = "└ ✅ Биографию"
-		}
-		if profile.LinkedIn != "" {
-			linkedInString = "└ ✅ LinkedIn"
-		}
-		if profile.GitHub != "" {
-			gitHubString = "└ ✅ GitHub"
-		}
-		if profile.FreeLink != "" {
-			freeLinkString = "└ ✅ Ссылка"
 		}
 	}
 
@@ -567,15 +516,11 @@ func (h *adminProfilesHandler) handlePublishProfile(b *gotgbot.Bot, ctx *ext.Con
 				"\n\n⚠️ Профиль пользователя неполный. "+
 				fmt.Sprintf("\n\nДля его публикации в канале \"<a href='%s'>Интро</a>\" необходимо указать: ",
 					utils.GetIntroTopicLink(h.config))+
-				"\n"+firstNameString+" "+
-				"\n"+lastNameString+" "+
-				"\n"+bioString+" "+
-				"\n\nИ хотя бы одну ссылку: "+
-				"\n"+linkedInString+" "+
-				"\n"+gitHubString+" "+
-				"\n"+freeLinkString+" ",
+				"\n"+firstNameString+
+				"\n"+lastNameString+
+				"\n"+bioString,
 			&gotgbot.SendMessageOpts{
-				ReplyMarkup: formatters.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
+				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
 			})
 
 		if err != nil {
@@ -653,7 +598,7 @@ func (h *adminProfilesHandler) handlePublishProfile(b *gotgbot.Bot, ctx *ext.Con
 		fmt.Sprintf("<b>%s</b>", adminProfilesMenuPublishHeader)+
 			fmt.Sprintf("\n\n✅ Профиль пользователя успешно опубликован в канале \"<a href='%s'>Интро</a>\"!", utils.GetIntroMessageLink(h.config, profile.PublishedMessageID.Int64)),
 		&gotgbot.SendMessageOpts{
-			ReplyMarkup: formatters.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
+			ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
 		})
 
 	if err != nil {
@@ -680,7 +625,7 @@ func (h *adminProfilesHandler) handleBioInput(b *gotgbot.Bot, ctx *ext.Context) 
 				fmt.Sprintf("\n\nТекущая длина: %d символов", bioLength)+
 				fmt.Sprintf("\n\nПожалуйста, сократи до %d символов и пришли снова:", adminProfilesBioLengthLimit),
 			&gotgbot.SendMessageOpts{
-				ReplyMarkup: formatters.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
+				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
 			})
 
 		h.SavePreviousMessageInfo(userId, errMsg)
@@ -705,123 +650,6 @@ func (h *adminProfilesHandler) handleBioInput(b *gotgbot.Bot, ctx *ext.Context) 
 	return h.returnToProfileView(b, ctx)
 }
 
-// Handle LinkedIn input
-func (h *adminProfilesHandler) handleLinkedinInput(b *gotgbot.Bot, ctx *ext.Context) error {
-	msg := ctx.EffectiveMessage
-	linkedin := msg.Text
-	userId := ctx.EffectiveUser.Id
-
-	if !strings.Contains(linkedin, "linkedin") {
-		h.RemovePreviousMessage(b, &userId)
-		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
-		errMsg, _ := h.messageSenderService.SendHtmlWithReturnMessage(
-			msg.Chat.Id,
-			fmt.Sprintf("<b>%s</b>", adminProfilesMenuEditLinkedinHeader)+
-				"\n\nПожалуйста, введи корректную ссылку на LinkedIn (содержит \"linkedin\"):",
-			&gotgbot.SendMessageOpts{
-				ReplyMarkup: formatters.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
-			})
-
-		h.SavePreviousMessageInfo(userId, errMsg)
-		return nil // Stay in current state
-	}
-
-	// Get profile ID from store
-	profileIDVal, ok := h.userStore.Get(userId, adminProfilesCtxDataKeyProfileID)
-	if !ok {
-		return fmt.Errorf("AdminProfilesHandler: profile ID not found in user store")
-	}
-	profileID := profileIDVal.(int)
-
-	// Save the LinkedIn link
-	err := h.profileRepository.Update(profileID, map[string]interface{}{
-		"linkedin": linkedin,
-	})
-	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to update LinkedIn: %w", err)
-	}
-
-	return h.returnToProfileView(b, ctx)
-}
-
-// Handle GitHub input
-func (h *adminProfilesHandler) handleGithubInput(b *gotgbot.Bot, ctx *ext.Context) error {
-	msg := ctx.EffectiveMessage
-	github := msg.Text
-	userId := ctx.EffectiveUser.Id
-
-	if !strings.Contains(github, "github") {
-		h.RemovePreviousMessage(b, &userId)
-		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
-		errMsg, _ := h.messageSenderService.SendHtmlWithReturnMessage(
-			msg.Chat.Id,
-			fmt.Sprintf("<b>%s</b>", adminProfilesMenuEditGithubHeader)+
-				"\n\nПожалуйста, введи корректную ссылку на GitHub (содержит \"github\"):",
-			&gotgbot.SendMessageOpts{
-				ReplyMarkup: formatters.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
-			})
-
-		h.SavePreviousMessageInfo(userId, errMsg)
-		return nil // Stay in current state
-	}
-
-	// Get profile ID from store
-	profileIDVal, ok := h.userStore.Get(userId, adminProfilesCtxDataKeyProfileID)
-	if !ok {
-		return fmt.Errorf("AdminProfilesHandler: profile ID not found in user store")
-	}
-	profileID := profileIDVal.(int)
-
-	// Save the GitHub link
-	err := h.profileRepository.Update(profileID, map[string]interface{}{
-		"github": github,
-	})
-	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to update GitHub: %w", err)
-	}
-
-	return h.returnToProfileView(b, ctx)
-}
-
-// Handle free link input
-func (h *adminProfilesHandler) handleFreeLinkInput(b *gotgbot.Bot, ctx *ext.Context) error {
-	msg := ctx.EffectiveMessage
-	freeLink := msg.Text
-	userId := ctx.EffectiveUser.Id
-
-	if !strings.Contains(freeLink, "https://") {
-		h.RemovePreviousMessage(b, &userId)
-		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
-		errMsg, _ := h.messageSenderService.SendHtmlWithReturnMessage(
-			msg.Chat.Id,
-			fmt.Sprintf("<b>%s</b>", adminProfilesMenuEditFreeLinkHeader)+
-				"\n\nПожалуйста, введи корректную ссылку (начинается с https://):",
-			&gotgbot.SendMessageOpts{
-				ReplyMarkup: formatters.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
-			})
-
-		h.SavePreviousMessageInfo(userId, errMsg)
-		return nil // Stay in current state
-	}
-
-	// Get profile ID from store
-	profileIDVal, ok := h.userStore.Get(userId, adminProfilesCtxDataKeyProfileID)
-	if !ok {
-		return fmt.Errorf("AdminProfilesHandler: profile ID not found in user store")
-	}
-	profileID := profileIDVal.(int)
-
-	// Save the free link
-	err := h.profileRepository.Update(profileID, map[string]interface{}{
-		"freelink": freeLink,
-	})
-	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to update free link: %w", err)
-	}
-
-	return h.returnToProfileView(b, ctx)
-}
-
 // Handle firstname input
 func (h *adminProfilesHandler) handleFirstnameInput(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
@@ -836,7 +664,7 @@ func (h *adminProfilesHandler) handleFirstnameInput(b *gotgbot.Bot, ctx *ext.Con
 			fmt.Sprintf("<b>%s</b>", adminProfilesMenuEditFirstnameHeader)+
 				"\n\nИмя слишком длинное. Пожалуйста, введи более короткое имя (не более 30 символов):",
 			&gotgbot.SendMessageOpts{
-				ReplyMarkup: formatters.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
+				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
 			})
 
 		h.SavePreviousMessageInfo(userId, errMsg)
@@ -875,7 +703,7 @@ func (h *adminProfilesHandler) handleLastnameInput(b *gotgbot.Bot, ctx *ext.Cont
 			fmt.Sprintf("<b>%s</b>", adminProfilesMenuEditLastnameHeader)+
 				"\n\nФамилия слишком длинная. Пожалуйста, введи более короткую фамилию (не более 30 символов):",
 			&gotgbot.SendMessageOpts{
-				ReplyMarkup: formatters.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
+				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
 			})
 
 		h.SavePreviousMessageInfo(userId, errMsg)
@@ -921,7 +749,7 @@ func (h *adminProfilesHandler) handleCoffeeBanInput(b *gotgbot.Bot, ctx *ext.Con
 				"\n- 0, нет, разрешить, разрешено - чтобы разрешить кофейные встречи"+
 				"\n- 1, да, запретить, запрещено - чтобы запретить кофейные встречи",
 			&gotgbot.SendMessageOpts{
-				ReplyMarkup: formatters.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
+				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
 			})
 
 		h.SavePreviousMessageInfo(userId, errMsg)

@@ -18,9 +18,6 @@ const (
 	ProfileViewOtherProfileCallback = ProfilePrefix + "view_other"
 
 	ProfileEditBioCallback               = ProfilePrefix + "edit_bio"
-	ProfileEditLinkedinCallback          = ProfilePrefix + "edit_linkedin"
-	ProfileEditGithubCallback            = ProfilePrefix + "edit_github"
-	ProfileEditFreeLinkCallback          = ProfilePrefix + "edit_free_link"
 	ProfileEditFirstnameCallback         = ProfilePrefix + "edit_firstname"
 	ProfileEditLastnameCallback          = ProfilePrefix + "edit_lastname"
 	ProfilePublishCallback               = ProfilePrefix + "publish"

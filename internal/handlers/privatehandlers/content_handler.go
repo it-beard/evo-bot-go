@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
+	"evo-bot-go/internal/buttons"
 	"evo-bot-go/internal/clients"
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/prompts"
 	"evo-bot-go/internal/database/repositories"
-	"evo-bot-go/internal/formatters"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
@@ -100,7 +100,7 @@ func (h *contentHandler) startContentSearch(b *gotgbot.Bot, ctx *ext.Context) er
 		msg,
 		fmt.Sprintf("Введите поисковый запрос по контенту:"),
 		&gotgbot.SendMessageOpts{
-			ReplyMarkup: formatters.CancelButton(contentCallbackConfirmCancel),
+			ReplyMarkup: buttons.CancelButton(contentCallbackConfirmCancel),
 		},
 	)
 
@@ -151,7 +151,7 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 	// Inform user that search has started
 	sentMsg, _ := h.messageSenderService.ReplyWithReturnMessage(msg, fmt.Sprintf("Ищу информацию по запросу: \"%s\"...", query), &gotgbot.SendMessageOpts{
-		ReplyMarkup: formatters.CancelButton(contentCallbackConfirmCancel),
+		ReplyMarkup: buttons.CancelButton(contentCallbackConfirmCancel),
 	})
 	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
 

@@ -1,4 +1,4 @@
-package formatters
+package buttons
 
 import "github.com/PaulSonOfLars/gotgbot/v2"
 

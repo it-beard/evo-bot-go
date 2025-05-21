@@ -5,9 +5,9 @@ import (
 	"log"
 	"time"
 
+	"evo-bot-go/internal/buttons"
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
-	"evo-bot-go/internal/formatters"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
@@ -92,7 +92,7 @@ func (h *trySummarizeHandler) startSummarizeConversation(b *gotgbot.Bot, ctx *ex
 		msg,
 		"Вы собираетесь запустить процесс тестирования саммаризации общения в клубе. Саммаризация будет отправлена в личные сообщения.\n\nПодтвердите действие, нажав одну из кнопок ниже:",
 		&gotgbot.SendMessageOpts{
-			ReplyMarkup: formatters.ConfirmAndCancelButton(trySummarizeCallbackConfirmYes, trySummarizeCallbackConfirmCancel),
+			ReplyMarkup: buttons.ConfirmAndCancelButton(trySummarizeCallbackConfirmYes, trySummarizeCallbackConfirmCancel),
 		},
 	)
 

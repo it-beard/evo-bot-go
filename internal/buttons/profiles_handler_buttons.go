@@ -1,4 +1,4 @@
-package formatters
+package buttons
 
 import (
 	"evo-bot-go/internal/constants"
@@ -44,20 +44,6 @@ func ProfilesEditMenuButtons(backCallbackData string) gotgbot.InlineKeyboardMark
 				{
 					Text:         "☕️ Кофе",
 					CallbackData: constants.AdminProfilesEditCoffeeBanCallback,
-				},
-			},
-			{
-				{
-					Text:         "💼 LinkedIn",
-					CallbackData: constants.AdminProfilesEditLinkedinCallback,
-				},
-				{
-					Text:         "💾 GitHub",
-					CallbackData: constants.AdminProfilesEditGithubCallback,
-				},
-				{
-					Text:         "🌐 Ссылка",
-					CallbackData: constants.AdminProfilesEditFreeLinkCallback,
 				},
 			},
 			{

@@ -5,10 +5,10 @@ import (
 	"log"
 	"strings"
 
+	"evo-bot-go/internal/buttons"
 	"evo-bot-go/internal/clients"
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
-	"evo-bot-go/internal/formatters"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
@@ -80,7 +80,7 @@ func (h *codeHandler) startCodeConversation(b *gotgbot.Bot, ctx *ext.Context) er
 		msg,
 		fmt.Sprintf("Пожалуйста, введите код:"),
 		&gotgbot.SendMessageOpts{
-			ReplyMarkup: formatters.CancelButton(codeHandlerCallbackConfirmCancel),
+			ReplyMarkup: buttons.CancelButton(codeHandlerCallbackConfirmCancel),
 		},
 	)
 

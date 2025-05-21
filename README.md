@@ -22,7 +22,6 @@ A Telegram bot for Evocoders Club management implemented in Go. Helps moderate d
 ### User Profile Management
 - 👤 **Profile Command** (`/profile`): Manage your personal profile
   - Create and edit personal information (name, bio)
-  - Add social links (LinkedIn, GitHub, and custom links)
   - Publish your profile to the designated "Intro" topic
   - Search for other club members' profiles
 
@@ -57,7 +56,7 @@ The bot uses PostgreSQL with automatically initialized tables:
 | **tg_sessions** | Manages Telegram User Client sessions | `id`, `data`, `updated_at` |
 | **prompting_templates** | Stores AI prompting templates | `template_key`, `template_text` |
 | **users** | Stores user information | `id`, `tg_id`, `firstname`, `lastname`, `tg_username`, `score`, `has_coffee_ban` |
-| **profiles** | Stores user profile data | `id`, `user_id`, `bio`, `linkedin`, `github`, `freelink`, `published_message_id`, `created_at`, `updated_at` |
+| **profiles** | Stores user profile data | `id`, `user_id`, `bio`, `published_message_id`, `created_at`, `updated_at` |
 | **events** | Stores event information | `id`, `name`, `type`, `status`, `started_at`, `created_at`, `updated_at` |
 | **topics** | Stores topics related to events | `id`, `topic`, `user_nickname`, `event_id`, `created_at` |
 | **migrations** | Tracks database migrations | `id`, `name`, `timestamp`, `created_at` |

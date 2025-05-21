@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"evo-bot-go/internal/buttons"
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/repositories"
@@ -109,7 +110,7 @@ func (h *eventDeleteHandler) startDelete(b *gotgbot.Bot, ctx *ext.Context) error
 		msg,
 		formattedResponse,
 		&gotgbot.SendMessageOpts{
-			ReplyMarkup: formatters.CancelButton(eventDeleteCallbackConfirmCancel),
+			ReplyMarkup: buttons.CancelButton(eventDeleteCallbackConfirmCancel),
 		},
 	)
 
@@ -171,7 +172,7 @@ func (h *eventDeleteHandler) handleSelectEvent(b *gotgbot.Bot, ctx *ext.Context)
 		confirmMessage,
 		&gotgbot.SendMessageOpts{
 			ParseMode:   "Markdown",
-			ReplyMarkup: formatters.ConfirmAndCancelButton(eventDeleteCallbackConfirmYes, eventDeleteCallbackConfirmCancel),
+			ReplyMarkup: buttons.ConfirmAndCancelButton(eventDeleteCallbackConfirmYes, eventDeleteCallbackConfirmCancel),
 		},
 	)
 

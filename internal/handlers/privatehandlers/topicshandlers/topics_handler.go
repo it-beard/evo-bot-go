@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"evo-bot-go/internal/buttons"
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/repositories"
@@ -112,7 +113,7 @@ func (h *topicsHandler) startTopics(b *gotgbot.Bot, ctx *ext.Context) error {
 		msg,
 		formattedEvents,
 		&gotgbot.SendMessageOpts{
-			ReplyMarkup: formatters.CancelButton(topicsCallbackConfirmCancel),
+			ReplyMarkup: buttons.CancelButton(topicsCallbackConfirmCancel),
 		},
 	)
 

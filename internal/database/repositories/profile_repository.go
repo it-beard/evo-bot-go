@@ -12,9 +12,6 @@ type Profile struct {
 	ID                 int
 	UserID             int
 	Bio                string
-	LinkedIn           string
-	GitHub             string
-	FreeLink           string
 	PublishedMessageID sql.NullInt64
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
@@ -33,7 +30,7 @@ func NewProfileRepository(db *sql.DB) *ProfileRepository {
 // GetByID retrieves a profile by ID
 func (r *ProfileRepository) GetByID(id int) (*Profile, error) {
 	query := `
-		SELECT id, user_id, bio, linkedin, github, freelink, published_message_id, created_at, updated_at
+		SELECT id, user_id, bio, published_message_id, created_at, updated_at
 		FROM profiles
 		WHERE id = $1`
 
@@ -42,9 +39,6 @@ func (r *ProfileRepository) GetByID(id int) (*Profile, error) {
 		&profile.ID,
 		&profile.UserID,
 		&profile.Bio,
-		&profile.LinkedIn,
-		&profile.GitHub,
-		&profile.FreeLink,
 		&profile.PublishedMessageID,
 		&profile.CreatedAt,
 		&profile.UpdatedAt,
@@ -64,7 +58,7 @@ func (r *ProfileRepository) GetByID(id int) (*Profile, error) {
 // GetByUserID retrieves a profile by user ID
 func (r *ProfileRepository) GetByUserID(userID int) (*Profile, error) {
 	query := `
-		SELECT id, user_id, bio, linkedin, github, freelink, published_message_id, created_at, updated_at
+		SELECT id, user_id, bio, published_message_id, created_at, updated_at
 		FROM profiles
 		WHERE user_id = $1`
 
@@ -73,9 +67,6 @@ func (r *ProfileRepository) GetByUserID(userID int) (*Profile, error) {
 		&profile.ID,
 		&profile.UserID,
 		&profile.Bio,
-		&profile.LinkedIn,
-		&profile.GitHub,
-		&profile.FreeLink,
 		&profile.PublishedMessageID,
 		&profile.CreatedAt,
 		&profile.UpdatedAt,
@@ -93,11 +84,11 @@ func (r *ProfileRepository) GetByUserID(userID int) (*Profile, error) {
 }
 
 // Create inserts a new profile record into the database
-func (r *ProfileRepository) Create(userID int, bio string, linkedin string, github string, freeLink string) (int, error) {
+func (r *ProfileRepository) Create(userID int, bio string) (int, error) {
 	var id int
-	query := `INSERT INTO profiles (user_id, bio, linkedin, github, freelink) 
-			VALUES ($1, $2, $3, $4, $5) RETURNING id`
-	err := r.db.QueryRow(query, userID, bio, linkedin, github, freeLink).Scan(&id)
+	query := `INSERT INTO profiles (user_id, bio) 
+			VALUES ($1, $2) RETURNING id`
+	err := r.db.QueryRow(query, userID, bio).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert profile: %w", err)
 	}
@@ -184,12 +175,7 @@ func (h *ProfileRepository) GetOrCreateDefaultProfileWithBio(dbUserID int, bio s
 
 	// If profile doesn't exist, create it
 	if err == sql.ErrNoRows {
-		// Initialize defaults for all fields
-		linkedin := ""
-		github := ""
-		freeLink := ""
-
-		_, err = h.Create(dbUserID, bio, linkedin, github, freeLink)
+		_, err = h.Create(dbUserID, bio)
 		if err != nil {
 			return nil, fmt.Errorf("ProfileHandler: failed to create profile in getOrCreateProfile: %w", err)
 		}
