@@ -180,7 +180,7 @@ func (h *adminProfilesHandler) showMainMenu(b *gotgbot.Bot, msg *gotgbot.Message
 		fmt.Sprintf("<b>%s</b>", adminProfilesMenuHeader)+
 			"\n\nЗдесь ты можешь редактировать профили пользователей или создать новый профиль на основе пересланного сообщения.",
 		&gotgbot.SendMessageOpts{
-			ReplyMarkup: formatters.ProfilesMainMenuButtons(constants.AdminProfilesStartCallback),
+			ReplyMarkup: formatters.ProfilesMainMenuButtons(),
 		})
 
 	if err != nil {

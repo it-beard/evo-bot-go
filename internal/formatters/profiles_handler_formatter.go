@@ -73,7 +73,7 @@ func ProfilesEditMenuButtons(backCallbackData string) gotgbot.InlineKeyboardMark
 			{
 				{
 					Text:         "◀️ Назад",
-					CallbackData: constants.AdminProfilesBackCallback,
+					CallbackData: backCallbackData,
 				},
 				{
 					Text:         "❌ Отмена",
@@ -84,7 +84,7 @@ func ProfilesEditMenuButtons(backCallbackData string) gotgbot.InlineKeyboardMark
 	}
 }
 
-func ProfilesMainMenuButtons(backCallbackData string) gotgbot.InlineKeyboardMarkup {
+func ProfilesMainMenuButtons() gotgbot.InlineKeyboardMarkup {
 	return gotgbot.InlineKeyboardMarkup{
 		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
 			{
