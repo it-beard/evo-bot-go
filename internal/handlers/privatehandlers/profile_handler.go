@@ -349,7 +349,9 @@ func (h *profileHandler) handleEditField(b *gotgbot.Bot, ctx *ext.Context, msg *
 
 	switch nextState {
 	case profileStateAwaitBio:
-		oldFieldValue = "Текущее значение: <blockquote expandable>" + dbProfile.Bio + "</blockquote>"
+		dbProfile.Bio = strings.ReplaceAll(dbProfile.Bio, "<", "&lt;")
+		dbProfile.Bio = strings.ReplaceAll(dbProfile.Bio, ">", "&gt;")
+		oldFieldValue = "Текущее значение: <pre>" + dbProfile.Bio + "</pre>"
 		menuHeader = profileMenuEditBioHeader
 	case profileStateAwaitFirstname:
 		oldFieldValue = "Текущее значение: <code>" + dbUser.Firstname + "</code>"
