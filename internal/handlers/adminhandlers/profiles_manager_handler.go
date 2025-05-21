@@ -49,9 +49,6 @@ const (
 	adminProfilesMenuEditBioHeader       = "Менеджер профилей → Редактирование → О себе"
 	adminProfilesMenuPublishHeader       = "Менеджер профилей → Публикация"
 	adminProfilesMenuCoffeeBanHeader     = "Менеджер профилей → Бан на кофейные встречи"
-
-	// Other
-	adminProfilesBioLengthLimit = 4000
 )
 
 type adminProfilesHandler struct {
@@ -435,7 +432,7 @@ func (h *adminProfilesHandler) handleEditFieldCallback(b *gotgbot.Bot, ctx *ext.
 		nextState = adminProfilesStateAwaitLastname
 		oldField = "Текущее значение: <code>" + dbUser.Lastname + "</code>"
 	case constants.AdminProfilesEditBioCallback:
-		callToAction = fmt.Sprintf("Введи новое значение для поля <b>биографию</b> (до %d символов)", adminProfilesBioLengthLimit)
+		callToAction = fmt.Sprintf("Введи новое значение для поля <b>биографию</b> (до %d символов)", constants.ProfileBioLengthLimit)
 		menuHeader = adminProfilesMenuEditBioHeader
 		nextState = adminProfilesStateAwaitBio
 		oldField = "Текущее значение: <blockquote expandable>" + profile.Bio + "</blockquote>"
@@ -649,14 +646,14 @@ func (h *adminProfilesHandler) handleBioInput(b *gotgbot.Bot, ctx *ext.Context) 
 	userId := ctx.EffectiveUser.Id
 	bioLength := utils.Utf16CodeUnitCount(bio)
 
-	if bioLength > adminProfilesBioLengthLimit {
+	if bioLength > constants.ProfileBioLengthLimit {
 		h.RemovePreviousMessage(b, &userId)
 		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
 		errMsg, _ := h.messageSenderService.SendHtmlWithReturnMessage(
 			msg.Chat.Id,
 			fmt.Sprintf("<b>%s</b>", adminProfilesMenuEditBioHeader)+
 				fmt.Sprintf("\n\nТекущая длина: %d символов", bioLength)+
-				fmt.Sprintf("\n\nПожалуйста, сократи до %d символов и пришли снова:", adminProfilesBioLengthLimit),
+				fmt.Sprintf("\n\nПожалуйста, сократи до %d символов и пришли снова:", constants.ProfileBioLengthLimit),
 			&gotgbot.SendMessageOpts{
 				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesEditMenuCallback),
 			})

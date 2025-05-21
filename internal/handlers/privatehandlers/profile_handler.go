@@ -42,9 +42,6 @@ const (
 	profileMenuEditBioHeader       = "Профиль → Редактирование → О себе"
 	profileMenuPublishHeader       = "Профиль → Публикация"
 	profileMenuSearchHeader        = "Профиль → Поиск"
-
-	// Other
-	profileBioLengthLimit = 4000
 )
 
 type profileHandler struct {
@@ -170,7 +167,7 @@ func (h *profileHandler) handleCallback(b *gotgbot.Bot, ctx *ext.Context) error 
 	case constants.ProfileViewOtherProfileCallback:
 		return h.handleViewOtherProfile(b, ctx, effectiveMsg)
 	case constants.ProfileEditBioCallback:
-		return h.handleEditField(b, ctx, effectiveMsg, fmt.Sprintf("обновлённую биографию (до %d символов)", profileBioLengthLimit), profileStateAwaitBio)
+		return h.handleEditField(b, ctx, effectiveMsg, fmt.Sprintf("обновлённую биографию (до %d символов)", constants.ProfileBioLengthLimit), profileStateAwaitBio)
 	case constants.ProfileEditFirstnameCallback:
 		return h.handleEditField(b, ctx, effectiveMsg, "новое имя", profileStateAwaitFirstname)
 	case constants.ProfileEditLastnameCallback:
@@ -374,14 +371,14 @@ func (h *profileHandler) handleBioInput(b *gotgbot.Bot, ctx *ext.Context) error 
 	bio := msg.Text
 	bioLength := utils.Utf16CodeUnitCount(bio)
 
-	if bioLength > profileBioLengthLimit {
+	if bioLength > constants.ProfileBioLengthLimit {
 		h.RemovePreviouseMessage(b, &msg.From.Id)
 		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
 		errMsg, _ := h.messageSenderService.SendMarkdownWithReturnMessage(
 			msg.Chat.Id,
 			fmt.Sprintf("*%s*", profileMenuEditBioHeader)+
 				fmt.Sprintf("\n\nТекущая длина: %d символов", bioLength)+
-				fmt.Sprintf("\n\nПожалуйста, сократи до %d символов и пришли снова:", profileBioLengthLimit),
+				fmt.Sprintf("\n\nПожалуйста, сократи до %d символов и пришли снова:", constants.ProfileBioLengthLimit),
 			&gotgbot.SendMessageOpts{
 				ReplyMarkup: buttons.ProfileBackCancelButtons(constants.ProfileEditMyProfileCallback),
 			})
