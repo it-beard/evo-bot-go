@@ -23,6 +23,27 @@ func ProfilesBackCancelButtons(backCallbackData string) gotgbot.InlineKeyboardMa
 	}
 }
 
+func ProfilesBackStartCancelButtons(backCallbackData string) gotgbot.InlineKeyboardMarkup {
+	return gotgbot.InlineKeyboardMarkup{
+		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
+			{
+				{
+					Text:         "◀️ Назад",
+					CallbackData: backCallbackData,
+				},
+				{
+					Text:         "⏪ Старт",
+					CallbackData: constants.AdminProfilesStartCallback,
+				},
+				{
+					Text:         "❌ Отмена",
+					CallbackData: constants.AdminProfilesCancelCallback,
+				},
+			},
+		},
+	}
+}
+
 // ProfilesCoffeeBanButtons returns buttons for managing coffee ban status
 func ProfilesCoffeeBanButtons(backCallbackData string, hasCoffeeBan bool) gotgbot.InlineKeyboardMarkup {
 	var toggleButtonText string
