@@ -323,29 +323,7 @@ func (h *adminProfilesHandler) handleForwardedMessage(b *gotgbot.Bot, ctx *ext.C
 	}
 
 	// Cast ForwardOrigin to MessageOriginUser to get user info
-	originUser, ok := msg.ForwardOrigin.(*gotgbot.MessageOriginUser)
-	if !ok {
-		// Should not happen if the type check above is correct, but handling it just in case
-		h.RemovePreviousMessage(b, &userId)
-		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
-		editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
-			msg.Chat.Id,
-			fmt.Sprintf("<b>%s</b>", adminProfilesMenuHeader)+
-				"\n\nНе удалось получить информацию о пользователе из пересланного сообщения. Пожалуйста, попробуйте еще раз:",
-			&gotgbot.SendMessageOpts{
-				ReplyMarkup: formatters.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
-			})
-
-		if err != nil {
-			return fmt.Errorf("AdminProfilesHandler: failed to send message in handleForwardedMessage: %w", err)
-		}
-
-		h.SavePreviousMessageInfo(userId, editedMsg)
-		return nil // Stay in the current state
-	}
-
-	// Get user info from the MessageOriginUser
-	forwardedUser := &originUser.SenderUser
+	forwardedUser := msg.ForwardOrigin.MergeMessageOrigin().SenderUser
 
 	// Get the user from the database if exists, or create a new one
 	dbUser, err := h.userRepository.GetOrCreateUser(forwardedUser)
@@ -361,7 +339,7 @@ func (h *adminProfilesHandler) handleForwardedMessage(b *gotgbot.Bot, ctx *ext.C
 	h.userStore.Set(userId, adminProfilesCtxDataKeyTelegramUsername, dbUser.TgUsername)
 
 	// Find or create the profile
-	profile, err := h.profileRepository.GetOrCreateDefaultProfile(dbUser.ID)
+	profile, err := h.profileRepository.GetOrCreateDefaultProfileWithBio(dbUser.ID, msg.Text)
 	if err != nil {
 		_ = h.messageSenderService.Reply(msg,
 			"Произошла ошибка при создании профиля.", nil)

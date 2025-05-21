@@ -175,7 +175,7 @@ func (r *ProfileRepository) UpdatePublishedMessageID(profileID int, messageID in
 	return nil
 }
 
-func (h *ProfileRepository) GetOrCreateDefaultProfile(dbUserID int) (*Profile, error) {
+func (h *ProfileRepository) GetOrCreateDefaultProfileWithBio(dbUserID int, bio string) (*Profile, error) {
 	// Try to get profile
 	profile, err := h.GetByUserID(dbUserID)
 	if err != nil && err != sql.ErrNoRows {
@@ -185,7 +185,6 @@ func (h *ProfileRepository) GetOrCreateDefaultProfile(dbUserID int) (*Profile, e
 	// If profile doesn't exist, create it
 	if err == sql.ErrNoRows {
 		// Initialize defaults for all fields
-		bio := ""
 		linkedin := ""
 		github := ""
 		freeLink := ""
@@ -205,4 +204,8 @@ func (h *ProfileRepository) GetOrCreateDefaultProfile(dbUserID int) (*Profile, e
 	}
 
 	return profile, nil
+}
+
+func (h *ProfileRepository) GetOrCreateDefaultProfile(dbUserID int) (*Profile, error) {
+	return h.GetOrCreateDefaultProfileWithBio(dbUserID, "")
 }
