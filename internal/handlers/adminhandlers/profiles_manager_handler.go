@@ -10,6 +10,7 @@ import (
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,6 +27,7 @@ const (
 	adminProfilesStateEdit                = "admin_profiles_state_edit"
 	adminProfilesStateAwaitUsername       = "admin_profiles_state_await_username"
 	adminProfilesStateAwaitForwardMessage = "admin_profiles_state_await_forward_message"
+	adminProfilesStateAwaitUserID         = "admin_profiles_state_await_user_id"
 	adminProfilesStateEditProfile         = "admin_profiles_state_edit_profile"
 	adminProfilesStateAwaitBio            = "admin_profiles_state_await_bio"
 	adminProfilesStateAwaitFirstname      = "admin_profiles_state_await_firstname"
@@ -44,6 +46,7 @@ const (
 	// Menu headers
 	adminProfilesMenuHeader              = "Админ-меню \"Менеджер профилей\""
 	adminProfilesMenuEditHeader          = "Менеджер профилей → Редактирование"
+	adminProfilesMenuCreateByIDHeader    = "Менеджер профилей → Создание по ID"
 	adminProfilesMenuEditFirstnameHeader = "Менеджер профилей → Редактирование → Имя"
 	adminProfilesMenuEditLastnameHeader  = "Менеджер профилей → Редактирование → Фамилия"
 	adminProfilesMenuEditBioHeader       = "Менеджер профилей → Редактирование → О себе"
@@ -84,6 +87,7 @@ func NewAdminProfilesHandler(
 			adminProfilesStateStart: {
 				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditCallback), h.handleEditCallback),
 				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCreateCallback), h.handleCreateCallback),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCreateByIDCallback), h.handleCreateByIDCallback),
 				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), h.handleCancelCallback),
 			},
 			adminProfilesStateAwaitUsername: {
@@ -93,6 +97,11 @@ func NewAdminProfilesHandler(
 			},
 			adminProfilesStateAwaitForwardMessage: {
 				handlers.NewMessage(message.All, h.handleForwardedMessage),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesStartCallback), h.handleStartCallback),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), h.handleCancelCallback),
+			},
+			adminProfilesStateAwaitUserID: {
+				handlers.NewMessage(message.Text, h.handleUserIDInput),
 				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesStartCallback), h.handleStartCallback),
 				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), h.handleCancelCallback),
 			},
@@ -864,6 +873,96 @@ func (h *adminProfilesHandler) handleToggleCoffeeBanCallback(b *gotgbot.Bot, ctx
 
 	h.SavePreviousMessageInfo(userId, editedMsg)
 	return nil // Stay in current state
+}
+
+// Handle the "Create profile by ID" button click
+func (h *adminProfilesHandler) handleCreateByIDCallback(b *gotgbot.Bot, ctx *ext.Context) error {
+	msg := ctx.EffectiveMessage
+	userId := ctx.EffectiveUser.Id
+
+	h.RemovePreviousMessage(b, &userId)
+	editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
+		msg.Chat.Id,
+		fmt.Sprintf("<b>%s</b>", adminProfilesMenuCreateByIDHeader)+
+			"\n\nВведи ID пользователя Telegram для создания профиля:",
+		&gotgbot.SendMessageOpts{
+			ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
+		})
+
+	if err != nil {
+		return fmt.Errorf("AdminProfilesHandler: failed to send message in handleCreateByIDCallback: %w", err)
+	}
+
+	h.SavePreviousMessageInfo(userId, editedMsg)
+	return handlers.NextConversationState(adminProfilesStateAwaitUserID)
+}
+
+// Handle the userID input for profile creation
+func (h *adminProfilesHandler) handleUserIDInput(b *gotgbot.Bot, ctx *ext.Context) error {
+	msg := ctx.EffectiveMessage
+	userIDStr := msg.Text
+	userId := ctx.EffectiveUser.Id
+
+	// Convert user ID string to int64
+	telegramID, err := strconv.ParseInt(userIDStr, 10, 64)
+	if err != nil {
+		h.RemovePreviousMessage(b, &userId)
+		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
+		editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
+			msg.Chat.Id,
+			fmt.Sprintf("<b>%s</b>", adminProfilesMenuCreateByIDHeader)+
+				fmt.Sprintf("\n\nНекорректный формат ID: <b>%s</b>. Введи числовой ID пользователя Telegram:", userIDStr),
+			&gotgbot.SendMessageOpts{
+				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
+			})
+		if err != nil {
+			return fmt.Errorf("AdminProfilesHandler: failed to send message in handleUserIDInput: %w", err)
+		}
+
+		h.SavePreviousMessageInfo(userId, editedMsg)
+		return nil
+	}
+
+	// Check if user exists, create if not
+	dbUser, err := h.userRepository.GetByTelegramID(telegramID)
+	if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("AdminProfilesHandler: failed to get user in handleUserIDInput: %w", err)
+	}
+
+	// If user not found, create a new user with minimal info
+	if err == sql.ErrNoRows {
+		userID, err := h.userRepository.Create(telegramID, "", "", "")
+		if err != nil {
+			return fmt.Errorf("AdminProfilesHandler: failed to create user in handleUserIDInput: %w", err)
+		}
+
+		dbUser, err = h.userRepository.GetByID(userID)
+		if err != nil {
+			return fmt.Errorf("AdminProfilesHandler: failed to get created user in handleUserIDInput: %w", err)
+		}
+	}
+
+	// Store the user ID for future use
+	h.userStore.Set(userId, adminProfilesCtxDataKeyUserID, dbUser.ID)
+	h.userStore.Set(userId, adminProfilesCtxDataKeyTelegramID, dbUser.TgID)
+	h.userStore.Set(userId, adminProfilesCtxDataKeyTelegramUsername, dbUser.TgUsername)
+
+	// Find or create the profile
+	profile, err := h.profileRepository.GetOrCreateDefaultProfile(dbUser.ID)
+	if err != nil {
+		_ = h.messageSenderService.Reply(msg,
+			"Произошла ошибка при получении или создании профиля.", nil)
+		return fmt.Errorf("AdminProfilesHandler: failed to get/create profile in handleUserIDInput: %w", err)
+	}
+
+	h.userStore.Set(userId, adminProfilesCtxDataKeyProfileID, profile.ID)
+
+	// Delete the input message
+	b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
+	h.RemovePreviousMessage(b, &userId)
+
+	// Show the profile edit menu
+	return h.showProfileEditMenu(b, msg, userId, dbUser, profile)
 }
 
 func (h *adminProfilesHandler) handleCancelCallback(b *gotgbot.Bot, ctx *ext.Context) error {

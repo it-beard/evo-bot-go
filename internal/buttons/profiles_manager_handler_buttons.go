@@ -137,6 +137,12 @@ func ProfilesMainMenuButtons() gotgbot.InlineKeyboardMarkup {
 			},
 			{
 				{
+					Text:         "🆔 Создать профиль по ID",
+					CallbackData: constants.AdminProfilesCreateByIDCallback,
+				},
+			},
+			{
+				{
 					Text:         "❌ Отмена",
 					CallbackData: constants.AdminProfilesCancelCallback,
 				},
