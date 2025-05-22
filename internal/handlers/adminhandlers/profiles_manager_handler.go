@@ -692,7 +692,7 @@ func (h *adminProfilesHandler) handleSearchByFullNameInput(b *gotgbot.Bot, ctx *
 
 // Shows the profile edit menu
 func (h *adminProfilesHandler) showProfileEditMenu(b *gotgbot.Bot, msg *gotgbot.Message, userId int64, user *repositories.User, profile *repositories.Profile) error {
-	profileText := fmt.Sprintf("<b>%s</b>\n\n%s", adminProfilesMenuEditHeader, formatters.FormatProfileManagerView(user, profile, user.HasCoffeeBan))
+	profileText := fmt.Sprintf("<b>%s</b>\n\n%s", adminProfilesMenuEditHeader, formatters.FormatProfileManagerView(user, profile, user.HasCoffeeBan, h.config))
 
 	editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
 		msg.Chat.Id,
@@ -984,6 +984,7 @@ func (h *adminProfilesHandler) handleBioInput(b *gotgbot.Bot, ctx *ext.Context) 
 	lastMessageDate, ok := h.userStore.Get(msg.From.Id, adminProfilesCtxDataKeyLastMessageTimeFromUser)
 	if ok && lastMessageDate == msg.Date {
 		// Skip processing - same message date detected
+		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
 		return nil
 	}
 
