@@ -692,7 +692,7 @@ func (h *adminProfilesHandler) handleSearchByFullNameInput(b *gotgbot.Bot, ctx *
 
 // Shows the profile edit menu
 func (h *adminProfilesHandler) showProfileEditMenu(b *gotgbot.Bot, msg *gotgbot.Message, userId int64, user *repositories.User, profile *repositories.Profile) error {
-	profileText := fmt.Sprintf("<b>%s</b>\n\n%s", adminProfilesMenuEditHeader, formatters.FormatProfileManagerView(user, profile, user.HasCoffeeBan))
+	profileText := fmt.Sprintf("<b>%s</b>\n\n%s", adminProfilesMenuEditHeader, formatters.FormatProfileManagerView(user, profile, user.HasCoffeeBan, h.config))
 
 	editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
 		msg.Chat.Id,

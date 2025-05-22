@@ -1,7 +1,9 @@
 package formatters
 
 import (
+	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/database/repositories"
+	"evo-bot-go/internal/utils"
 	"fmt"
 	"strconv"
 	"strings"
@@ -42,7 +44,7 @@ func FormatProfileView(user *repositories.User, profile *repositories.Profile, s
 }
 
 // Format a readable view of a user profile for the admin manager
-func FormatProfileManagerView(user *repositories.User, profile *repositories.Profile, hasCoffeeBan bool) string {
+func FormatProfileManagerView(user *repositories.User, profile *repositories.Profile, hasCoffeeBan bool, config *config.Config) string {
 
 	// Format username
 	username := ""
@@ -73,6 +75,10 @@ func FormatProfileManagerView(user *repositories.User, profile *repositories.Pro
 	}
 	text += fmt.Sprintf("\n<i>Кофейные встречи:</i> %s", coffeeBanStatus)
 	text += fmt.Sprintf("\n<i>Telegram ID:</i> <code>%d</code>", user.TgID)
+	if profile.PublishedMessageID.Valid {
+		linkToPost := utils.GetIntroMessageLink(config, profile.PublishedMessageID.Int64)
+		text += fmt.Sprintf("\n<i>Ссылка на профиль:</i> %s", linkToPost)
+	}
 	return text
 }
 
