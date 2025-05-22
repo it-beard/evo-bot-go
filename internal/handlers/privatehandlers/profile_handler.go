@@ -394,6 +394,7 @@ func (h *profileHandler) handleBioInput(b *gotgbot.Bot, ctx *ext.Context) error 
 	lastMessageDate, ok := h.userStore.Get(msg.From.Id, profileCtxDataKeyLastMessageTimeFromUser)
 	if ok && lastMessageDate == msg.Date {
 		// Skip processing - same message date detected
+		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
 		return nil
 	}
 
