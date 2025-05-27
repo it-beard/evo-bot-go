@@ -1,6 +1,8 @@
 # Evocoders Telegram Bot
 
-![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)
+![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat&logo=go)
+![License](https://img.shields.io/badge/License-MIT-blue.svg)
+![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg)
 
 A Telegram bot for Evocoders Club management implemented in Go. Helps moderate discussions, provides AI-powered search, and generates daily chat summaries.
 
@@ -10,20 +12,24 @@ A Telegram bot for Evocoders Club management implemented in Go. Helps moderate d
 - ✅ **Thread Management**: Deletes non-admin messages in read-only threads
 - ✅ **Message Forwarding**: Forwards replies from closed threads to the general topic
 - ✅ **Join/Leave Cleanup**: Removes join/leave messages for cleaner conversations
+- 🛡️ **HTML Sanitization**: Automatically sanitizes HTML tags in user content for security
 
 ### AI-Powered Functionality
 - 🔍 **Tool Search** (`/tool`): Finds relevant AI tools based on user queries
 - 📚 **Content Search** (`/content`): Searches through designated topics for information
-- 👋 **Club Members Introduction Search** (`/intro`): Provides information about clubs members
+- 👋 **Club Members Introduction Search** (`/intro`): Provides information about club members
 - 📋 **Chat Summarization**: Creates daily summaries of conversations
   - Auto-posts at configured times
   - Manual trigger with `/summarize` (admin-only)
 
 ### User Profile Management
-- 👤 **Profile Command** (`/profile`): Manage your personal profile
-  - Create and edit personal information (name, bio)
+- 👤 **Profile Command** (`/profile`): Comprehensive profile management system
+  - Create and edit personal information (name, bio with length validation)
   - Publish your profile to the designated "Intro" topic
   - Search for other club members' profiles
+  - View profile links and enhanced profile viewing capabilities
+  - Duplicate detection for bio input timestamps
+  - Profile button text optimization for better user experience
 
 ### Event Management
 - 📅 **Event Management**: Track and organize community events
@@ -32,8 +38,9 @@ A Telegram bot for Evocoders Club management implemented in Go. Helps moderate d
   - Topic organization within events
 
 ### Utility
-- ℹ️ **Help** (`/help`): Provides usage information
+- ℹ️ **Help** (`/help`): Provides comprehensive usage information
 - 🧩 **Dynamic Templates**: Customizable AI prompts stored in database
+- 🔧 **Graceful Shutdown**: Proper resource cleanup on application termination
 
 For more details on bot usage, use the `/help` command in the bot chat.
 
@@ -61,35 +68,90 @@ The bot uses PostgreSQL with automatically initialized tables:
 | **topics** | Stores topics related to events | `id`, `topic`, `user_nickname`, `event_id`, `created_at` |
 | **migrations** | Tracks database migrations | `id`, `name`, `timestamp`, `created_at` |
 
-## Building the Executable
+## 🏗️ Building and Development
 
-To build the executable for Windows, use the following command:
+### Building the Executable
 
+To build the executable for different platforms:
+
+**Windows (64-bit):**
 ```shell
 GOOS=windows GOARCH=amd64 go build -o bot.exe
 ```
 
-This command will create a Windows executable named `bot.exe` that can run on 64-bit Windows systems.
+**Linux (64-bit):**
+```shell
+GOOS=linux GOARCH=amd64 go build -o bot
+```
 
-## Develop and run the bot
+**macOS (64-bit):**
+```shell
+GOOS=darwin GOARCH=amd64 go build -o bot
+```
 
-Run the bot with:
+### Development Commands
 
+**Run the bot in development mode:**
 ```shell
 go run main.go  
 ```
 
-Build the project:
-
+**Build the project:**
 ```shell
 go build main.go
 ```
 
-Command for update dependencies:
-
+**Update dependencies:**
 ```shell
 go mod tidy
 ```
+
+**Download dependencies:**
+```shell
+go mod download
+```
+
+**Check for potential issues:**
+```shell
+go vet ./...
+```
+
+## 📁 Project Structure
+
+The project follows a clean architecture pattern with the following structure:
+
+```
+evo-bot-go/
+├── main.go                 # Application entry point
+├── go.mod                  # Go module definition
+├── go.sum                  # Go module checksums
+├── README.md              # Project documentation
+├── CLAUDE.md              # AI assistant documentation
+└── internal/              # Internal application code
+    ├── bot/               # Telegram bot client implementation
+    ├── buttons/           # Inline keyboard button definitions
+    ├── clients/           # External service clients (OpenAI, etc.)
+    ├── config/            # Configuration management
+    ├── constants/         # Application constants
+    ├── database/          # Database connection and operations
+    ├── formatters/        # Message and data formatters
+    ├── handlers/          # Message and command handlers
+    │   ├── privatehandlers/   # Private chat handlers
+    │   └── supergrouphandlers/ # Supergroup chat handlers
+    ├── services/          # Business logic services
+    ├── tasks/             # Background tasks (summarization, etc.)
+    └── utils/             # Utility functions and helpers
+```
+
+### Key Components
+
+- **`main.go`**: Application bootstrap with graceful shutdown handling
+- **`internal/bot/`**: Core Telegram bot implementation and client management
+- **`internal/handlers/`**: Command and message processing logic
+- **`internal/services/`**: Business logic for AI search, profiles, events
+- **`internal/database/`**: PostgreSQL integration and schema management
+- **`internal/tasks/`**: Scheduled tasks like daily summarization
+- **`internal/config/`**: Environment-based configuration loading
 
 ## ⚙️ Configuration
 
@@ -169,97 +231,167 @@ Send this code **REVERTED** by /code command to your bot.
 
 After that your bot will be able to use Telegram User Client and will update session automaticaly once per _30 minutes_.
 
-## Running Tests
+## 🧪 Running Tests
 
-This project includes unit tests to ensure functionality works as expected. Here are various ways to run the tests:
+This project includes comprehensive unit tests to ensure functionality works as expected. Here are various ways to run and analyze the tests:
 
-### Run All Tests
+### Basic Test Commands
 
-To run all tests in the project:
-
+**Run all tests in the project:**
 ```shell
 go test ./...
 ```
 
-This command will recursively run all tests in all packages of your project.
-
-### Run Tests in a Specific Package
-
-To run tests in a specific package:
-
-```shell
-go test evo-bot-go/internal/handlers/privatehandlers
-```
-
-Or navigate to the package directory and run:
-
-```shell
-cd internal/handlers/privatehandlers
-go test
-```
-
-### Run a Specific Test
-
-To run a specific test function:
-
-```shell
-go test -run TestHelpHandler_Name evo-bot-go/internal/handlers/privatehandlers
-```
-
-The `-run` flag accepts a regular expression that matches test function names.
-
-### Verbose Output
-
-For more detailed test output, add the `-v` flag:
-
+**Run tests with verbose output:**
 ```shell
 go test -v ./...
 ```
 
-### Code Coverage
+**Run tests in a specific package:**
+```shell
+go test evo-bot-go/internal/handlers/privatehandlers
+```
 
-To see test coverage:
+**Run a specific test function:**
+```shell
+go test -run TestHelpHandler_Name evo-bot-go/internal/handlers/privatehandlers
+```
 
+### Advanced Testing Options
+
+**Test with race condition detection:**
+```shell
+go test -race ./...
+```
+
+**Run tests with timeout:**
+```shell
+go test -timeout 30s ./...
+```
+
+**Run tests multiple times to catch flaky tests:**
+```shell
+go test -count=5 ./...
+```
+
+### Code Coverage Analysis
+
+**Basic coverage report:**
 ```shell
 go test -cover ./...
 ```
 
-For a detailed coverage report:
-
+**Generate detailed coverage profile:**
 ```shell
 go test -coverprofile=coverage.out ./...
 go tool cover -html=coverage.out
 ```
 
-This will generate an HTML report showing which lines of code are covered by tests.
-
-### Test with Race Detection
-
-To check for race conditions:
-
+**Coverage by function:**
 ```shell
-go test -race ./...
+go test -coverprofile=coverage.out ./...
+go tool cover -func=coverage.out
 ```
 
-### Colored Test Output with gotestsum
-
-For better visibility with colored test output and icons, you can use gotestsum:
-
+**Set coverage threshold:**
 ```shell
-# Install gotestsum
+go test -cover ./... | grep -E "coverage: [0-9]+\.[0-9]+%" | awk '{if($2 < 80.0) exit 1}'
+```
+
+### Enhanced Test Output with gotestsum
+
+For better visibility with colored output and icons:
+
+**Install gotestsum:**
+```shell
 go install gotest.tools/gotestsum@latest
-
-# Run tests with colored output and icons
-gotestsum --format pkgname --format-icons hivis
-
-# If gotestsum is not in your PATH, run it directly
-go run gotest.tools/gotestsum@latest --format pkgname --format-icons hivis
 ```
 
-For maximum detail with colors and icons:
+**Run tests with colored output:**
+```shell
+gotestsum --format pkgname --format-icons hivis
+```
+
+**Detailed output with colors and icons:**
+```shell
+gotestsum --format standard-verbose --format-icons hivis --packages=./... -- -v
+```
+
+**Run tests with coverage using gotestsum:**
+```shell
+gotestsum --format pkgname -- -cover ./...
+```
+
+### Continuous Integration
+
+For CI/CD pipelines, use these commands:
 
 ```shell
-go run gotest.tools/gotestsum@latest --format standard-verbose --format-icons hivis --packages=./... -- -v
+# Run all tests with race detection and coverage
+go test -race -coverprofile=coverage.out -covermode=atomic ./...
+
+# Generate coverage report
+go tool cover -html=coverage.out -o coverage.html
+
+# Check coverage threshold (example: 80%)
+go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//' | awk '{if($1 < 80) exit 1}'
 ```
 
-This provides colored output with clear pass/fail indicators and detailed test information.
+## 🔧 Troubleshooting
+
+### Common Issues
+
+**Bot not responding to commands:**
+- Verify the bot token is correct and the bot is added to the supergroup
+- Check that the bot has the required admin permissions (pin messages, delete messages)
+- Ensure environment variables are properly set
+
+**Database connection errors:**
+- Verify PostgreSQL is running and accessible
+- Check the database connection string format
+- Ensure the database exists and the user has proper permissions
+
+**Telegram User Client authentication issues:**
+- Make sure the phone number format is correct (with country code)
+- Verify the App ID and App Hash from Telegram API
+- Check if 2FA password is required and properly set
+
+**Summarization not working:**
+- Verify monitored topic IDs are correct
+- Check if the summarization task is enabled in configuration
+- Ensure the summary time format is correct (HH:MM)
+
+**OpenAI API errors:**
+- Verify the API key is valid and has sufficient credits
+- Check for rate limiting issues
+- Ensure the API key has access to the required models
+
+### Debug Mode
+
+To run the bot with more verbose logging, you can modify the log level in the code or add debug environment variables as needed.
+
+### Getting Help
+
+- Check the `/help` command in the bot for usage information
+- Review the configuration section for proper environment variable setup
+- Examine the logs for specific error messages
+- Ensure all dependencies are properly installed with `go mod tidy`
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📞 Support
+
+For support and questions:
+- Open an issue in the GitHub repository
+- Contact the Evocoders Club administrators
+- Check the bot's `/help` command for usage guidance
