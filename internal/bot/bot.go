@@ -206,6 +206,7 @@ func (b *TgBotClient) Start() {
 	}
 
 	log.Printf("Bot Runner: Bot @%s has been started successfully\n", b.bot.User.Username)
+	log.Printf("Bot Runner: Current server time is %s (UTC: %s)", time.Now(), time.Now().UTC())
 	b.updater.Idle()
 }
 

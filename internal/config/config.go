@@ -228,8 +228,8 @@ func LoadConfig() (*Config, error) {
 	// Meeting poll time
 	meetingPollTimeStr := os.Getenv("TG_EVO_BOT_MEETING_POLL_TIME")
 	if meetingPollTimeStr == "" {
-		// Default to 5:00 PM if not specified
-		meetingPollTimeStr = "17:00"
+		// Default to 2:00 PM if not specified
+		meetingPollTimeStr = "14:00"
 	}
 
 	// Parse the time in 24-hour format
