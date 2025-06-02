@@ -2,9 +2,18 @@ package repositories
 
 import (
 	"database/sql"
-	"evo-bot-go/internal/models"
+	"time"
 	// "time" // Not strictly needed for these specific queries if using NOW()
 )
+
+type WeeklyMeetingParticipant struct {
+	ID              int64     `db:"id"`
+	PollID          int64     `db:"poll_id"`
+	UserID          int64     `db:"user_id"`
+	IsParticipating bool      `db:"is_participating"`
+	CreatedAt       time.Time `db:"created_at"`
+	UpdatedAt       time.Time `db:"updated_at"`
+}
 
 type WeeklyMeetingParticipantRepository struct {
 	db *sql.DB
@@ -14,7 +23,7 @@ func NewWeeklyMeetingParticipantRepository(db *sql.DB) *WeeklyMeetingParticipant
 	return &WeeklyMeetingParticipantRepository{db: db}
 }
 
-func (r *WeeklyMeetingParticipantRepository) UpsertParticipant(participant models.WeeklyMeetingParticipant) error {
+func (r *WeeklyMeetingParticipantRepository) UpsertParticipant(participant WeeklyMeetingParticipant) error {
 	query := `
 		INSERT INTO weekly_meeting_participants (poll_id, user_id, is_participating, created_at, updated_at)
 		VALUES ($1, $2, $3, NOW(), NOW())
@@ -32,10 +41,10 @@ func (r *WeeklyMeetingParticipantRepository) RemoveParticipant(pollID int64, use
 	return err
 }
 
-func (r *WeeklyMeetingParticipantRepository) GetParticipant(pollID int64, userID int64) (*models.WeeklyMeetingParticipant, error) {
+func (r *WeeklyMeetingParticipantRepository) GetParticipant(pollID int64, userID int64) (*WeeklyMeetingParticipant, error) {
 	query := "SELECT id, poll_id, user_id, is_participating, created_at, updated_at FROM weekly_meeting_participants WHERE poll_id = $1 AND user_id = $2"
 	row := r.db.QueryRow(query, pollID, userID)
-	p := &models.WeeklyMeetingParticipant{}
+	p := &WeeklyMeetingParticipant{}
 	err := row.Scan(&p.ID, &p.PollID, &p.UserID, &p.IsParticipating, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {

@@ -3,7 +3,6 @@ package grouphandlers
 import (
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/database/repositories"
-	"evo-bot-go/internal/models"
 	"log"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -87,7 +86,7 @@ func (h *PollAnswerHandler) handleUpdate(b *gotgbot.Bot, ctx *ext.Context) error
 		// So, OptionIds[0] being 0 means "Yes", OptionIds[0] being 1 means "No".
 		isParticipating := pollAnswer.OptionIds[0] == 0
 
-		participant := models.WeeklyMeetingParticipant{
+		participant := repositories.WeeklyMeetingParticipant{
 			PollID:          retrievedPoll.ID,
 			UserID:          int64(internalUser.ID),
 			IsParticipating: isParticipating,
