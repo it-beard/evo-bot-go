@@ -42,6 +42,7 @@ type Config struct {
 	RandomCoffeePollTaskEnabled bool
 	RandomCoffeePollTime        time.Time
 	RandomCoffeePollDay         time.Weekday
+	RandomCoffeeTopicID         int
 }
 
 // LoadConfig loads the configuration from environment variables
@@ -264,6 +265,18 @@ func LoadConfig() (*Config, error) {
 			return nil, fmt.Errorf("invalid random coffee poll day: %s (valid values: sunday, monday, tuesday, wednesday, thursday, friday, saturday)", randomCoffeePollDayStr)
 		}
 	}
+
+	// Random coffee topic ID
+	randomCoffeeTopicIDStr := os.Getenv("TG_EVO_BOT_RANDOM_COFFEE_TOPIC_ID")
+	if randomCoffeeTopicIDStr == "" {
+		return nil, fmt.Errorf("TG_EVO_BOT_RANDOM_COFFEE_TOPIC_ID environment variable is not set")
+	}
+
+	randomCoffeeTopicID, err := strconv.Atoi(randomCoffeeTopicIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid random coffee topic ID: %s", randomCoffeeTopicIDStr)
+	}
+	config.RandomCoffeeTopicID = randomCoffeeTopicID
 
 	return config, nil
 }

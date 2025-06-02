@@ -86,12 +86,14 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	summarizationService := services.NewSummarizationService(
 		appConfig, openaiClient, messageSenderService, promptingTemplateRepository,
 	)
+	randomCoffeePollService := services.NewRandomCoffeePollService(
+		appConfig, bot, randomCoffeePollRepository)
 
 	// Initialize scheduled tasks
 	scheduledTasks := []tasks.Task{
 		tasks.NewSessionKeepAliveTask(30 * time.Minute),
 		tasks.NewDailySummarizationTask(appConfig, summarizationService),
-		tasks.NewRandomCoffeePollTask(appConfig, bot, randomCoffeePollRepository),
+		tasks.NewRandomCoffeePollTask(appConfig, randomCoffeePollService),
 	}
 
 	// Create bot client
