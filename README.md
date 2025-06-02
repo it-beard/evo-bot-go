@@ -20,7 +20,7 @@ A Telegram bot for Evocoders Club management implemented in Go. Helps moderate d
   - Manual trigger with `/summarize` (admin-only)
 
 ### 🎲 Weekly Random Coffee Meetings
-- **Automated Participation Poll**: Every week (typically on Friday), the bot posts a poll asking members if they want to participate in random coffee meetings for the following week.
+- **Automated Participation Poll**: Every week (configurable day and time in UTC, defaults to Friday at 5 PM UTC), the bot posts a poll asking members if they want to participate in random coffee meetings for the following week.
 - **Opt-in/Opt-out**: Members can easily indicate their availability by responding to the poll. Votes can be changed or retracted before pairs are made.
 - **Admin-Triggered Pairing**: An administrator can trigger the pairing process using the `/pair_meetings` command (typically on Monday).
 - **Random Pair Announcement**: Once triggered, the bot randomly pairs participating members and announces the pairs in the main chat.
@@ -133,7 +133,7 @@ The bot uses environment variables for configuration, make sure to set them all:
 - `TG_EVO_BOT_SUMMARY_TIME`: Time to run daily summary in 24-hour format (e.g., `03:00` for 3 AM)
 - `TG_EVO_BOT_SUMMARIZATION_TASK_ENABLED`: Enable or disable the daily summarization task (`true` or `false`, defaults to `true` if not specified)
 - `TG_EVO_BOT_MEETING_POLL_TASK_ENABLED`: Enable or disable the weekly meeting poll task (`true` or `false`, defaults to `true` if not specified)
-- `TG_EVO_BOT_MEETING_POLL_TIME`: Time to send the weekly meeting poll in 24-hour format (e.g., `17:00` for 5 PM, defaults to `17:00` if not specified)
+- `TG_EVO_BOT_MEETING_POLL_TIME`: Time to send the weekly meeting poll in 24-hour format UTC (e.g., `17:00` for 5 PM UTC, defaults to `17:00` if not specified)
 - `TG_EVO_BOT_MEETING_POLL_DAY`: Day of the week to send the poll (e.g., `friday`, `monday`, etc., defaults to `friday` if not specified)
 
 On Windows, you can set the environment variables using the following commands in Command Prompt:

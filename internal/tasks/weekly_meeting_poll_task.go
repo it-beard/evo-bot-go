@@ -36,7 +36,7 @@ func (t *WeeklyMeetingPollTask) Start() {
 		log.Println("Weekly Meeting Poll Task: Weekly meeting poll task is disabled")
 		return
 	}
-	log.Printf("Weekly Meeting Poll Task: Starting weekly meeting poll task with time %02d:%02d on %s",
+	log.Printf("Weekly Meeting Poll Task: Starting weekly meeting poll task with time %02d:%02d UTC on %s",
 		t.config.MeetingPollTime.Hour(),
 		t.config.MeetingPollTime.Minute(),
 		t.config.MeetingPollDay.String())
@@ -87,14 +87,7 @@ func (t *WeeklyMeetingPollTask) run() {
 
 // calculateNextRun calculates the next run time
 func (t *WeeklyMeetingPollTask) calculateNextRun() time.Time {
-	// Load Moscow location for timezone calculations
-	location, err := time.LoadLocation("Europe/Moscow")
-	if err != nil {
-		log.Printf("Weekly Meeting Poll Task: Error loading location 'Europe/Moscow': %v. Using UTC.", err)
-		location = time.UTC // Fallback to UTC
-	}
-
-	now := time.Now().In(location)
+	now := time.Now().UTC()
 
 	// Get the configured day and time
 	targetWeekday := t.config.MeetingPollDay
@@ -105,7 +98,7 @@ func (t *WeeklyMeetingPollTask) calculateNextRun() time.Time {
 	daysUntilTarget := (int(targetWeekday) - int(now.Weekday()) + 7) % 7
 
 	// Create target time for this week
-	targetTime := time.Date(now.Year(), now.Month(), now.Day(), targetHour, targetMinute, 0, 0, location)
+	targetTime := time.Date(now.Year(), now.Month(), now.Day(), targetHour, targetMinute, 0, 0, time.UTC)
 
 	if daysUntilTarget == 0 {
 		// Today is the target day, check if the target time has already passed
@@ -148,24 +141,18 @@ func (t *WeeklyMeetingPollTask) sendWeeklyMeetingPoll(ctx context.Context) error
 	}
 	log.Printf("Weekly Meeting Poll Task: Poll sent successfully. MessageID: %d, ChatID: %d", sentPollMsg.MessageId, sentPollMsg.Chat.Id)
 
-	// Calculate upcoming Monday in Moscow time
-	location, err := time.LoadLocation("Europe/Moscow")
-	if err != nil {
-		log.Printf("Weekly Meeting Poll Task: Error loading location 'Europe/Moscow': %v. Using UTC.", err)
-		location = time.UTC // Fallback to UTC
-	}
-
-	nowInLoc := time.Now().In(location)
+	// Calculate upcoming Monday in UTC
+	nowInLoc := time.Now().UTC()
 	daysUntilMonday := (8 - int(nowInLoc.Weekday())) % 7
 	if daysUntilMonday == 0 { // If today is Monday
 		daysUntilMonday = 7 // schedule for next Monday
 	}
 	weekStartDate := nowInLoc.AddDate(0, 0, daysUntilMonday)
-	// Normalize to the beginning of the day in the specified location
-	weekStartDate = time.Date(weekStartDate.Year(), weekStartDate.Month(), weekStartDate.Day(), 0, 0, 0, 0, location)
+	// Normalize to the beginning of the day in UTC
+	weekStartDate = time.Date(weekStartDate.Year(), weekStartDate.Month(), weekStartDate.Day(), 0, 0, 0, 0, time.UTC)
 
-	log.Printf("Weekly Meeting Poll Task: Calculated WeekStartDate: %s (Location: %s)",
-		weekStartDate.Format("2006-01-02"), location.String())
+	log.Printf("Weekly Meeting Poll Task: Calculated WeekStartDate: %s (UTC)",
+		weekStartDate.Format("2006-01-02"))
 
 	if t.pollRepo == nil {
 		log.Printf("Weekly Meeting Poll Task: pollRepo is nil, skipping DB interaction.")
