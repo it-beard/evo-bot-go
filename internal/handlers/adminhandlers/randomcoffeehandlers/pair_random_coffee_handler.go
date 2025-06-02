@@ -1,4 +1,4 @@
-package adminhandlers
+package randomcoffeehandlers
 
 import (
 	"evo-bot-go/internal/config"

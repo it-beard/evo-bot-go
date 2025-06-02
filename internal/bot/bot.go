@@ -11,6 +11,7 @@ import (
 	"evo-bot-go/internal/handlers"
 	"evo-bot-go/internal/handlers/adminhandlers"
 	"evo-bot-go/internal/handlers/adminhandlers/eventhandlers"
+	"evo-bot-go/internal/handlers/adminhandlers/randomcoffeehandlers"
 	"evo-bot-go/internal/handlers/grouphandlers"
 	"evo-bot-go/internal/handlers/privatehandlers"
 	"evo-bot-go/internal/handlers/privatehandlers/topicshandlers"
@@ -26,6 +27,7 @@ type HandlerDependencies struct {
 	OpenAiClient                      *clients.OpenAiClient
 	AppConfig                         *config.Config
 	SummarizationService              *services.SummarizationService
+	RandomCoffeePollService           *services.RandomCoffeePollService
 	MessageSenderService              *services.MessageSenderService
 	PermissionsService                *services.PermissionsService
 	EventRepository                   *repositories.EventRepository
@@ -113,6 +115,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 		OpenAiClient:                      openaiClient,
 		AppConfig:                         appConfig,
 		SummarizationService:              summarizationService,
+		RandomCoffeePollService:           randomCoffeePollService,
 		MessageSenderService:              messageSenderService,
 		PermissionsService:                permissionsService,
 		EventRepository:                   eventRepository,
@@ -159,7 +162,8 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 		eventhandlers.NewEventSetupHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
 		eventhandlers.NewEventDeleteHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
 		eventhandlers.NewEventStartHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
-		adminhandlers.NewPairRandomCoffeeHandler(deps.AppConfig, deps.PermissionsService, deps.MessageSenderService, deps.RandomCoffeePollRepository, deps.RandomCoffeeParticipantRepository),
+		randomcoffeehandlers.NewPairRandomCoffeeHandler(deps.AppConfig, deps.PermissionsService, deps.MessageSenderService, deps.RandomCoffeePollRepository, deps.RandomCoffeeParticipantRepository),
+		randomcoffeehandlers.NewCoffeeStartHandler(deps.AppConfig, deps.MessageSenderService, deps.PermissionsService, deps.RandomCoffeePollService),
 	}
 
 	// Register private chat handlers

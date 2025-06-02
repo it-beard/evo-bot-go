@@ -41,3 +41,11 @@ const (
 )
 
 const PairRandomCoffeeCommand = "pair_random_coffee"
+const CoffeeRestartCommand = "coofeeRestart"
+
+// Coffee Start Handler callback constants
+const (
+	CoffeeStartPrefix          = "coffee_start_"
+	CoffeeStartConfirmCallback = CoffeeStartPrefix + "confirm"
+	CoffeeStartCancelCallback  = CoffeeStartPrefix + "cancel"
+)
