@@ -132,7 +132,9 @@ The bot uses environment variables for configuration, make sure to set them all:
 - `TG_EVO_BOT_SUMMARY_TOPIC_ID`: Topic ID where daily summaries will be posted
 - `TG_EVO_BOT_SUMMARY_TIME`: Time to run daily summary in 24-hour format (e.g., `03:00` for 3 AM)
 - `TG_EVO_BOT_SUMMARIZATION_TASK_ENABLED`: Enable or disable the daily summarization task (`true` or `false`, defaults to `true` if not specified)
-- `TG_EVO_BOT_MEETING_POLL_SCHEDULE`: Cron expression for when the weekly meeting poll is sent (e.g., `"CRON_TZ=Europe/Moscow 0 17 * * FRI"` for every Friday at 5 PM Moscow time). Defaults to Friday 5 PM Moscow time if not set.
+- `TG_EVO_BOT_MEETING_POLL_TASK_ENABLED`: Enable or disable the weekly meeting poll task (`true` or `false`, defaults to `true` if not specified)
+- `TG_EVO_BOT_MEETING_POLL_TIME`: Time to send the weekly meeting poll in 24-hour format (e.g., `17:00` for 5 PM, defaults to `17:00` if not specified)
+- `TG_EVO_BOT_MEETING_POLL_DAY`: Day of the week to send the poll (e.g., `friday`, `monday`, etc., defaults to `friday` if not specified)
 
 On Windows, you can set the environment variables using the following commands in Command Prompt:
 
@@ -164,7 +166,11 @@ set TG_EVO_BOT_MONITORED_TOPICS_IDS=0,2
 set TG_EVO_BOT_SUMMARY_TOPIC_ID=3
 set TG_EVO_BOT_SUMMARY_TIME=03:00
 set TG_EVO_BOT_SUMMARIZATION_TASK_ENABLED=true
-set TG_EVO_BOT_MEETING_POLL_SCHEDULE="CRON_TZ=Europe/Moscow 0 17 * * FRI"
+
+# Weekly Meeting Poll Feature
+set TG_EVO_BOT_MEETING_POLL_TASK_ENABLED=true
+set TG_EVO_BOT_MEETING_POLL_TIME=17:00
+set TG_EVO_BOT_MEETING_POLL_DAY=friday
 ```
 
 Then run the executable.

@@ -37,7 +37,11 @@ type Config struct {
 	SummaryTopicID           int
 	SummaryTime              time.Time
 	SummarizationTaskEnabled bool
-	MeetingPollSchedule      string
+
+	// Weekly Meeting Poll Feature
+	MeetingPollTaskEnabled bool
+	MeetingPollTime        time.Time
+	MeetingPollDay         time.Weekday
 }
 
 // LoadConfig loads the configuration from environment variables
@@ -208,10 +212,57 @@ func LoadConfig() (*Config, error) {
 		config.SummarizationTaskEnabled = summarizationTaskEnabled
 	}
 
-	// Weekly Meeting Poll Schedule
-	config.MeetingPollSchedule = os.Getenv("TG_EVO_BOT_MEETING_POLL_SCHEDULE")
-	if config.MeetingPollSchedule == "" {
-		config.MeetingPollSchedule = "CRON_TZ=Europe/Moscow 0 17 * * FRI" // Default schedule
+	// Weekly Meeting Poll Feature
+	meetingPollTaskEnabledStr := os.Getenv("TG_EVO_BOT_MEETING_POLL_TASK_ENABLED")
+	if meetingPollTaskEnabledStr == "" {
+		// Default to enabled if not specified
+		config.MeetingPollTaskEnabled = true
+	} else {
+		meetingPollTaskEnabled, err := strconv.ParseBool(meetingPollTaskEnabledStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid meeting poll task enabled value: %s", meetingPollTaskEnabledStr)
+		}
+		config.MeetingPollTaskEnabled = meetingPollTaskEnabled
+	}
+
+	// Meeting poll time
+	meetingPollTimeStr := os.Getenv("TG_EVO_BOT_MEETING_POLL_TIME")
+	if meetingPollTimeStr == "" {
+		// Default to 5:00 PM if not specified
+		meetingPollTimeStr = "17:00"
+	}
+
+	// Parse the time in 24-hour format
+	meetingPollTime, err := time.Parse("15:04", meetingPollTimeStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid meeting poll time format: %s", meetingPollTimeStr)
+	}
+	config.MeetingPollTime = meetingPollTime
+
+	// Meeting poll day
+	meetingPollDayStr := os.Getenv("TG_EVO_BOT_MEETING_POLL_DAY")
+	if meetingPollDayStr == "" {
+		// Default to Friday if not specified
+		config.MeetingPollDay = time.Friday
+	} else {
+		switch strings.ToLower(meetingPollDayStr) {
+		case "sunday":
+			config.MeetingPollDay = time.Sunday
+		case "monday":
+			config.MeetingPollDay = time.Monday
+		case "tuesday":
+			config.MeetingPollDay = time.Tuesday
+		case "wednesday":
+			config.MeetingPollDay = time.Wednesday
+		case "thursday":
+			config.MeetingPollDay = time.Thursday
+		case "friday":
+			config.MeetingPollDay = time.Friday
+		case "saturday":
+			config.MeetingPollDay = time.Saturday
+		default:
+			return nil, fmt.Errorf("invalid meeting poll day: %s (valid values: sunday, monday, tuesday, wednesday, thursday, friday, saturday)", meetingPollDayStr)
+		}
 	}
 
 	return config, nil

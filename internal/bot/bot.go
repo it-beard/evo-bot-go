@@ -13,7 +13,6 @@ import (
 	"evo-bot-go/internal/handlers/adminhandlers/eventhandlers"
 	"evo-bot-go/internal/handlers/grouphandlers"
 	"evo-bot-go/internal/handlers/privatehandlers"
-	"evo-bot-go/internal/constants" // Added for PairMeetingsCommand, though not directly used in this file if command is in handler
 	"evo-bot-go/internal/handlers/privatehandlers/topicshandlers"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/tasks"
@@ -24,14 +23,14 @@ import (
 
 // HandlerDependencies contains all dependencies needed by handlers
 type HandlerDependencies struct {
-	OpenAiClient                *clients.OpenAiClient
-	AppConfig                   *config.Config
-	SummarizationService        *services.SummarizationService
-	MessageSenderService        *services.MessageSenderService
-	PermissionsService          *services.PermissionsService
-	EventRepository             *repositories.EventRepository
-	TopicRepository             *repositories.TopicRepository
-	PromptingTemplateRepository *repositories.PromptingTemplateRepository
+	OpenAiClient                       *clients.OpenAiClient
+	AppConfig                          *config.Config
+	SummarizationService               *services.SummarizationService
+	MessageSenderService               *services.MessageSenderService
+	PermissionsService                 *services.PermissionsService
+	EventRepository                    *repositories.EventRepository
+	TopicRepository                    *repositories.TopicRepository
+	PromptingTemplateRepository        *repositories.PromptingTemplateRepository
 	UserRepository                     *repositories.UserRepository
 	ProfileRepository                  *repositories.ProfileRepository
 	WeeklyMeetingPollRepository        *repositories.WeeklyMeetingPollRepository
@@ -81,7 +80,6 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	userRepository := repositories.NewUserRepository(db.DB)
 	profileRepository := repositories.NewProfileRepository(db.DB)
 	weeklyMeetingPollRepository := repositories.NewWeeklyMeetingPollRepository(db.DB)
-	weeklyMeetingParticipantRepository := repositories.NewWeeklyMeetingParticipantRepository(db.DB)
 	// Initialize services
 	messageSenderService := services.NewMessageSenderService(bot)
 	permissionsService := services.NewPermissionsService(appConfig, bot, messageSenderService)
