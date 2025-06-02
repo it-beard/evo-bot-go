@@ -17,35 +17,35 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 )
 
-type PairMeetingsHandler struct {
+type PairRandomCoffeeHandler struct {
 	config          *config.Config
 	permissions     *services.PermissionsService
 	sender          *services.MessageSenderService
-	pollRepo        *repositories.WeeklyMeetingPollRepository
-	participantRepo *repositories.WeeklyMeetingParticipantRepository
+	pollRepo        *repositories.RandomCoffeePollRepository
+	participantRepo *repositories.RandomCoffeeParticipantRepository
 }
 
-func NewPairMeetingsHandler(
+func NewPairRandomCoffeeHandler(
 	config *config.Config,
 	permissions *services.PermissionsService,
 	sender *services.MessageSenderService,
-	pollRepo *repositories.WeeklyMeetingPollRepository,
-	participantRepo *repositories.WeeklyMeetingParticipantRepository,
+	pollRepo *repositories.RandomCoffeePollRepository,
+	participantRepo *repositories.RandomCoffeeParticipantRepository,
 ) ext.Handler {
-	h := &PairMeetingsHandler{
+	h := &PairRandomCoffeeHandler{
 		config:          config,
 		permissions:     permissions,
 		sender:          sender,
 		pollRepo:        pollRepo,
 		participantRepo: participantRepo,
 	}
-	return handlers.NewCommand(constants.PairMeetingsCommand, h.handleCommand)
+	return handlers.NewCommand(constants.PairRandomCoffeeCommand, h.handleCommand)
 }
 
-func (h *PairMeetingsHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *PairRandomCoffeeHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !utils.IsUserAdminOrCreator(b, ctx.EffectiveUser.Id, h.config) { // Using IsAdmin for permission check
-		log.Printf("PairMeetingsHandler: User %d (%s) tried to use /%s without admin permissions.",
-			ctx.EffectiveUser.Id, ctx.EffectiveUser.Username, constants.PairMeetingsCommand)
+		log.Printf("PairRandomCoffeeHandler: User %d (%s) tried to use /%s without admin permissions.",
+			ctx.EffectiveUser.Id, ctx.EffectiveUser.Username, constants.PairRandomCoffeeCommand)
 		// Optionally send a message, or just ignore
 		// h.sender.Reply(ctx.EffectiveMessage, "You do not have permission to use this command.", nil)
 		return nil
@@ -53,19 +53,19 @@ func (h *PairMeetingsHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) er
 
 	chatID := h.config.SuperGroupChatID // Assuming polls are always in the supergroup
 	if chatID == 0 {
-		log.Println("PairMeetingsHandler: SupergroupChatID is not configured.")
+		log.Println("PairRandomCoffeeHandler: SupergroupChatID is not configured.")
 		h.sender.Reply(ctx.EffectiveMessage, "Supergroup chat ID is not configured.", nil)
 		return nil
 	}
 
 	latestPoll, err := h.pollRepo.GetLatestPollForChat(chatID)
 	if err != nil {
-		log.Printf("PairMeetingsHandler: Error getting latest poll for chat %d: %v", chatID, err)
+		log.Printf("PairRandomCoffeeHandler: Error getting latest poll for chat %d: %v", chatID, err)
 		h.sender.Reply(ctx.EffectiveMessage, "Error fetching poll information.", nil)
 		return nil
 	}
 	if latestPoll == nil {
-		h.sender.Reply(ctx.EffectiveMessage, fmt.Sprintf("No weekly meeting poll found for chat ID %d.", chatID), nil)
+		h.sender.Reply(ctx.EffectiveMessage, fmt.Sprintf("No random coffee poll found for chat ID %d.", chatID), nil)
 		return nil
 	}
 
@@ -75,7 +75,7 @@ func (h *PairMeetingsHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) er
 
 	participants, err := h.participantRepo.GetParticipatingUsers(latestPoll.ID)
 	if err != nil {
-		log.Printf("PairMeetingsHandler: Error getting participants for poll ID %d: %v", latestPoll.ID, err)
+		log.Printf("PairRandomCoffeeHandler: Error getting participants for poll ID %d: %v", latestPoll.ID, err)
 		h.sender.Reply(ctx.EffectiveMessage, "Error fetching participants.", nil)
 		return nil
 	}
@@ -84,7 +84,7 @@ func (h *PairMeetingsHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) er
 		msg := fmt.Sprintf("Not enough participants for pairing from poll (ID: %d, Week: %s). Need at least 2, got %d.",
 			latestPoll.ID, latestPoll.WeekStartDate.Format("2006-01-02"), len(participants))
 		h.sender.Send(chatID, msg, nil) // Send to supergroup
-		log.Printf("PairMeetingsHandler: %s", msg)
+		log.Printf("PairRandomCoffeeHandler: %s", msg)
 		return nil
 	}
 
@@ -129,11 +129,11 @@ func (h *PairMeetingsHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) er
 	// Send the pairing message to the SupergroupChatID, not as a reply to the admin command.
 	err = h.sender.Send(chatID, messageBuilder.String(), nil)
 	if err != nil {
-		log.Printf("PairMeetingsHandler: Error sending pairing message to chat %d: %v", chatID, err)
+		log.Printf("PairRandomCoffeeHandler: Error sending pairing message to chat %d: %v", chatID, err)
 		// Notify admin who invoked the command about the failure
 		h.sender.Reply(ctx.EffectiveMessage, "Error sending pairing message to the group. Please check logs.", nil)
 	} else {
-		log.Printf("PairMeetingsHandler: Successfully sent pairings for poll ID %d to chat %d.", latestPoll.ID, chatID)
+		log.Printf("PairRandomCoffeeHandler: Successfully sent pairings for poll ID %d to chat %d.", latestPoll.ID, chatID)
 		// Optionally, confirm to admin
 		h.sender.Reply(ctx.EffectiveMessage, "Pairings announced in the supergroup.", nil)
 	}
@@ -141,6 +141,6 @@ func (h *PairMeetingsHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) er
 }
 
 // Name method for the handler interface (optional, but good practice)
-func (h *PairMeetingsHandler) Name() string {
-	return "PairMeetingsHandler"
+func (h *PairRandomCoffeeHandler) Name() string {
+	return "PairRandomCoffeeHandler"
 }

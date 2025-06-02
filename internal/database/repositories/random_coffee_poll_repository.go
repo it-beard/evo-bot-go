@@ -2,11 +2,10 @@ package repositories
 
 import (
 	"database/sql"
-	"evo-bot-go/internal/models"
 	"time"
 )
 
-type WeeklyMeetingPoll struct {
+type RandomCoffeePoll struct {
 	ID             int64     `db:"id"`
 	MessageID      int64     `db:"message_id"`
 	ChatID         int64     `db:"chat_id"`
@@ -15,17 +14,17 @@ type WeeklyMeetingPoll struct {
 	CreatedAt      time.Time `db:"created_at"`
 }
 
-type WeeklyMeetingPollRepository struct {
+type RandomCoffeePollRepository struct {
 	db *sql.DB
 }
 
-func NewWeeklyMeetingPollRepository(db *sql.DB) *WeeklyMeetingPollRepository {
-	return &WeeklyMeetingPollRepository{db: db}
+func NewRandomCoffeePollRepository(db *sql.DB) *RandomCoffeePollRepository {
+	return &RandomCoffeePollRepository{db: db}
 }
 
-func (r *WeeklyMeetingPollRepository) CreatePoll(poll models.WeeklyMeetingPoll) (int64, error) {
+func (r *RandomCoffeePollRepository) CreatePoll(poll RandomCoffeePoll) (int64, error) {
 	query := `
-		INSERT INTO weekly_meeting_polls (message_id, chat_id, week_start_date, telegram_poll_id, created_at)
+		INSERT INTO random_coffee_polls (message_id, chat_id, week_start_date, telegram_poll_id, created_at)
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id
 	`
@@ -48,13 +47,13 @@ func (r *WeeklyMeetingPollRepository) CreatePoll(poll models.WeeklyMeetingPoll) 
 	return id, nil
 }
 
-func (r *WeeklyMeetingPollRepository) GetPollByTelegramPollID(telegramPollID string) (*models.WeeklyMeetingPoll, error) {
+func (r *RandomCoffeePollRepository) GetPollByTelegramPollID(telegramPollID string) (*RandomCoffeePoll, error) {
 	query := `
 		SELECT id, message_id, chat_id, week_start_date, telegram_poll_id, created_at
-		FROM weekly_meeting_polls
+		FROM random_coffee_polls
 		WHERE telegram_poll_id = $1
 	`
-	poll := &models.WeeklyMeetingPoll{}
+	poll := &RandomCoffeePoll{}
 	err := r.db.QueryRow(query, telegramPollID).Scan(
 		&poll.ID,
 		&poll.MessageID,
@@ -73,15 +72,15 @@ func (r *WeeklyMeetingPollRepository) GetPollByTelegramPollID(telegramPollID str
 }
 
 // GetLatestPollForChat retrieves the latest poll for a given chat ID
-func (r *WeeklyMeetingPollRepository) GetLatestPollForChat(chatID int64) (*models.WeeklyMeetingPoll, error) {
+func (r *RandomCoffeePollRepository) GetLatestPollForChat(chatID int64) (*RandomCoffeePoll, error) {
 	query := `
 		SELECT id, message_id, chat_id, week_start_date, telegram_poll_id, created_at
-		FROM weekly_meeting_polls
+		FROM random_coffee_polls
 		WHERE chat_id = $1
 		ORDER BY week_start_date DESC, id DESC 
 		LIMIT 1
 	`
-	poll := &models.WeeklyMeetingPoll{}
+	poll := &RandomCoffeePoll{}
 	err := r.db.QueryRow(query, chatID).Scan(
 		&poll.ID,
 		&poll.MessageID,

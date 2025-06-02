@@ -20,6 +20,7 @@ func Registry() []implementations.Migration {
 		implementations.NewAddPublishedMessageIDToProfiles(),
 		implementations.NewRenameWebsiteToFreelink(),
 		implementations.NewRemoveSocialLinksFromProfiles(),
+		implementations.NewAddRandomCoffeePollTables(),
 		// Add new migrations here
 	}
 }

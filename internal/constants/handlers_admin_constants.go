@@ -40,4 +40,4 @@ const (
 	AdminProfilesCancelCallback = AdminProfilesPrefix + "cancel"
 )
 
-const PairMeetingsCommand = "pair_meetings"
+const PairRandomCoffeeCommand = "pair_random_coffee"

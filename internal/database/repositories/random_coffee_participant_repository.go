@@ -3,10 +3,9 @@ package repositories
 import (
 	"database/sql"
 	"time"
-	// "time" // Not strictly needed for these specific queries if using NOW()
 )
 
-type WeeklyMeetingParticipant struct {
+type RandomCoffeeParticipant struct {
 	ID              int64     `db:"id"`
 	PollID          int64     `db:"poll_id"`
 	UserID          int64     `db:"user_id"`
@@ -15,17 +14,17 @@ type WeeklyMeetingParticipant struct {
 	UpdatedAt       time.Time `db:"updated_at"`
 }
 
-type WeeklyMeetingParticipantRepository struct {
+type RandomCoffeeParticipantRepository struct {
 	db *sql.DB
 }
 
-func NewWeeklyMeetingParticipantRepository(db *sql.DB) *WeeklyMeetingParticipantRepository {
-	return &WeeklyMeetingParticipantRepository{db: db}
+func NewRandomCoffeeParticipantRepository(db *sql.DB) *RandomCoffeeParticipantRepository {
+	return &RandomCoffeeParticipantRepository{db: db}
 }
 
-func (r *WeeklyMeetingParticipantRepository) UpsertParticipant(participant WeeklyMeetingParticipant) error {
+func (r *RandomCoffeeParticipantRepository) UpsertParticipant(participant RandomCoffeeParticipant) error {
 	query := `
-		INSERT INTO weekly_meeting_participants (poll_id, user_id, is_participating, created_at, updated_at)
+		INSERT INTO random_coffee_participants (poll_id, user_id, is_participating, created_at, updated_at)
 		VALUES ($1, $2, $3, NOW(), NOW())
 		ON CONFLICT (poll_id, user_id) DO UPDATE SET
 			is_participating = EXCLUDED.is_participating,
@@ -35,16 +34,16 @@ func (r *WeeklyMeetingParticipantRepository) UpsertParticipant(participant Weekl
 	return err
 }
 
-func (r *WeeklyMeetingParticipantRepository) RemoveParticipant(pollID int64, userID int64) error {
-	query := "DELETE FROM weekly_meeting_participants WHERE poll_id = $1 AND user_id = $2"
+func (r *RandomCoffeeParticipantRepository) RemoveParticipant(pollID int64, userID int64) error {
+	query := "DELETE FROM random_coffee_participants WHERE poll_id = $1 AND user_id = $2"
 	_, err := r.db.Exec(query, pollID, userID)
 	return err
 }
 
-func (r *WeeklyMeetingParticipantRepository) GetParticipant(pollID int64, userID int64) (*WeeklyMeetingParticipant, error) {
-	query := "SELECT id, poll_id, user_id, is_participating, created_at, updated_at FROM weekly_meeting_participants WHERE poll_id = $1 AND user_id = $2"
+func (r *RandomCoffeeParticipantRepository) GetParticipant(pollID int64, userID int64) (*RandomCoffeeParticipant, error) {
+	query := "SELECT id, poll_id, user_id, is_participating, created_at, updated_at FROM random_coffee_participants WHERE poll_id = $1 AND user_id = $2"
 	row := r.db.QueryRow(query, pollID, userID)
-	p := &WeeklyMeetingParticipant{}
+	p := &RandomCoffeeParticipant{}
 	err := row.Scan(&p.ID, &p.PollID, &p.UserID, &p.IsParticipating, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -56,16 +55,12 @@ func (r *WeeklyMeetingParticipantRepository) GetParticipant(pollID int64, userID
 }
 
 // GetParticipatingUsers retrieves all users who are participating in a given poll
-func (r *WeeklyMeetingParticipantRepository) GetParticipatingUsers(pollID int64) ([]User, error) {
-	// Note: We are returning []User from this package, which is defined in user_repository.go
-	// This creates a slight package dependency issue if we consider repositories strictly separate.
-	// Ideally, User model would be in a common models package.
-	// For now, we will use the User struct defined in the repositories package.
+func (r *RandomCoffeeParticipantRepository) GetParticipatingUsers(pollID int64) ([]User, error) {
 	query := `
 		SELECT u.id, u.tg_id, u.firstname, u.lastname, u.tg_username 
 		FROM users u
-		JOIN weekly_meeting_participants wmp ON u.id = wmp.user_id
-		WHERE wmp.poll_id = $1 AND wmp.is_participating = TRUE
+		JOIN random_coffee_participants rpc ON u.id = rpc.user_id
+		WHERE rpc.poll_id = $1 AND rpc.is_participating = TRUE
 	`
 	rows, err := r.db.Query(query, pollID)
 	if err != nil {
