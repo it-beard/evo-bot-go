@@ -19,6 +19,13 @@ A Telegram bot for Evocoders Club management implemented in Go. Helps moderate d
   - Auto-posts at configured times
   - Manual trigger with `/summarize` (admin-only)
 
+### 🎲 Weekly Random Coffee Meetings
+- **Automated Participation Poll**: Every week (typically on Friday), the bot posts a poll asking members if they want to participate in random coffee meetings for the following week.
+- **Opt-in/Opt-out**: Members can easily indicate their availability by responding to the poll. Votes can be changed or retracted before pairs are made.
+- **Admin-Triggered Pairing**: An administrator can trigger the pairing process using the `/pair_meetings` command (typically on Monday).
+- **Random Pair Announcement**: Once triggered, the bot randomly pairs participating members and announces the pairs in the main chat.
+- **Self-Managed Meetings**: Paired members are encouraged to contact each other to arrange the day, time, and format of their meeting.
+
 ### User Profile Management
 - 👤 **Profile Command** (`/profile`): Manage your personal profile
   - Create and edit personal information (name, bio)
@@ -125,6 +132,7 @@ The bot uses environment variables for configuration, make sure to set them all:
 - `TG_EVO_BOT_SUMMARY_TOPIC_ID`: Topic ID where daily summaries will be posted
 - `TG_EVO_BOT_SUMMARY_TIME`: Time to run daily summary in 24-hour format (e.g., `03:00` for 3 AM)
 - `TG_EVO_BOT_SUMMARIZATION_TASK_ENABLED`: Enable or disable the daily summarization task (`true` or `false`, defaults to `true` if not specified)
+- `TG_EVO_BOT_MEETING_POLL_SCHEDULE`: Cron expression for when the weekly meeting poll is sent (e.g., `"CRON_TZ=Europe/Moscow 0 17 * * FRI"` for every Friday at 5 PM Moscow time). Defaults to Friday 5 PM Moscow time if not set.
 
 On Windows, you can set the environment variables using the following commands in Command Prompt:
 
@@ -156,6 +164,7 @@ set TG_EVO_BOT_MONITORED_TOPICS_IDS=0,2
 set TG_EVO_BOT_SUMMARY_TOPIC_ID=3
 set TG_EVO_BOT_SUMMARY_TIME=03:00
 set TG_EVO_BOT_SUMMARIZATION_TASK_ENABLED=true
+set TG_EVO_BOT_MEETING_POLL_SCHEDULE="CRON_TZ=Europe/Moscow 0 17 * * FRI"
 ```
 
 Then run the executable.

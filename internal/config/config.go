@@ -37,6 +37,7 @@ type Config struct {
 	SummaryTopicID           int
 	SummaryTime              time.Time
 	SummarizationTaskEnabled bool
+	MeetingPollSchedule      string
 }
 
 // LoadConfig loads the configuration from environment variables
@@ -205,6 +206,12 @@ func LoadConfig() (*Config, error) {
 			return nil, fmt.Errorf("invalid summarization task enabled value: %s", summarizationTaskEnabledStr)
 		}
 		config.SummarizationTaskEnabled = summarizationTaskEnabled
+	}
+
+	// Weekly Meeting Poll Schedule
+	config.MeetingPollSchedule = os.Getenv("TG_EVO_BOT_MEETING_POLL_SCHEDULE")
+	if config.MeetingPollSchedule == "" {
+		config.MeetingPollSchedule = "CRON_TZ=Europe/Moscow 0 17 * * FRI" // Default schedule
 	}
 
 	return config, nil

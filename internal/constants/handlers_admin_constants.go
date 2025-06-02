@@ -39,3 +39,5 @@ const (
 	AdminProfilesStartCallback  = AdminProfilesPrefix + "start"
 	AdminProfilesCancelCallback = AdminProfilesPrefix + "cancel"
 )
+
+const PairMeetingsCommand = "pair_meetings"

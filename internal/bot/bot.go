@@ -13,6 +13,7 @@ import (
 	"evo-bot-go/internal/handlers/adminhandlers/eventhandlers"
 	"evo-bot-go/internal/handlers/grouphandlers"
 	"evo-bot-go/internal/handlers/privatehandlers"
+	"evo-bot-go/internal/constants" // Added for PairMeetingsCommand, though not directly used in this file if command is in handler
 	"evo-bot-go/internal/handlers/privatehandlers/topicshandlers"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/tasks"
@@ -31,8 +32,10 @@ type HandlerDependencies struct {
 	EventRepository             *repositories.EventRepository
 	TopicRepository             *repositories.TopicRepository
 	PromptingTemplateRepository *repositories.PromptingTemplateRepository
-	UserRepository              *repositories.UserRepository
-	ProfileRepository           *repositories.ProfileRepository
+	UserRepository                     *repositories.UserRepository
+	ProfileRepository                  *repositories.ProfileRepository
+	WeeklyMeetingPollRepository        *repositories.WeeklyMeetingPollRepository
+	WeeklyMeetingParticipantRepository *repositories.WeeklyMeetingParticipantRepository
 }
 
 // TgBotClient represents a Telegram bot client with all required dependencies
@@ -77,6 +80,8 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	promptingTemplateRepository := repositories.NewPromptingTemplateRepository(db.DB)
 	userRepository := repositories.NewUserRepository(db.DB)
 	profileRepository := repositories.NewProfileRepository(db.DB)
+	weeklyMeetingPollRepository := repositories.NewWeeklyMeetingPollRepository(db.DB)
+	weeklyMeetingParticipantRepository := repositories.NewWeeklyMeetingParticipantRepository(db.DB)
 	// Initialize services
 	messageSenderService := services.NewMessageSenderService(bot)
 	permissionsService := services.NewPermissionsService(appConfig, bot, messageSenderService)
@@ -88,6 +93,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	scheduledTasks := []tasks.Task{
 		tasks.NewSessionKeepAliveTask(30 * time.Minute),
 		tasks.NewDailySummarizationTask(appConfig, summarizationService),
+		tasks.NewWeeklyMeetingPollTask(appConfig, bot, weeklyMeetingPollRepository),
 	}
 
 	// Create bot client
@@ -111,6 +117,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 		PromptingTemplateRepository: promptingTemplateRepository,
 		UserRepository:              userRepository,
 		ProfileRepository:           profileRepository,
+		WeeklyMeetingPollRepository: weeklyMeetingPollRepository,
 	}
 
 	// Register all handlers
@@ -148,6 +155,7 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 		eventhandlers.NewEventSetupHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
 		eventhandlers.NewEventDeleteHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
 		eventhandlers.NewEventStartHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
+		adminhandlers.NewPairMeetingsHandler(deps.AppConfig, deps.PermissionsService, deps.MessageSenderService, deps.WeeklyMeetingPollRepository, deps.WeeklyMeetingParticipantRepository),
 	}
 
 	// Register private chat handlers
@@ -160,6 +168,7 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 		privatehandlers.NewProfileHandler(deps.AppConfig, deps.MessageSenderService, deps.PermissionsService, deps.UserRepository, deps.ProfileRepository),
 		topicshandlers.NewTopicsHandler(deps.AppConfig, deps.TopicRepository, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
 		topicshandlers.NewTopicAddHandler(deps.AppConfig, deps.TopicRepository, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
+		privatehandlers.NewPollAnswerHandler(deps.AppConfig, deps.UserRepository, deps.WeeklyMeetingPollRepository, deps.WeeklyMeetingParticipantRepository),
 	}
 
 	// Register group chat handlers
