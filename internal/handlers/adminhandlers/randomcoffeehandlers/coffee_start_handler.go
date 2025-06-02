@@ -173,8 +173,14 @@ func (h *coffeeStartHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) erro
 	msg := ctx.EffectiveMessage
 	userId := ctx.EffectiveUser.Id
 
-	h.MessageRemoveInlineKeyboard(b, &userId)
-	_ = h.messageSenderService.Reply(msg, "Создание опроса по кофейным встречам отменено.", nil)
+	h.RemovePreviousMessage(b, &userId)
+	err := h.messageSenderService.Send(
+		msg.Chat.Id,
+		"Создание опроса по кофейным встречам отменено.",
+		nil)
+	if err != nil {
+		return fmt.Errorf("CoffeeStartHandler: failed to send cancel message: %w", err)
+	}
 	h.userStore.Clear(userId)
 
 	return handlers.EndConversation()

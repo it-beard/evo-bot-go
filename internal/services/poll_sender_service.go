@@ -1,6 +1,7 @@
 package services
 
 import (
+	"evo-bot-go/internal/utils"
 	"log"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -26,7 +27,12 @@ func (s *PollSenderService) SendPoll(chatID int64, question string, answers []go
 		log.Printf("Poll Sender Service: Poll will be sent to topic ID %d", options.MessageThreadId)
 	}
 
-	sentPollMsg, err := s.bot.SendPoll(chatID, question, answers, options)
+	sentPollMsg, err := s.bot.SendPoll(
+		utils.ChatIdToFullChatId(chatID),
+		question,
+		answers,
+		options,
+	)
 	if err != nil {
 		log.Printf("Poll Sender Service: Failed to send poll: %v", err)
 		return nil, err
