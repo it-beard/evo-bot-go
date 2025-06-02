@@ -80,14 +80,17 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	userRepository := repositories.NewUserRepository(db.DB)
 	profileRepository := repositories.NewProfileRepository(db.DB)
 	randomCoffeePollRepository := repositories.NewRandomCoffeePollRepository(db.DB)
+	randomCoffeeParticipantRepository := repositories.NewRandomCoffeeParticipantRepository(db.DB)
+
 	// Initialize services
 	messageSenderService := services.NewMessageSenderService(bot)
+	pollSenderService := services.NewPollSenderService(bot)
 	permissionsService := services.NewPermissionsService(appConfig, bot, messageSenderService)
 	summarizationService := services.NewSummarizationService(
 		appConfig, openaiClient, messageSenderService, promptingTemplateRepository,
 	)
 	randomCoffeePollService := services.NewRandomCoffeePollService(
-		appConfig, bot, randomCoffeePollRepository)
+		appConfig, pollSenderService, randomCoffeePollRepository)
 
 	// Initialize scheduled tasks
 	scheduledTasks := []tasks.Task{
@@ -107,17 +110,18 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 
 	// Create dependencies container
 	deps := &HandlerDependencies{
-		OpenAiClient:                openaiClient,
-		AppConfig:                   appConfig,
-		SummarizationService:        summarizationService,
-		MessageSenderService:        messageSenderService,
-		PermissionsService:          permissionsService,
-		EventRepository:             eventRepository,
-		TopicRepository:             topicRepository,
-		PromptingTemplateRepository: promptingTemplateRepository,
-		UserRepository:              userRepository,
-		ProfileRepository:           profileRepository,
-		RandomCoffeePollRepository:  randomCoffeePollRepository,
+		OpenAiClient:                      openaiClient,
+		AppConfig:                         appConfig,
+		SummarizationService:              summarizationService,
+		MessageSenderService:              messageSenderService,
+		PermissionsService:                permissionsService,
+		EventRepository:                   eventRepository,
+		TopicRepository:                   topicRepository,
+		PromptingTemplateRepository:       promptingTemplateRepository,
+		UserRepository:                    userRepository,
+		ProfileRepository:                 profileRepository,
+		RandomCoffeePollRepository:        randomCoffeePollRepository,
+		RandomCoffeeParticipantRepository: randomCoffeeParticipantRepository,
 	}
 
 	// Register all handlers

@@ -14,17 +14,17 @@ import (
 
 // RandomCoffeePollService handles the business logic for random coffee polls
 type RandomCoffeePollService struct {
-	config   *config.Config
-	bot      *gotgbot.Bot
-	pollRepo *repositories.RandomCoffeePollRepository
+	config     *config.Config
+	pollSender *PollSenderService
+	pollRepo   *repositories.RandomCoffeePollRepository
 }
 
 // NewRandomCoffeePollService creates a new random coffee poll service
-func NewRandomCoffeePollService(config *config.Config, bot *gotgbot.Bot, pollRepo *repositories.RandomCoffeePollRepository) *RandomCoffeePollService {
+func NewRandomCoffeePollService(config *config.Config, pollSender *PollSenderService, pollRepo *repositories.RandomCoffeePollRepository) *RandomCoffeePollService {
 	return &RandomCoffeePollService{
-		config:   config,
-		bot:      bot,
-		pollRepo: pollRepo,
+		config:     config,
+		pollSender: pollSender,
+		pollRepo:   pollRepo,
 	}
 }
 
@@ -41,37 +41,23 @@ func (s *RandomCoffeePollService) SendRandomCoffeePoll(ctx context.Context) erro
 	}
 
 	// Send the poll
-	sentPollMsg, err := s.sendPoll(chatID)
+	question := "📝 Готов ли ты участвовать в рандомных кофе-встречах на следующей неделе?\n\nКак это работает: в конце каждой недели я буду спрашивать здесь, хочешь ли ты участвовать во встречах. Если ответишь «да», то в понедельник тебя могут объединить в пару с другим участником для неформального общения!"
+	answers := []gotgbot.InputPollOption{
+		{Text: "Да, участвую! ☕️"},
+		{Text: "Нет, пропускаю эту неделю"},
+	}
+	options := &gotgbot.SendPollOpts{
+		IsAnonymous:           false,
+		AllowsMultipleAnswers: false,
+		MessageThreadId:       int64(s.config.RandomCoffeeTopicID),
+	}
+	sentPollMsg, err := s.pollSender.SendPoll(chatID, question, answers, options)
 	if err != nil {
 		return err
 	}
 
 	// Save to database
 	return s.savePollToDB(sentPollMsg)
-}
-
-// sendPoll sends the actual poll message
-func (s *RandomCoffeePollService) sendPoll(chatID int64) (*gotgbot.Message, error) {
-	question := "📝 Готов ли ты участвовать в рандомных кофе-встречах на следующей неделе?\n\nКак это работает: в конце каждой недели я буду спрашивать здесь, хочешь ли ты участвовать во встречах. Если ответишь «да», то в понедельник тебя могут объединить в пару с другим участником для неформального общения!"
-	options := []gotgbot.InputPollOption{
-		{Text: "Да, участвую! ☕️"},
-		{Text: "Нет, пропускаю эту неделю"},
-	}
-	opts := &gotgbot.SendPollOpts{
-		IsAnonymous:           false,
-		AllowsMultipleAnswers: false,
-		MessageThreadId:       int64(s.config.RandomCoffeeTopicID),
-	}
-
-	log.Printf("Random Coffee Poll Service: Sending poll to chat ID %d, topic ID %d", chatID, s.config.RandomCoffeeTopicID)
-
-	sentPollMsg, err := s.bot.SendPoll(chatID, question, options, opts)
-	if err != nil {
-		return nil, err
-	}
-
-	log.Printf("Random Coffee Poll Service: Poll sent successfully. MessageID: %d, ChatID: %d", sentPollMsg.MessageId, sentPollMsg.Chat.Id)
-	return sentPollMsg, nil
 }
 
 // savePollToDB saves the poll information to the database
