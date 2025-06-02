@@ -21,6 +21,7 @@ func Registry() []implementations.Migration {
 		implementations.NewRenameWebsiteToFreelink(),
 		implementations.NewRemoveSocialLinksFromProfiles(),
 		implementations.NewAddRandomCoffeePollTables(),
+		implementations.NewRemoveChatIdFromRandomCoffeePolls(),
 		// Add new migrations here
 	}
 }

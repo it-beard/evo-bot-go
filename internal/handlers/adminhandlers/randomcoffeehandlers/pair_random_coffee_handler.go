@@ -58,14 +58,14 @@ func (h *PairRandomCoffeeHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context
 		return nil
 	}
 
-	latestPoll, err := h.pollRepo.GetLatestPollForChat(chatID)
+	latestPoll, err := h.pollRepo.GetLatestPoll()
 	if err != nil {
-		log.Printf("PairRandomCoffeeHandler: Error getting latest poll for chat %d: %v", chatID, err)
+		log.Printf("PairRandomCoffeeHandler: Error getting latest poll: %v", err)
 		h.sender.Reply(ctx.EffectiveMessage, "Error fetching poll information.", nil)
 		return nil
 	}
 	if latestPoll == nil {
-		h.sender.Reply(ctx.EffectiveMessage, fmt.Sprintf("No random coffee poll found for chat ID %d.", chatID), nil)
+		h.sender.Reply(ctx.EffectiveMessage, "No random coffee poll found.", nil)
 		return nil
 	}
 

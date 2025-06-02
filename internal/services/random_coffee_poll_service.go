@@ -81,7 +81,6 @@ func (s *RandomCoffeePollService) savePollToDB(sentPollMsg *gotgbot.Message) err
 
 	newPollEntry := repositories.RandomCoffeePoll{
 		MessageID:      sentPollMsg.MessageId,
-		ChatID:         sentPollMsg.Chat.Id,
 		TelegramPollID: sentPollMsg.Poll.Id,
 		WeekStartDate:  weekStartDate,
 	}
