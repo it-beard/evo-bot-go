@@ -1,4 +1,4 @@
-package privatehandlers
+package grouphandlers
 
 import (
 	"evo-bot-go/internal/config"

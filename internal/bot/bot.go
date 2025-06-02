@@ -166,7 +166,6 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 		privatehandlers.NewProfileHandler(deps.AppConfig, deps.MessageSenderService, deps.PermissionsService, deps.UserRepository, deps.ProfileRepository),
 		topicshandlers.NewTopicsHandler(deps.AppConfig, deps.TopicRepository, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
 		topicshandlers.NewTopicAddHandler(deps.AppConfig, deps.TopicRepository, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
-		privatehandlers.NewPollAnswerHandler(deps.AppConfig, deps.UserRepository, deps.WeeklyMeetingPollRepository, deps.WeeklyMeetingParticipantRepository),
 	}
 
 	// Register group chat handlers
@@ -174,6 +173,7 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 		grouphandlers.NewDeleteJoinLeftMessagesHandler(),
 		grouphandlers.NewRepliesFromClosedThreadsHandler(deps.AppConfig, deps.MessageSenderService),
 		grouphandlers.NewCleanClosedThreadsHandler(deps.AppConfig, deps.MessageSenderService),
+		grouphandlers.NewPollAnswerHandler(deps.AppConfig, deps.UserRepository, deps.WeeklyMeetingPollRepository, deps.WeeklyMeetingParticipantRepository),
 	}
 
 	// Combine all handlers
