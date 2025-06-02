@@ -43,14 +43,10 @@ func (h *RandomCoffeePollAnswerHandler) handleUpdate(b *gotgbot.Bot, ctx *ext.Co
 
 	// 1. Get internal user ID from database
 	// Assuming userRepo.GetUserByTgID exists and is correctly implemented.
-	internalUser, err := h.userRepo.GetByTelegramID(pollAnswer.User.Id)
+	internalUser, err := h.userRepo.GetOrCreateUser(pollAnswer.User)
 	if err != nil {
 		log.Printf("RandomCoffeePollAnswerHandler: Error getting user by tg_id %d: %v", pollAnswer.User.Id, err)
 		return nil // Returning nil to avoid stopping the bot for one failed handler
-	}
-	if internalUser == nil {
-		log.Printf("RandomCoffeePollAnswerHandler: User with tg_id %d not found in DB. Ignoring poll answer.", pollAnswer.User.Id)
-		return nil
 	}
 
 	// 2. Get our poll from the database using Telegram's Poll ID

@@ -17,7 +17,7 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 )
 
-type PairRandomCoffeeHandler struct {
+type CoffeeGeneratePairsHandler struct {
 	config          *config.Config
 	permissions     *services.PermissionsService
 	sender          *services.MessageSenderService
@@ -25,14 +25,14 @@ type PairRandomCoffeeHandler struct {
 	participantRepo *repositories.RandomCoffeeParticipantRepository
 }
 
-func NewPairRandomCoffeeHandler(
+func NewCoffeeGeneratePairsHandler(
 	config *config.Config,
 	permissions *services.PermissionsService,
 	sender *services.MessageSenderService,
 	pollRepo *repositories.RandomCoffeePollRepository,
 	participantRepo *repositories.RandomCoffeeParticipantRepository,
 ) ext.Handler {
-	h := &PairRandomCoffeeHandler{
+	h := &CoffeeGeneratePairsHandler{
 		config:          config,
 		permissions:     permissions,
 		sender:          sender,
@@ -42,7 +42,7 @@ func NewPairRandomCoffeeHandler(
 	return handlers.NewCommand(constants.PairRandomCoffeeCommand, h.handleCommand)
 }
 
-func (h *PairRandomCoffeeHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *CoffeeGeneratePairsHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !utils.IsUserAdminOrCreator(b, ctx.EffectiveUser.Id, h.config) { // Using IsAdmin for permission check
 		log.Printf("PairRandomCoffeeHandler: User %d (%s) tried to use /%s without admin permissions.",
 			ctx.EffectiveUser.Id, ctx.EffectiveUser.Username, constants.PairRandomCoffeeCommand)
@@ -141,6 +141,6 @@ func (h *PairRandomCoffeeHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context
 }
 
 // Name method for the handler interface (optional, but good practice)
-func (h *PairRandomCoffeeHandler) Name() string {
-	return "PairRandomCoffeeHandler"
+func (h *CoffeeGeneratePairsHandler) Name() string {
+	return "CoffeeGeneratePairsHandler"
 }
