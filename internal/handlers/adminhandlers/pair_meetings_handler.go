@@ -5,6 +5,7 @@ import (
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/repositories" // User model is also in here
 	"evo-bot-go/internal/services"
+	"evo-bot-go/internal/utils"
 	"fmt"
 	"log"
 	"math/rand"
@@ -42,7 +43,7 @@ func NewPairMeetingsHandler(
 }
 
 func (h *PairMeetingsHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
-	if !h.permissions.IsAdmin(ctx.EffectiveUser.Id) { // Using IsAdmin for permission check
+	if !utils.IsUserAdminOrCreator(b, ctx.EffectiveUser.Id, h.config) { // Using IsAdmin for permission check
 		log.Printf("PairMeetingsHandler: User %d (%s) tried to use /%s without admin permissions.",
 			ctx.EffectiveUser.Id, ctx.EffectiveUser.Username, constants.PairMeetingsCommand)
 		// Optionally send a message, or just ignore
@@ -50,7 +51,7 @@ func (h *PairMeetingsHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) er
 		return nil
 	}
 
-	chatID := h.config.SupergroupChatID // Assuming polls are always in the supergroup
+	chatID := h.config.SuperGroupChatID // Assuming polls are always in the supergroup
 	if chatID == 0 {
 		log.Println("PairMeetingsHandler: SupergroupChatID is not configured.")
 		h.sender.Reply(ctx.EffectiveMessage, "Supergroup chat ID is not configured.", nil)
@@ -82,7 +83,7 @@ func (h *PairMeetingsHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) er
 	if len(participants) < 2 {
 		msg := fmt.Sprintf("Not enough participants for pairing from poll (ID: %d, Week: %s). Need at least 2, got %d.",
 			latestPoll.ID, latestPoll.WeekStartDate.Format("2006-01-02"), len(participants))
-		h.sender.SendMessage(chatID, msg, nil) // Send to supergroup
+		h.sender.Send(chatID, msg, nil) // Send to supergroup
 		log.Printf("PairMeetingsHandler: %s", msg)
 		return nil
 	}
@@ -126,7 +127,7 @@ func (h *PairMeetingsHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) er
 	messageBuilder.WriteString("\n🗓 День, время и формат встречи вы выбираете сами. Просто напиши партнеру в личку, когда и в каком формате тебе удобно встретиться.")
 
 	// Send the pairing message to the SupergroupChatID, not as a reply to the admin command.
-	_, err = h.sender.SendMessage(chatID, messageBuilder.String(), nil)
+	err = h.sender.Send(chatID, messageBuilder.String(), nil)
 	if err != nil {
 		log.Printf("PairMeetingsHandler: Error sending pairing message to chat %d: %v", chatID, err)
 		// Notify admin who invoked the command about the failure

@@ -44,7 +44,7 @@ func (h *PollAnswerHandler) handleUpdate(b *gotgbot.Bot, ctx *ext.Context) error
 
 	// 1. Get internal user ID from database
 	// Assuming userRepo.GetUserByTgID exists and is correctly implemented.
-	internalUser, err := h.userRepo.GetUserByTgID(pollAnswer.User.Id)
+	internalUser, err := h.userRepo.GetByTelegramID(pollAnswer.User.Id)
 	if err != nil {
 		log.Printf("PollAnswerHandler: Error getting user by tg_id %d: %v", pollAnswer.User.Id, err)
 		return nil // Returning nil to avoid stopping the bot for one failed handler
@@ -74,9 +74,8 @@ func (h *PollAnswerHandler) handleUpdate(b *gotgbot.Bot, ctx *ext.Context) error
 	//  return nil
 	// }
 
-
 	if len(pollAnswer.OptionIds) == 0 { // Vote retracted
-		err = h.participantRepo.RemoveParticipant(retrievedPoll.ID, internalUser.ID)
+		err = h.participantRepo.RemoveParticipant(retrievedPoll.ID, int64(internalUser.ID))
 		if err != nil {
 			log.Printf("PollAnswerHandler: Error removing participant (PollID: %d, UserID: %d): %v", retrievedPoll.ID, internalUser.ID, err)
 		} else {
@@ -90,7 +89,7 @@ func (h *PollAnswerHandler) handleUpdate(b *gotgbot.Bot, ctx *ext.Context) error
 
 		participant := models.WeeklyMeetingParticipant{
 			PollID:          retrievedPoll.ID,
-			UserID:          internalUser.ID,
+			UserID:          int64(internalUser.ID),
 			IsParticipating: isParticipating,
 		}
 		err = h.participantRepo.UpsertParticipant(participant)
