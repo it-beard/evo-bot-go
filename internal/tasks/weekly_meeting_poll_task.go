@@ -51,11 +51,10 @@ func (t *WeeklyMeetingPollTask) Stop() {
 
 // run runs the weekly meeting poll task
 func (t *WeeklyMeetingPollTask) run() {
-	// Calculate time until next run
 	nextRun := t.calculateNextRun()
 	log.Printf("Weekly Meeting Poll Task: Next meeting poll scheduled for: %v", nextRun)
 
-	ticker := time.NewTicker(time.Minute) // Check every minute
+	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 
 	for {
@@ -63,11 +62,9 @@ func (t *WeeklyMeetingPollTask) run() {
 		case <-t.stop:
 			return
 		case now := <-ticker.C:
-			// Check if it's time to run
 			if now.After(nextRun) {
 				log.Println("Weekly Meeting Poll Task: Running scheduled weekly meeting poll")
 
-				// Run poll sending in a separate goroutine
 				go func() {
 					ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 					defer cancel()
@@ -77,7 +74,6 @@ func (t *WeeklyMeetingPollTask) run() {
 					}
 				}()
 
-				// Calculate next run time
 				nextRun = t.calculateNextRun()
 				log.Printf("Weekly Meeting Poll Task: Next meeting poll scheduled for: %v", nextRun)
 			}
@@ -88,42 +84,49 @@ func (t *WeeklyMeetingPollTask) run() {
 // calculateNextRun calculates the next run time
 func (t *WeeklyMeetingPollTask) calculateNextRun() time.Time {
 	now := time.Now().UTC()
-
-	// Get the configured day and time
-	targetWeekday := t.config.MeetingPollDay
 	targetHour := t.config.MeetingPollTime.Hour()
 	targetMinute := t.config.MeetingPollTime.Minute()
+	targetWeekday := t.config.MeetingPollDay
 
-	// Calculate days until the target weekday
+	// Calculate days until target weekday
 	daysUntilTarget := (int(targetWeekday) - int(now.Weekday()) + 7) % 7
 
-	// Create target time for this week
+	// Create target time for today
 	targetTime := time.Date(now.Year(), now.Month(), now.Day(), targetHour, targetMinute, 0, 0, time.UTC)
 
-	if daysUntilTarget == 0 {
-		// Today is the target day, check if the target time has already passed
-		if now.Before(targetTime) {
-			// Target time hasn't passed yet today
-			return targetTime
-		}
-		// Target time has passed, schedule for next week
-		daysUntilTarget = 7
+	if daysUntilTarget == 0 && now.Before(targetTime) {
+		// Today is target day and time hasn't passed yet
+		return targetTime
 	}
 
-	// Add the days to get to the target day
-	targetTime = targetTime.Add(time.Duration(daysUntilTarget) * 24 * time.Hour)
+	// Either not target day or time has passed - schedule for next occurrence
+	if daysUntilTarget == 0 {
+		daysUntilTarget = 7 // Next week
+	}
 
-	return targetTime
+	return targetTime.AddDate(0, 0, daysUntilTarget)
 }
 
 // sendWeeklyMeetingPoll sends the weekly meeting poll
 func (t *WeeklyMeetingPollTask) sendWeeklyMeetingPoll(ctx context.Context) error {
 	chatID := t.config.SuperGroupChatID
 	if chatID == 0 {
-		log.Printf("Weekly Meeting Poll Task: SuperGroupChatID is not configured. Skipping poll.")
+		log.Println("Weekly Meeting Poll Task: SuperGroupChatID is not configured. Skipping poll.")
 		return nil
 	}
 
+	// Send the poll
+	sentPollMsg, err := t.sendPoll(chatID)
+	if err != nil {
+		return err
+	}
+
+	// Save to database
+	return t.savePollToDB(sentPollMsg)
+}
+
+// sendPoll sends the actual poll message
+func (t *WeeklyMeetingPollTask) sendPoll(chatID int64) (*gotgbot.Message, error) {
 	question := "Как это работает? 📝 В конце каждой недели я буду спрашивать здесь, готов ли ты участвовать во встречах на следующей. Are you ready to participate in random coffee meetings next week?"
 	options := []gotgbot.InputPollOption{
 		{Text: "Yes, I'll participate"},
@@ -137,34 +140,37 @@ func (t *WeeklyMeetingPollTask) sendWeeklyMeetingPoll(ctx context.Context) error
 	log.Printf("Weekly Meeting Poll Task: Sending poll to chat ID %d", chatID)
 	sentPollMsg, err := t.bot.SendPoll(chatID, question, options, opts)
 	if err != nil {
-		return err
+		return nil, err
 	}
+
 	log.Printf("Weekly Meeting Poll Task: Poll sent successfully. MessageID: %d, ChatID: %d", sentPollMsg.MessageId, sentPollMsg.Chat.Id)
+	return sentPollMsg, nil
+}
 
-	// Calculate upcoming Monday in UTC
-	nowInLoc := time.Now().UTC()
-	daysUntilMonday := (8 - int(nowInLoc.Weekday())) % 7
-	if daysUntilMonday == 0 { // If today is Monday
-		daysUntilMonday = 7 // schedule for next Monday
-	}
-	weekStartDate := nowInLoc.AddDate(0, 0, daysUntilMonday)
-	// Normalize to the beginning of the day in UTC
-	weekStartDate = time.Date(weekStartDate.Year(), weekStartDate.Month(), weekStartDate.Day(), 0, 0, 0, 0, time.UTC)
-
-	log.Printf("Weekly Meeting Poll Task: Calculated WeekStartDate: %s (UTC)",
-		weekStartDate.Format("2006-01-02"))
-
+// savePollToDB saves the poll information to the database
+func (t *WeeklyMeetingPollTask) savePollToDB(sentPollMsg *gotgbot.Message) error {
 	if t.pollRepo == nil {
-		log.Printf("Weekly Meeting Poll Task: pollRepo is nil, skipping DB interaction.")
+		log.Println("Weekly Meeting Poll Task: pollRepo is nil, skipping DB interaction.")
 		return nil
 	}
+
+	// Calculate next Monday (week start date)
+	now := time.Now().UTC()
+	daysUntilMonday := (8 - int(now.Weekday())) % 7
+	if daysUntilMonday == 0 {
+		daysUntilMonday = 7 // Next Monday if today is Monday
+	}
+
+	weekStartDate := now.AddDate(0, 0, daysUntilMonday)
+	weekStartDate = time.Date(weekStartDate.Year(), weekStartDate.Month(), weekStartDate.Day(), 0, 0, 0, 0, time.UTC)
+
+	log.Printf("Weekly Meeting Poll Task: Calculated WeekStartDate: %s (UTC)", weekStartDate.Format("2006-01-02"))
 
 	newPollEntry := models.WeeklyMeetingPoll{
 		MessageID:      sentPollMsg.MessageId,
 		ChatID:         sentPollMsg.Chat.Id,
 		TelegramPollID: sentPollMsg.Poll.Id,
 		WeekStartDate:  weekStartDate,
-		// CreatedAt will be set by the repository method or DB default
 	}
 
 	pollID, err := t.pollRepo.CreatePoll(newPollEntry)
@@ -172,6 +178,7 @@ func (t *WeeklyMeetingPollTask) sendWeeklyMeetingPoll(ctx context.Context) error
 		log.Printf("Weekly Meeting Poll Task: Failed to save weekly meeting poll to DB: %v. Poll Message ID: %d", err, sentPollMsg.MessageId)
 		return err
 	}
+
 	log.Printf("Weekly Meeting Poll Task: Weekly meeting poll saved to DB with ID: %d, Original MessageID: %d, WeekStartDate: %s",
 		pollID, sentPollMsg.MessageId, weekStartDate.Format("2006-01-02"))
 
