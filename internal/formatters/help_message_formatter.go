@@ -40,7 +40,7 @@ func FormatHelpMessage(isAdmin bool) string {
 			fmt.Sprintf("└ /%s - Редактировать мероприятие\n", constants.EventEditCommand) +
 			fmt.Sprintf("└ /%s - Удалить мероприятие\n", constants.EventDeleteCommand) +
 			fmt.Sprintf("└ /%s - Просмотреть темы и вопросы к предстоящим мероприятиям *с возможностью удаления*\n", constants.ShowTopicsCommand) +
-			fmt.Sprintf("└ /%s - Ручной запуск и объявление пар для еженедельного Random Coffee\n", constants.PairRandomCoffeeCommand) +
+			fmt.Sprintf("└ /%s - Ручной запуск генерации пар для Random Coffee\n", constants.CoffeeGeneratePairsCommand) +
 			fmt.Sprintf("└ /%s - Запустить новый опрос по кофейным встречам\n", constants.CoffeeRestartCommand) +
 			fmt.Sprintf("└ /%s - Ввести код для авторизации TG-клиента (задом наперед)\n", constants.CodeCommand) +
 			fmt.Sprintf("└ /%s - Тестирование саммаризации общения в клубе\n", constants.TrySummarizeCommand) +

@@ -10,6 +10,7 @@ import (
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -181,6 +182,8 @@ func (h *adminProfilesHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) e
 
 	// Check if user has admin permissions and is in a private chat
 	if !h.permissionsService.CheckAdminAndPrivateChat(msg, constants.AdminProfilesCommand) {
+		log.Printf("AdminProfilesHandler: User %d (%s) tried to use /%s without admin permissions.",
+			ctx.EffectiveUser.Id, ctx.EffectiveUser.Username, constants.AdminProfilesCommand)
 		return handlers.EndConversation()
 	}
 

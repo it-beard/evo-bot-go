@@ -8,6 +8,7 @@ import (
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 	"fmt"
+	"log"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -79,6 +80,8 @@ func (h *coffeeStartHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) err
 
 	// Check if user has admin permissions and is in a private chat
 	if !h.permissionsService.CheckAdminAndPrivateChat(msg, constants.CoffeeRestartCommand) {
+		log.Printf("CoffeeStartHandler: User %d (%s) tried to use /%s without admin permissions.",
+			ctx.EffectiveUser.Id, ctx.EffectiveUser.Username, constants.CoffeeRestartCommand)
 		return handlers.EndConversation()
 	}
 

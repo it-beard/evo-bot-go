@@ -40,7 +40,7 @@ const (
 	AdminProfilesCancelCallback = AdminProfilesPrefix + "cancel"
 )
 
-const PairRandomCoffeeCommand = "pair_random_coffee"
+const CoffeeGeneratePairsCommand = "coffeeGeneratePairs"
 const CoffeeRestartCommand = "coofeeRestart"
 
 // Coffee Start Handler callback constants
@@ -48,4 +48,11 @@ const (
 	CoffeeStartPrefix          = "coffee_start_"
 	CoffeeStartConfirmCallback = CoffeeStartPrefix + "confirm"
 	CoffeeStartCancelCallback  = CoffeeStartPrefix + "cancel"
+)
+
+// Coffee Generate Pairs Handler callback constants
+const (
+	CoffeeGeneratePairsPrefix          = "coffee_generate_pairs_"
+	CoffeeGeneratePairsConfirmCallback = CoffeeGeneratePairsPrefix + "confirm"
+	CoffeeGeneratePairsCancelCallback  = CoffeeGeneratePairsPrefix + "cancel"
 )
