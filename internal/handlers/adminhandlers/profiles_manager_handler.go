@@ -1259,9 +1259,11 @@ func (h *adminProfilesHandler) handleCancelCallback(b *gotgbot.Bot, ctx *ext.Con
 
 func (h *adminProfilesHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
+	userId := ctx.EffectiveUser.Id
 
-	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
-	_ = h.messageSenderService.Reply(msg, "Админ-сессия работы с профилями завершена.", nil)
+	h.RemovePreviousMessage(b, &userId)
+	_ = h.messageSenderService.Send(
+		msg.Chat.Id, "Админ-сессия работы с профилями завершена.", nil)
 	h.userStore.Clear(ctx.EffectiveUser.Id)
 
 	return handlers.EndConversation()
