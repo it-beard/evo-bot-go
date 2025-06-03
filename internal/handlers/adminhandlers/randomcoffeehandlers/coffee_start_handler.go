@@ -95,6 +95,7 @@ func (h *coffeeStartHandler) showConfirmationMenu(b *gotgbot.Bot, msg *gotgbot.M
 	editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
 		msg.Chat.Id,
 		fmt.Sprintf("<b>%s</b>", coffeeStartMenuHeader)+
+			"\n\n⚠️ ЭТА КОМАНДА НУЖНА ДЛЯ ТЕСТИРОВАНИЯ ФУНКЦИОНАЛА!"+
 			"\n\nВы уверены, что хотите запустить новый опрос по кофейным встречам?"+
 			fmt.Sprintf("\n\nОпрос будет отправлен в топик \"Random Coffee\" (ID: %d).", h.config.RandomCoffeeTopicID),
 		&gotgbot.SendMessageOpts{

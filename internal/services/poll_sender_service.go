@@ -1,7 +1,6 @@
 package services
 
 import (
-	"evo-bot-go/internal/utils"
 	"log"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -20,7 +19,12 @@ func NewPollSenderService(bot *gotgbot.Bot) *PollSenderService {
 }
 
 // SendPoll sends a poll to the specified chat
-func (s *PollSenderService) SendPoll(chatID int64, question string, answers []gotgbot.InputPollOption, options *gotgbot.SendPollOpts) (*gotgbot.Message, error) {
+func (s *PollSenderService) SendPoll(
+	chatID int64,
+	question string,
+	answers []gotgbot.InputPollOption,
+	options *gotgbot.SendPollOpts,
+) (*gotgbot.Message, error) {
 	log.Printf("Poll Sender Service: Sending poll to chat ID %d", chatID)
 
 	if options != nil && options.MessageThreadId != 0 {
@@ -28,7 +32,7 @@ func (s *PollSenderService) SendPoll(chatID int64, question string, answers []go
 	}
 
 	sentPollMsg, err := s.bot.SendPoll(
-		utils.ChatIdToFullChatId(chatID),
+		chatID,
 		question,
 		answers,
 		options,
@@ -38,6 +42,10 @@ func (s *PollSenderService) SendPoll(chatID int64, question string, answers []go
 		return nil, err
 	}
 
-	log.Printf("Poll Sender Service: Poll sent successfully. MessageID: %d, ChatID: %d", sentPollMsg.MessageId, sentPollMsg.Chat.Id)
+	log.Printf(
+		"Poll Sender Service: Poll sent successfully. MessageID: %d, ChatID: %d",
+		sentPollMsg.MessageId,
+		sentPollMsg.Chat.Id,
+	)
 	return sentPollMsg, nil
 }

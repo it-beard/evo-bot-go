@@ -67,6 +67,7 @@ func NewCoffeeGeneratePairsHandler(
 		map[string][]ext.Handler{
 			coffeeGeneratePairsStateAwaitConfirmation: {
 				handlers.NewCallback(callbackquery.Equal(constants.CoffeeGeneratePairsConfirmCallback), h.handleConfirmCallback),
+				handlers.NewCallback(callbackquery.Equal(constants.CoffeeGeneratePairsBackCallback), h.handleBackCallback),
 				handlers.NewCallback(callbackquery.Equal(constants.CoffeeGeneratePairsCancelCallback), h.handleCancelCallback),
 			},
 		},
@@ -121,10 +122,11 @@ func (h *CoffeeGeneratePairsHandler) showConfirmationMenu(b *gotgbot.Bot, msg *g
 	editedMsg, err := h.sender.SendHtmlWithReturnMessage(
 		msg.Chat.Id,
 		fmt.Sprintf("<b>%s</b>", coffeeGeneratePairsMenuHeader)+
+			"\n\n⚠️ ЭТА КОМАНДА НУЖНА ДЛЯ ТЕСТИРОВАНИЯ ФУНКЦИОНАЛА!"+
 			"\n\nВы уверены, что хотите сгенерировать пары для текущего опроса?"+
 			fmt.Sprintf("\n\n📊 Опрос: неделя %s", latestPoll.WeekStartDate.Format("2006-01-02"))+
 			fmt.Sprintf("\n👥 Участников: %d", len(participants))+
-			"\n\n⚠️ Пары будут отправлены в супергруппу.",
+			"\n\n⚠️ Пары будут отправлены в сообщество.",
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: buttons.ConfirmAndCancelButton(
 				constants.CoffeeGeneratePairsConfirmCallback,
@@ -147,12 +149,12 @@ func (h *CoffeeGeneratePairsHandler) handleConfirmCallback(b *gotgbot.Bot, ctx *
 	h.RemovePreviousMessage(b, &userId)
 
 	// Show processing message
-	processingMsg, err := h.sender.SendHtmlWithReturnMessage(
+	editedMsg, err := h.sender.SendHtmlWithReturnMessage(
 		msg.Chat.Id,
 		fmt.Sprintf("<b>%s</b>", coffeeGeneratePairsMenuHeader)+
 			"\n\n⏳ Генерация пар...",
 		nil)
-
+	h.SavePreviousMessageInfo(userId, editedMsg)
 	if err != nil {
 		return fmt.Errorf("CoffeeGeneratePairsHandler: failed to send processing message: %w", err)
 	}
@@ -160,34 +162,40 @@ func (h *CoffeeGeneratePairsHandler) handleConfirmCallback(b *gotgbot.Bot, ctx *
 	// Execute the pairs generation logic
 	err = h.generateAndSendPairs()
 	if err != nil {
-		// Update message with error
-		_, _, editErr := b.EditMessageText(
+		h.RemovePreviousMessage(b, &userId)
+
+		// Send new error message with buttons
+		editedMsg, sendErr := h.sender.SendHtmlWithReturnMessage(
+			msg.Chat.Id,
 			fmt.Sprintf("<b>%s</b>", coffeeGeneratePairsMenuHeader)+
 				"\n\n❌ Ошибка при генерации пар:"+
-				fmt.Sprintf("\n<code>%s</code>", err.Error()),
-			&gotgbot.EditMessageTextOpts{
-				ChatId:    msg.Chat.Id,
-				MessageId: processingMsg.MessageId,
-				ParseMode: "HTML",
+				fmt.Sprintf("\n<code>%s</code>", err.Error())+
+				"\n\nВернуться к подтверждению?",
+			&gotgbot.SendMessageOpts{
+				ReplyMarkup: buttons.BackAndCancelButton(
+					constants.CoffeeGeneratePairsBackCallback,
+					constants.CoffeeGeneratePairsCancelCallback,
+				),
 			})
-		if editErr != nil {
-			return fmt.Errorf("CoffeeGeneratePairsHandler: failed to edit error message: %w", editErr)
+		if sendErr != nil {
+			return fmt.Errorf("CoffeeGeneratePairsHandler: failed to send error message: %w", sendErr)
 		}
-		return fmt.Errorf("CoffeeGeneratePairsHandler: failed to generate pairs: %w", err)
+
+		h.SavePreviousMessageInfo(userId, editedMsg)
+		return nil // Stay in the same state to allow retry
 	}
 
-	// Update message with success
-	_, _, err = b.EditMessageText(
+	h.RemovePreviousMessage(b, &userId)
+
+	// Send success message
+	err = h.sender.SendHtml(
+		msg.Chat.Id,
 		fmt.Sprintf("<b>%s</b>", coffeeGeneratePairsMenuHeader)+
 			"\n\n✅ Пары успешно сгенерированы и отправлены в супергруппу!",
-		&gotgbot.EditMessageTextOpts{
-			ChatId:    msg.Chat.Id,
-			MessageId: processingMsg.MessageId,
-			ParseMode: "HTML",
-		})
+		nil)
 
 	if err != nil {
-		return fmt.Errorf("CoffeeGeneratePairsHandler: failed to update success message: %w", err)
+		return fmt.Errorf("CoffeeGeneratePairsHandler: failed to send success message: %w", err)
 	}
 
 	h.userStore.Clear(userId)
@@ -247,13 +255,24 @@ func (h *CoffeeGeneratePairsHandler) generateAndSendPairs() error {
 
 	// Send the pairing message
 	chatID := utils.ChatIdToFullChatId(h.config.SuperGroupChatID)
-	err = h.sender.SendHtml(chatID, messageBuilder.String(), nil)
+	opts := &gotgbot.SendMessageOpts{
+		MessageThreadId: int64(h.config.RandomCoffeeTopicID),
+	}
+
+	err = h.sender.SendHtml(chatID, messageBuilder.String(), opts)
 	if err != nil {
 		return fmt.Errorf("error sending pairing message to chat %d: %w", chatID, err)
 	}
 
 	log.Printf("CoffeeGeneratePairsHandler: Successfully sent pairings for poll ID %d to chat %d.", latestPoll.ID, h.config.SuperGroupChatID)
 	return nil
+}
+
+func (h *CoffeeGeneratePairsHandler) handleBackCallback(b *gotgbot.Bot, ctx *ext.Context) error {
+	msg := ctx.EffectiveMessage
+	userId := ctx.EffectiveUser.Id
+
+	return h.showConfirmationMenu(b, msg, userId)
 }
 
 func (h *CoffeeGeneratePairsHandler) handleCancelCallback(b *gotgbot.Bot, ctx *ext.Context) error {

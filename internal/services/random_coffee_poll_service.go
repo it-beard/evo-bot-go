@@ -8,6 +8,7 @@ import (
 
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/database/repositories"
+	"evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 )
@@ -20,7 +21,11 @@ type RandomCoffeePollService struct {
 }
 
 // NewRandomCoffeePollService creates a new random coffee poll service
-func NewRandomCoffeePollService(config *config.Config, pollSender *PollSenderService, pollRepo *repositories.RandomCoffeePollRepository) *RandomCoffeePollService {
+func NewRandomCoffeePollService(
+	config *config.Config,
+	pollSender *PollSenderService,
+	pollRepo *repositories.RandomCoffeePollRepository,
+) *RandomCoffeePollService {
 	return &RandomCoffeePollService{
 		config:     config,
 		pollSender: pollSender,
@@ -30,7 +35,7 @@ func NewRandomCoffeePollService(config *config.Config, pollSender *PollSenderSer
 
 // SendRandomCoffeePoll sends the random coffee poll
 func (s *RandomCoffeePollService) SendRandomCoffeePoll(ctx context.Context) error {
-	chatID := s.config.SuperGroupChatID
+	chatID := utils.ChatIdToFullChatId(s.config.SuperGroupChatID)
 	if chatID == 0 {
 		log.Println("Random Coffee Poll Service: SuperGroupChatID is not configured. Skipping poll.")
 		return nil
@@ -41,7 +46,9 @@ func (s *RandomCoffeePollService) SendRandomCoffeePoll(ctx context.Context) erro
 	}
 
 	// Send the poll
-	question := "📝 Готов/а ли ты участвовать в рандомных кофе-встречах на следующей неделе?\n\nКак это работает: в конце каждой недели я буду спрашивать здесь, хочешь ли ты участвовать во встречах. Если ответишь «да», то в понедельник тебя могут объединить в пару с другим участником/цей для неформального общения!"
+	question := "📝 Готов/а ли ты участвовать в рандомных кофе-встречах на следующей неделе?" +
+		"\n\nКак это работает: в конце каждой недели я буду спрашивать здесь, хочешь ли ты участвовать во встречах. " +
+		"Если ответишь «да», то в понедельник тебя могут объединить в пару с другим участником/цей для неформального общения!"
 	answers := []gotgbot.InputPollOption{
 		{Text: "Да, участвую! ☕️"},
 		{Text: "Нет, пропускаю эту неделю"},
@@ -75,9 +82,18 @@ func (s *RandomCoffeePollService) savePollToDB(sentPollMsg *gotgbot.Message) err
 	}
 
 	weekStartDate := now.AddDate(0, 0, daysUntilMonday)
-	weekStartDate = time.Date(weekStartDate.Year(), weekStartDate.Month(), weekStartDate.Day(), 0, 0, 0, 0, time.UTC)
+	weekStartDate =
+		time.Date(
+			weekStartDate.Year(),
+			weekStartDate.Month(),
+			weekStartDate.Day(),
+			0, 0, 0, 0, time.UTC,
+		)
 
-	log.Printf("Random Coffee Poll Service: Calculated WeekStartDate: %s (UTC)", weekStartDate.Format("2006-01-02"))
+	log.Printf(
+		"Random Coffee Poll Service: Calculated WeekStartDate: %s (UTC)",
+		weekStartDate.Format("2006-01-02"),
+	)
 
 	newPollEntry := repositories.RandomCoffeePoll{
 		MessageID:      sentPollMsg.MessageId,

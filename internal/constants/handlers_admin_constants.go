@@ -54,5 +54,6 @@ const (
 const (
 	CoffeeGeneratePairsPrefix          = "coffee_generate_pairs_"
 	CoffeeGeneratePairsConfirmCallback = CoffeeGeneratePairsPrefix + "confirm"
+	CoffeeGeneratePairsBackCallback    = CoffeeGeneratePairsPrefix + "back"
 	CoffeeGeneratePairsCancelCallback  = CoffeeGeneratePairsPrefix + "cancel"
 )
