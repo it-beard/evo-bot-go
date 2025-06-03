@@ -183,7 +183,7 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 		grouphandlers.NewDeleteJoinLeftMessagesHandler(),
 		grouphandlers.NewRepliesFromClosedThreadsHandler(deps.AppConfig, deps.MessageSenderService),
 		grouphandlers.NewCleanClosedThreadsHandler(deps.AppConfig, deps.MessageSenderService),
-		grouphandlers.NewRandomCoffeePollAnswerHandler(deps.AppConfig, deps.UserRepository, deps.RandomCoffeePollRepository, deps.RandomCoffeeParticipantRepository),
+		grouphandlers.NewRandomCoffeePollAnswerHandler(deps.AppConfig, deps.UserRepository, deps.RandomCoffeePollRepository, deps.RandomCoffeeParticipantRepository, deps.MessageSenderService),
 	}
 
 	// Combine all handlers

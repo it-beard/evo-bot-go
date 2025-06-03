@@ -124,7 +124,7 @@ func (h *profileHandler) showProfileMenu(b *gotgbot.Bot, msg *gotgbot.Message, u
 	dbUser, err := h.userRepository.GetByTelegramID(userId)
 	if err == nil {
 
-		profile, err := h.profileRepository.GetByUserID(dbUser.ID)
+		profile, err := h.profileRepository.GetOrCreate(dbUser.ID)
 		if err == nil {
 			if profile.PublishedMessageID.Valid {
 				profileTextAdditional = fmt.Sprintf("\n\n👉 <a href='%s'>Ссылка</a> на твой профиль на канале \"Интро\".",
@@ -211,7 +211,7 @@ func (h *profileHandler) handleViewMyProfile(b *gotgbot.Bot, ctx *ext.Context, m
 	}
 
 	// Try to get profile
-	profile, err := h.profileRepository.GetByUserID(dbUser.ID)
+	profile, err := h.profileRepository.GetOrCreate(dbUser.ID)
 	if err != nil && err != sql.ErrNoRows {
 		_ = h.messageSenderService.Reply(msg,
 			"Произошла ошибка при получении профиля.", nil)
@@ -305,7 +305,7 @@ func (h *profileHandler) handleUsernameInput(b *gotgbot.Bot, ctx *ext.Context) e
 	}
 
 	// Try to get profile
-	profile, err := h.profileRepository.GetByUserID(dbUser.ID)
+	profile, err := h.profileRepository.GetOrCreate(dbUser.ID)
 	if err != nil && err != sql.ErrNoRows {
 		_ = h.messageSenderService.Reply(msg,
 			"Произошла ошибка при получении профиля.", nil)
@@ -343,7 +343,7 @@ func (h *profileHandler) handleEditField(b *gotgbot.Bot, ctx *ext.Context, msg *
 		return fmt.Errorf("ProfileHandler: failed to get user in handleEditField: %w", err)
 	}
 
-	dbProfile, err := h.profileRepository.GetOrCreateDefaultProfile(dbUser.ID)
+	dbProfile, err := h.profileRepository.GetOrCreate(dbUser.ID)
 	if err != nil {
 		return fmt.Errorf("ProfileHandler: failed to get/create profile in handleEditField: %w", err)
 	}
@@ -537,7 +537,7 @@ func (h *profileHandler) handlePublishProfile(b *gotgbot.Bot, ctx *ext.Context, 
 		return fmt.Errorf("ProfileHandler: failed to get user in handlePublishProfile: %w", err)
 	}
 
-	profile, err := h.profileRepository.GetByUserID(dbUser.ID)
+	profile, err := h.profileRepository.GetOrCreate(dbUser.ID)
 	if err != nil && err != sql.ErrNoRows {
 		return fmt.Errorf("ProfileHandler: failed to get profile in handlePublishProfile: %w", err)
 	}
@@ -684,7 +684,7 @@ func (h *profileHandler) saveProfileField(tgUser *gotgbot.User, fieldName string
 	}
 
 	// Try to get profile
-	profile, err := h.profileRepository.GetOrCreateDefaultProfile(dbUser.ID)
+	profile, err := h.profileRepository.GetOrCreate(dbUser.ID)
 	if err != nil {
 		return fmt.Errorf("ProfileHandler: failed to get/create profile in saveProfileField: %w", err)
 	}
@@ -708,7 +708,7 @@ func (h *profileHandler) saveUserField(tgUser *gotgbot.User, fieldName string, v
 		return fmt.Errorf("ProfileHandler: failed to get/create user in saveUserField: %w", err)
 	}
 
-	_, err = h.profileRepository.GetOrCreateDefaultProfile(dbUser.ID)
+	_, err = h.profileRepository.GetOrCreate(dbUser.ID)
 	if err != nil {
 		return fmt.Errorf("ProfileHandler: failed to get/create profile in saveUserField: %w", err)
 	}

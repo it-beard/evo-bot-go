@@ -137,7 +137,6 @@ func (h *CoffeeGeneratePairsHandler) showConfirmationMenu(b *gotgbot.Bot, msg *g
 	return handlers.NextConversationState(coffeeGeneratePairsStateAwaitConfirmation)
 }
 
-// Handle the "Да" (Confirm) button click
 func (h *CoffeeGeneratePairsHandler) handleConfirmCallback(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	userId := ctx.EffectiveUser.Id
@@ -260,7 +259,6 @@ func (h *CoffeeGeneratePairsHandler) generateAndSendPairs() error {
 	return nil
 }
 
-// Handle the "Нет" (Cancel) button click
 func (h *CoffeeGeneratePairsHandler) handleCancelCallback(b *gotgbot.Bot, ctx *ext.Context) error {
 	return h.handleCancel(b, ctx)
 }
