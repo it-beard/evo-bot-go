@@ -55,34 +55,6 @@ func (r *ProfileRepository) GetByID(id int) (*Profile, error) {
 	return &profile, nil
 }
 
-// GetByUserID retrieves a profile by user ID
-func (r *ProfileRepository) GetByUserID(userID int) (*Profile, error) {
-	query := `
-		SELECT id, user_id, bio, published_message_id, created_at, updated_at
-		FROM profiles
-		WHERE user_id = $1`
-
-	var profile Profile
-	err := r.db.QueryRow(query, userID).Scan(
-		&profile.ID,
-		&profile.UserID,
-		&profile.Bio,
-		&profile.PublishedMessageID,
-		&profile.CreatedAt,
-		&profile.UpdatedAt,
-	)
-
-	if err == sql.ErrNoRows {
-		return nil, sql.ErrNoRows
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to get profile for user with ID %d: %w", userID, err)
-	}
-
-	return &profile, nil
-}
-
 // Create inserts a new profile record into the database
 func (r *ProfileRepository) Create(userID int, bio string) (int, error) {
 	var id int
@@ -166,32 +138,71 @@ func (r *ProfileRepository) UpdatePublishedMessageID(profileID int, messageID in
 	return nil
 }
 
-func (h *ProfileRepository) GetOrCreateDefaultProfileWithBio(dbUserID int, bio string) (*Profile, error) {
+func (r *ProfileRepository) GetOrCreateWithBio(userID int, bio string) (*Profile, error) {
 	// Try to get profile
-	profile, err := h.GetByUserID(dbUserID)
+	profile, err := r.getByUserID(userID)
 	if err != nil && err != sql.ErrNoRows {
-		return nil, fmt.Errorf("ProfileHandler: failed to get profile in getOrCreateProfile: %w", err)
+		return nil, fmt.Errorf("ProfileRepository: failed to get profile in GetOrCreateByUserId: %w", err)
 	}
 
-	// If profile doesn't exist, create it
+	// If profile exists, return it
+	if err == nil {
+		return profile, nil
+	}
+
+	// Profile doesn't exist, check if user exists
+	userRepo := NewUserRepository(r.db)
+	_, err = userRepo.GetByID(userID)
 	if err == sql.ErrNoRows {
-		_, err = h.Create(dbUserID, bio)
-		if err != nil {
-			return nil, fmt.Errorf("ProfileHandler: failed to create profile in getOrCreateProfile: %w", err)
-		}
-
-		// Get the newly created profile
-		newProfile, err := h.GetByUserID(dbUserID)
-		if err != nil {
-			return nil, fmt.Errorf("ProfileHandler: failed to get created profile in getOrCreateProfile: %w", err)
-		}
-
-		return newProfile, nil
+		return nil, fmt.Errorf("ProfileRepository: user with ID %d not found, cannot create profile", userID)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("ProfileRepository: failed to verify user exists in GetOrCreateByUserId: %w", err)
 	}
 
-	return profile, nil
+	// User exists, create profile
+	_, err = r.Create(userID, bio)
+	if err != nil {
+		return nil, fmt.Errorf("ProfileRepository: failed to create profile in GetOrCreateByUserId: %w", err)
+	}
+
+	// Get the newly created profile
+	newProfile, err := r.getByUserID(userID)
+	if err != nil {
+		return nil, fmt.Errorf("ProfileRepository: failed to get created profile in GetOrCreateByUserId: %w", err)
+	}
+
+	return newProfile, nil
 }
 
-func (h *ProfileRepository) GetOrCreateDefaultProfile(dbUserID int) (*Profile, error) {
-	return h.GetOrCreateDefaultProfileWithBio(dbUserID, "")
+func (r *ProfileRepository) GetOrCreate(userID int) (*Profile, error) {
+	return r.GetOrCreateWithBio(userID, "")
+}
+
+// GetByUserID retrieves a profile by user ID
+func (r *ProfileRepository) getByUserID(userID int) (*Profile, error) {
+	query := `
+		SELECT id, user_id, bio, published_message_id, created_at, updated_at
+		FROM profiles
+		WHERE user_id = $1`
+
+	var profile Profile
+	err := r.db.QueryRow(query, userID).Scan(
+		&profile.ID,
+		&profile.UserID,
+		&profile.Bio,
+		&profile.PublishedMessageID,
+		&profile.CreatedAt,
+		&profile.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, sql.ErrNoRows
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get profile for user with ID %d: %w", userID, err)
+	}
+
+	return &profile, nil
 }

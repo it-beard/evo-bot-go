@@ -39,3 +39,20 @@ const (
 	AdminProfilesStartCallback  = AdminProfilesPrefix + "start"
 	AdminProfilesCancelCallback = AdminProfilesPrefix + "cancel"
 )
+
+// Try Create Coffee Pool Handler callback constants
+const (
+	TryCreateCoffeePoolCommand         = "tryCreateCoffeePool"
+	TryCreateCoffeePoolPrefix          = "try_create_coffee_pool_"
+	TryCreateCoffeePoolConfirmCallback = TryCreateCoffeePoolPrefix + "confirm"
+	TryCreateCoffeePoolCancelCallback  = TryCreateCoffeePoolPrefix + "cancel"
+)
+
+// Try Generate Coffee Pairs Handler callback constants
+const (
+	TryGenerateCoffeePairsCommand         = "tryGenerateCoffeePairs"
+	TryGenerateCoffeePairsPrefix          = "try_generate_coffee_pairs_"
+	TryGenerateCoffeePairsConfirmCallback = TryGenerateCoffeePairsPrefix + "confirm"
+	TryGenerateCoffeePairsBackCallback    = TryGenerateCoffeePairsPrefix + "back"
+	TryGenerateCoffeePairsCancelCallback  = TryGenerateCoffeePairsPrefix + "cancel"
+)
