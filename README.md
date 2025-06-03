@@ -20,10 +20,11 @@ A Telegram bot for Evocoders Club management implemented in Go. Helps moderate d
   - Manual trigger with `/summarize` (admin-only)
 
 ### 🎲 Weekly Random Coffee Meetings
-- **Automated Participation Poll**: Every week (configurable day and time in UTC, defaults to Friday at 5 PM UTC), the bot posts a poll asking members if they want to participate in random coffee meetings for the following week.
+- **Automated Participation Poll**: Every week (configurable day and time in UTC, defaults to Friday at 2 PM UTC), the bot posts a poll asking members if they want to participate in random coffee meetings for the following week.
 - **Opt-in/Opt-out**: Members can easily indicate their availability by responding to the poll. Votes can be changed or retracted before pairs are made.
-- **Admin-Triggered Pairing**: An administrator can trigger the pairing process using the `/pair_meetings` command (typically on Monday).
-- **Random Pair Announcement**: Once triggered, the bot randomly pairs participating members and announces the pairs in the main chat.
+- **Automated Pairing**: The bot automatically generates and announces pairs on a scheduled basis (configurable day and time in UTC, defaults to Monday at 12 PM UTC).
+- **Manual Pairing**: An administrator can also manually trigger the pairing process using the `/pair_meetings` command.
+- **Random Pair Announcement**: The bot randomly pairs participating members and announces the pairs in the main chat.
 - **Self-Managed Meetings**: Paired members are encouraged to contact each other to arrange the day, time, and format of their meeting.
 
 ### User Profile Management
@@ -66,6 +67,8 @@ The bot uses PostgreSQL with automatically initialized tables:
 | **profiles** | Stores user profile data | `id`, `user_id`, `bio`, `published_message_id`, `created_at`, `updated_at` |
 | **events** | Stores event information | `id`, `name`, `type`, `status`, `started_at`, `created_at`, `updated_at` |
 | **topics** | Stores topics related to events | `id`, `topic`, `user_nickname`, `event_id`, `created_at` |
+| **random_coffee_polls** | Stores random coffee poll information | `id`, `message_id`, `telegram_poll_id`, `week_start_date`, `created_at` |
+| **random_coffee_participants** | Stores poll participants data | `id`, `poll_id`, `user_id`, `participating`, `updated_at` |
 | **migrations** | Tracks database migrations | `id`, `name`, `timestamp`, `created_at` |
 
 ## Building the Executable
@@ -132,9 +135,15 @@ The bot uses environment variables for configuration, make sure to set them all:
 - `TG_EVO_BOT_SUMMARY_TOPIC_ID`: Topic ID where daily summaries will be posted
 - `TG_EVO_BOT_SUMMARY_TIME`: Time to run daily summary in 24-hour format (e.g., `03:00` for 3 AM)
 - `TG_EVO_BOT_SUMMARIZATION_TASK_ENABLED`: Enable or disable the daily summarization task (`true` or `false`, defaults to `true` if not specified)
-- `TG_EVO_BOT_MEETING_POLL_TASK_ENABLED`: Enable or disable the weekly meeting poll task (`true` or `false`, defaults to `true` if not specified)
-- `TG_EVO_BOT_MEETING_POLL_TIME`: Time to send the weekly meeting poll in 24-hour format UTC (e.g., `17:00` for 5 PM UTC, defaults to `17:00` if not specified)
-- `TG_EVO_BOT_MEETING_POLL_DAY`: Day of the week to send the poll (e.g., `friday`, `monday`, etc., defaults to `friday` if not specified)
+
+### Random Coffee Feature
+- `TG_EVO_BOT_RANDOM_COFFEE_TOPIC_ID`: Topic ID where random coffee polls and pairs will be posted
+- `TG_EVO_BOT_RANDOM_COFFEE_POLL_TASK_ENABLED`: Enable or disable the weekly coffee poll task (`true` or `false`, defaults to `true` if not specified)
+- `TG_EVO_BOT_RANDOM_COFFEE_POLL_TIME`: Time to send the weekly coffee poll in 24-hour format UTC (e.g., `14:00` for 2 PM UTC, defaults to `14:00` if not specified)
+- `TG_EVO_BOT_RANDOM_COFFEE_POLL_DAY`: Day of the week to send the poll (e.g., `friday`, `monday`, etc., defaults to `friday` if not specified)
+- `TG_EVO_BOT_RANDOM_COFFEE_PAIRS_TASK_ENABLED`: Enable or disable the automatic pairs generation task (`true` or `false`, defaults to `true` if not specified)
+- `TG_EVO_BOT_RANDOM_COFFEE_PAIRS_TIME`: Time to generate and announce coffee pairs in 24-hour format UTC (e.g., `12:00` for 12 PM UTC, defaults to `12:00` if not specified)
+- `TG_EVO_BOT_RANDOM_COFFEE_PAIRS_DAY`: Day of the week to generate pairs (e.g., `monday`, `tuesday`, etc., defaults to `monday` if not specified)
 
 On Windows, you can set the environment variables using the following commands in Command Prompt:
 
@@ -167,10 +176,14 @@ set TG_EVO_BOT_SUMMARY_TOPIC_ID=3
 set TG_EVO_BOT_SUMMARY_TIME=03:00
 set TG_EVO_BOT_SUMMARIZATION_TASK_ENABLED=true
 
-# Weekly Meeting Poll Feature
-set TG_EVO_BOT_MEETING_POLL_TASK_ENABLED=true
-set TG_EVO_BOT_MEETING_POLL_TIME=17:00
-set TG_EVO_BOT_MEETING_POLL_DAY=friday
+# Random Coffee Feature
+set TG_EVO_BOT_RANDOM_COFFEE_TOPIC_ID=random_coffee_topic_id
+set TG_EVO_BOT_RANDOM_COFFEE_POLL_TASK_ENABLED=true
+set TG_EVO_BOT_RANDOM_COFFEE_POLL_TIME=14:00
+set TG_EVO_BOT_RANDOM_COFFEE_POLL_DAY=friday
+set TG_EVO_BOT_RANDOM_COFFEE_PAIRS_TASK_ENABLED=true
+set TG_EVO_BOT_RANDOM_COFFEE_PAIRS_TIME=12:00
+set TG_EVO_BOT_RANDOM_COFFEE_PAIRS_DAY=monday
 ```
 
 Then run the executable.

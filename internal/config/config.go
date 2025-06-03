@@ -44,6 +44,10 @@ type Config struct {
 	RandomCoffeePollTaskEnabled bool
 	RandomCoffeePollTime        time.Time
 	RandomCoffeePollDay         time.Weekday
+
+	RandomCoffeePairsTaskEnabled bool
+	RandomCoffeePairsTime        time.Time
+	RandomCoffeePairsDay         time.Weekday
 }
 
 // LoadConfig loads the configuration from environment variables
@@ -276,6 +280,59 @@ func LoadConfig() (*Config, error) {
 			config.RandomCoffeePollDay = time.Saturday
 		default:
 			return nil, fmt.Errorf("invalid random coffee poll day: %s (valid values: sunday, monday, tuesday, wednesday, thursday, friday, saturday)", randomCoffeePollDayStr)
+		}
+	}
+
+	// Random Coffee Pairs Feature
+	randomCoffeePairsTaskEnabledStr := os.Getenv("TG_EVO_BOT_RANDOM_COFFEE_PAIRS_TASK_ENABLED")
+	if randomCoffeePairsTaskEnabledStr == "" {
+		// Default to enabled if not specified
+		config.RandomCoffeePairsTaskEnabled = true
+	} else {
+		randomCoffeePairsTaskEnabled, err := strconv.ParseBool(randomCoffeePairsTaskEnabledStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid random coffee pairs task enabled value: %s", randomCoffeePairsTaskEnabledStr)
+		}
+		config.RandomCoffeePairsTaskEnabled = randomCoffeePairsTaskEnabled
+	}
+
+	// Pairs generation time
+	randomCoffeePairsTimeStr := os.Getenv("TG_EVO_BOT_RANDOM_COFFEE_PAIRS_TIME")
+	if randomCoffeePairsTimeStr == "" {
+		// Default to 12:00 PM if not specified
+		randomCoffeePairsTimeStr = "12:00"
+	}
+
+	// Parse the time in 24-hour format
+	randomCoffeePairsTime, err := time.Parse("15:04", randomCoffeePairsTimeStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid random coffee pairs time format: %s", randomCoffeePairsTimeStr)
+	}
+	config.RandomCoffeePairsTime = randomCoffeePairsTime
+
+	// Pairs generation day
+	randomCoffeePairsDayStr := os.Getenv("TG_EVO_BOT_RANDOM_COFFEE_PAIRS_DAY")
+	if randomCoffeePairsDayStr == "" {
+		// Default to Monday if not specified
+		config.RandomCoffeePairsDay = time.Monday
+	} else {
+		switch strings.ToLower(randomCoffeePairsDayStr) {
+		case "sunday":
+			config.RandomCoffeePairsDay = time.Sunday
+		case "monday":
+			config.RandomCoffeePairsDay = time.Monday
+		case "tuesday":
+			config.RandomCoffeePairsDay = time.Tuesday
+		case "wednesday":
+			config.RandomCoffeePairsDay = time.Wednesday
+		case "thursday":
+			config.RandomCoffeePairsDay = time.Thursday
+		case "friday":
+			config.RandomCoffeePairsDay = time.Friday
+		case "saturday":
+			config.RandomCoffeePairsDay = time.Saturday
+		default:
+			return nil, fmt.Errorf("invalid random coffee pairs day: %s (valid values: sunday, monday, tuesday, wednesday, thursday, friday, saturday)", randomCoffeePairsDayStr)
 		}
 	}
 

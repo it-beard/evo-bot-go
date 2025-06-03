@@ -105,6 +105,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 		tasks.NewSessionKeepAliveTask(30 * time.Minute),
 		tasks.NewDailySummarizationTask(appConfig, summarizationService),
 		tasks.NewRandomCoffeePollTask(appConfig, randomCoffeeService),
+		tasks.NewRandomCoffeePairsTask(appConfig, randomCoffeeService),
 	}
 
 	// Create bot client
