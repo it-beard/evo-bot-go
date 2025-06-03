@@ -49,3 +49,21 @@ func (s *PollSenderService) SendPoll(
 	)
 	return sentPollMsg, nil
 }
+
+// StopPoll stops a poll in the specified chat
+func (s *PollSenderService) StopPoll(
+	chatID int64,
+	messageID int64,
+	options *gotgbot.StopPollOpts,
+) (*gotgbot.Poll, error) {
+	log.Printf("Poll Sender Service: Stopping poll in chat ID %d, message ID %d", chatID, messageID)
+
+	stoppedPoll, err := s.bot.StopPoll(chatID, messageID, options)
+	if err != nil {
+		log.Printf("Poll Sender Service: Failed to stop poll: %v", err)
+		return nil, err
+	}
+
+	log.Printf("Poll Sender Service: Poll stopped successfully. Poll ID: %s", stoppedPoll.Id)
+	return stoppedPoll, nil
+}

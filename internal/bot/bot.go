@@ -92,7 +92,13 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 		appConfig, openaiClient, messageSenderService, promptingTemplateRepository,
 	)
 	randomCoffeeService := services.NewRandomCoffeeService(
-		appConfig, pollSenderService, randomCoffeePollRepository)
+		appConfig,
+		pollSenderService,
+		messageSenderService,
+		randomCoffeePollRepository,
+		randomCoffeeParticipantRepository,
+		profileRepository,
+	)
 
 	// Initialize scheduled tasks
 	scheduledTasks := []tasks.Task{
@@ -154,16 +160,70 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 
 	// Register admin chat handlers
 	adminHandlers := []ext.Handler{
-		adminhandlers.NewCodeHandler(deps.AppConfig, deps.MessageSenderService, deps.PermissionsService),
-		adminhandlers.NewShowTopicsHandler(deps.AppConfig, deps.TopicRepository, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
-		adminhandlers.NewAdminProfilesHandler(deps.AppConfig, deps.MessageSenderService, deps.PermissionsService, deps.UserRepository, deps.ProfileRepository),
-		eventhandlers.NewEventEditHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
-		eventhandlers.NewEventSetupHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
-		eventhandlers.NewEventDeleteHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
-		eventhandlers.NewEventStartHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
-		testhandlers.NewTrySummarizeHandler(deps.AppConfig, deps.SummarizationService, deps.MessageSenderService, deps.PermissionsService),
-		testhandlers.NewTryGenerateCoffeePairsHandler(deps.AppConfig, deps.PermissionsService, deps.MessageSenderService, deps.RandomCoffeePollRepository, deps.RandomCoffeeParticipantRepository, deps.ProfileRepository),
-		testhandlers.NewTryCreateCoffeePoolHandler(deps.AppConfig, deps.MessageSenderService, deps.PermissionsService, deps.RandomCoffeeService),
+		adminhandlers.NewCodeHandler(
+			deps.AppConfig,
+			deps.MessageSenderService,
+			deps.PermissionsService,
+		),
+		adminhandlers.NewShowTopicsHandler(
+			deps.AppConfig,
+			deps.TopicRepository,
+			deps.EventRepository,
+			deps.MessageSenderService,
+			deps.PermissionsService,
+		),
+		adminhandlers.NewAdminProfilesHandler(
+			deps.AppConfig,
+			deps.MessageSenderService,
+			deps.PermissionsService,
+			deps.UserRepository,
+			deps.ProfileRepository,
+		),
+		eventhandlers.NewEventEditHandler(
+			deps.AppConfig,
+			deps.EventRepository,
+			deps.MessageSenderService,
+			deps.PermissionsService,
+		),
+		eventhandlers.NewEventSetupHandler(
+			deps.AppConfig,
+			deps.EventRepository,
+			deps.MessageSenderService,
+			deps.PermissionsService,
+		),
+		eventhandlers.NewEventDeleteHandler(
+			deps.AppConfig,
+			deps.EventRepository,
+			deps.MessageSenderService,
+			deps.PermissionsService,
+		),
+		eventhandlers.NewEventStartHandler(
+			deps.AppConfig,
+			deps.EventRepository,
+			deps.MessageSenderService,
+			deps.PermissionsService,
+		),
+		testhandlers.NewTrySummarizeHandler(
+			deps.AppConfig,
+			deps.SummarizationService,
+			deps.MessageSenderService,
+			deps.PermissionsService,
+		),
+		testhandlers.NewTryGenerateCoffeePairsHandler(
+			deps.AppConfig,
+			deps.PermissionsService,
+			deps.MessageSenderService,
+			deps.RandomCoffeePollRepository,
+			deps.RandomCoffeeParticipantRepository,
+			deps.ProfileRepository,
+			deps.RandomCoffeeService,
+		),
+		testhandlers.NewTryCreateCoffeePoolHandler(
+			deps.AppConfig,
+			deps.MessageSenderService,
+			deps.PermissionsService,
+			deps.RandomCoffeeService,
+		),
 	}
 
 	// Register private chat handlers

@@ -9,9 +9,6 @@ import (
 	"evo-bot-go/internal/utils"
 	"fmt"
 	"log"
-	"math/rand"
-	"strings"
-	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -33,13 +30,14 @@ const (
 )
 
 type tryGenerateCoffeePairsHandler struct {
-	config          *config.Config
-	permissions     *services.PermissionsService
-	sender          *services.MessageSenderService
-	pollRepo        *repositories.RandomCoffeePollRepository
-	participantRepo *repositories.RandomCoffeeParticipantRepository
-	profileRepo     *repositories.ProfileRepository
-	userStore       *utils.UserDataStore
+	config              *config.Config
+	permissions         *services.PermissionsService
+	sender              *services.MessageSenderService
+	pollRepo            *repositories.RandomCoffeePollRepository
+	participantRepo     *repositories.RandomCoffeeParticipantRepository
+	profileRepo         *repositories.ProfileRepository
+	randomCoffeeService *services.RandomCoffeeService
+	userStore           *utils.UserDataStore
 }
 
 func NewTryGenerateCoffeePairsHandler(
@@ -49,15 +47,17 @@ func NewTryGenerateCoffeePairsHandler(
 	pollRepo *repositories.RandomCoffeePollRepository,
 	participantRepo *repositories.RandomCoffeeParticipantRepository,
 	profileRepo *repositories.ProfileRepository,
+	randomCoffeeService *services.RandomCoffeeService,
 ) ext.Handler {
 	h := &tryGenerateCoffeePairsHandler{
-		config:          config,
-		permissions:     permissions,
-		sender:          sender,
-		pollRepo:        pollRepo,
-		participantRepo: participantRepo,
-		profileRepo:     profileRepo,
-		userStore:       utils.NewUserDataStore(),
+		config:              config,
+		permissions:         permissions,
+		sender:              sender,
+		pollRepo:            pollRepo,
+		participantRepo:     participantRepo,
+		profileRepo:         profileRepo,
+		randomCoffeeService: randomCoffeeService,
+		userStore:           utils.NewUserDataStore(),
 	}
 
 	return handlers.NewConversation(
@@ -160,7 +160,7 @@ func (h *tryGenerateCoffeePairsHandler) handleConfirmCallback(b *gotgbot.Bot, ct
 	}
 
 	// Execute the pairs generation logic
-	err = h.generateAndSendPairs()
+	err = h.randomCoffeeService.GenerateAndSendPairs()
 	if err != nil {
 		h.RemovePreviousMessage(b, &userId)
 
@@ -200,72 +200,6 @@ func (h *tryGenerateCoffeePairsHandler) handleConfirmCallback(b *gotgbot.Bot, ct
 
 	h.userStore.Clear(userId)
 	return handlers.EndConversation()
-}
-
-// Generate pairs and send them to the supergroup
-func (h *tryGenerateCoffeePairsHandler) generateAndSendPairs() error {
-	latestPoll, err := h.pollRepo.GetLatestPoll()
-	if err != nil {
-		return fmt.Errorf("error getting latest poll: %w", err)
-	}
-	if latestPoll == nil {
-		return fmt.Errorf("опрос для рандом кофе не найден")
-	}
-
-	participants, err := h.participantRepo.GetParticipatingUsers(latestPoll.ID)
-	if err != nil {
-		return fmt.Errorf("error getting participants for poll ID %d: %w", latestPoll.ID, err)
-	}
-
-	if len(participants) < 2 {
-		return fmt.Errorf("недостаточно участников для создания пар (нужно минимум 2, зарегистрировалось %d)", len(participants))
-	}
-
-	// Random Pairing Logic
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	r.Shuffle(len(participants), func(i, j int) {
-		participants[i], participants[j] = participants[j], participants[i]
-	})
-
-	var pairsText []string
-	var unpairedUserText string
-
-	for i := 0; i < len(participants); i += 2 {
-		user1 := participants[i]
-		user1Display := h.formatUserDisplay(&user1)
-
-		if i+1 < len(participants) {
-			user2 := participants[i+1]
-			user2Display := h.formatUserDisplay(&user2)
-			pairsText = append(pairsText, fmt.Sprintf("%s x %s", user1Display, user2Display))
-		} else {
-			unpairedUserText = user1Display
-		}
-	}
-
-	var messageBuilder strings.Builder
-	messageBuilder.WriteString(fmt.Sprintf("☕️ Пары для рандом кофе (неделя %s):\n\n", latestPoll.WeekStartDate.Format("Mon, Jan 2")))
-	for _, pair := range pairsText {
-		messageBuilder.WriteString(fmt.Sprintf("➪ %s\n", pair))
-	}
-	if unpairedUserText != "" {
-		messageBuilder.WriteString(fmt.Sprintf("\n😔 %s ищет кофе-компаньона на эту неделю!\n", unpairedUserText))
-	}
-	messageBuilder.WriteString("\n🗓 День, время и формат встречи вы выбираете сами. Просто напиши партнеру в личку, когда и в каком формате тебе удобно встретиться.")
-
-	// Send the pairing message
-	chatID := utils.ChatIdToFullChatId(h.config.SuperGroupChatID)
-	opts := &gotgbot.SendMessageOpts{
-		MessageThreadId: int64(h.config.RandomCoffeeTopicID),
-	}
-
-	err = h.sender.SendHtml(chatID, messageBuilder.String(), opts)
-	if err != nil {
-		return fmt.Errorf("error sending pairing message to chat %d: %w", chatID, err)
-	}
-
-	log.Printf("TryGenerateCoffeePairsHandler: Successfully sent pairings for poll ID %d to chat %d.", latestPoll.ID, h.config.SuperGroupChatID)
-	return nil
 }
 
 func (h *tryGenerateCoffeePairsHandler) handleBackCallback(b *gotgbot.Bot, ctx *ext.Context) error {
@@ -325,44 +259,4 @@ func (h *tryGenerateCoffeePairsHandler) SavePreviousMessageInfo(userID int64, se
 		tryGenerateCoffeePairsCtxDataKeyPreviousMessageID,
 		tryGenerateCoffeePairsCtxDataKeyPreviousChatID,
 	)
-}
-
-// formatUserDisplay formats user display based on whether they have a published profile
-func (h *tryGenerateCoffeePairsHandler) formatUserDisplay(user *repositories.User) string {
-	// Get user profile to check if it's published
-	profile, err := h.profileRepo.GetOrCreate(user.ID)
-	if err != nil {
-		log.Printf("TryGenerateCoffeePairsHandler: Error getting profile for user %d: %v", user.ID, err)
-		// Fallback to username only
-		if user.TgUsername != "" {
-			return fmt.Sprintf("@%s", user.TgUsername)
-		}
-		return user.Firstname
-	}
-
-	// Check if profile is published (has published_message_id)
-	hasPublishedProfile := profile.PublishedMessageID.Valid && profile.PublishedMessageID.Int64 > 0
-
-	if hasPublishedProfile {
-		// Show full name with username for published profiles, wrap name in link
-		fullName := user.Firstname
-		if user.Lastname != "" {
-			fullName += " " + user.Lastname
-		}
-
-		// Get link to the published profile post
-		profileLink := utils.GetIntroMessageLink(h.config, profile.PublishedMessageID.Int64)
-		linkedName := fmt.Sprintf("<a href=\"%s\">%s</a>", profileLink, fullName)
-
-		if user.TgUsername != "" {
-			return fmt.Sprintf("%s (@%s)", linkedName, user.TgUsername)
-		}
-		return linkedName
-	} else {
-		// Show only username for unpublished profiles
-		if user.TgUsername != "" {
-			return fmt.Sprintf("@%s", user.TgUsername)
-		}
-		return user.Firstname
-	}
 }
