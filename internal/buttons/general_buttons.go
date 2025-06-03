@@ -50,3 +50,22 @@ func ConfirmAndCancelButton(callbackDataYes string, callbackDataNo string) gotgb
 
 	return inlineKeyboard
 }
+
+func BackAndCancelButton(callbackDataBack string, callbackDataCancel string) gotgbot.InlineKeyboardMarkup {
+	inlineKeyboard := gotgbot.InlineKeyboardMarkup{
+		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
+			{
+				{
+					Text:         "◀️ Назад",
+					CallbackData: callbackDataBack,
+				},
+				{
+					Text:         "❌ Отмена",
+					CallbackData: callbackDataCancel,
+				},
+			},
+		},
+	}
+
+	return inlineKeyboard
+}

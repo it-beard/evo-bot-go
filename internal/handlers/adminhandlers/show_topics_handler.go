@@ -88,6 +88,8 @@ func (h *showTopicsHandler) startShowTopics(b *gotgbot.Bot, ctx *ext.Context) er
 
 	// Check if user has admin permissions and is in a private chat
 	if !h.permissionsService.CheckAdminAndPrivateChat(msg, constants.ShowTopicsCommand) {
+		log.Printf("ShowTopicsHandler: User %d (%s) tried to use /%s without admin permissions.",
+			ctx.EffectiveUser.Id, ctx.EffectiveUser.Username, constants.ShowTopicsCommand)
 		return handlers.EndConversation()
 	}
 

@@ -80,7 +80,7 @@ func (s *DailySummarizationTask) run() {
 
 // calculateNextRun calculates the next run time
 func (s *DailySummarizationTask) calculateNextRun() time.Time {
-	now := time.Now()
+	now := time.Now().UTC()
 
 	// Get the configured hour and minute
 	targetHour := s.config.SummaryTime.Hour()

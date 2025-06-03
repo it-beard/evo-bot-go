@@ -125,7 +125,7 @@ func (h *startHandler) handleCallbackHelp(b *gotgbot.Bot, ctx *ext.Context) erro
 
 	user := ctx.EffectiveUser
 	isAdmin := utils.IsUserAdminOrCreator(b, user.Id, h.config)
-	helpText := formatters.FormatHelpMessage(isAdmin)
+	helpText := formatters.FormatHelpMessage(isAdmin, h.config)
 
 	h.messageSenderService.ReplyHtml(ctx.EffectiveMessage, helpText, nil)
 

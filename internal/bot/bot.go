@@ -11,6 +11,7 @@ import (
 	"evo-bot-go/internal/handlers"
 	"evo-bot-go/internal/handlers/adminhandlers"
 	"evo-bot-go/internal/handlers/adminhandlers/eventhandlers"
+	"evo-bot-go/internal/handlers/adminhandlers/testhandlers"
 	"evo-bot-go/internal/handlers/grouphandlers"
 	"evo-bot-go/internal/handlers/privatehandlers"
 	"evo-bot-go/internal/handlers/privatehandlers/topicshandlers"
@@ -23,16 +24,19 @@ import (
 
 // HandlerDependencies contains all dependencies needed by handlers
 type HandlerDependencies struct {
-	OpenAiClient                *clients.OpenAiClient
-	AppConfig                   *config.Config
-	SummarizationService        *services.SummarizationService
-	MessageSenderService        *services.MessageSenderService
-	PermissionsService          *services.PermissionsService
-	EventRepository             *repositories.EventRepository
-	TopicRepository             *repositories.TopicRepository
-	PromptingTemplateRepository *repositories.PromptingTemplateRepository
-	UserRepository              *repositories.UserRepository
-	ProfileRepository           *repositories.ProfileRepository
+	OpenAiClient                      *clients.OpenAiClient
+	AppConfig                         *config.Config
+	SummarizationService              *services.SummarizationService
+	RandomCoffeeService               *services.RandomCoffeeService
+	MessageSenderService              *services.MessageSenderService
+	PermissionsService                *services.PermissionsService
+	EventRepository                   *repositories.EventRepository
+	TopicRepository                   *repositories.TopicRepository
+	PromptingTemplateRepository       *repositories.PromptingTemplateRepository
+	UserRepository                    *repositories.UserRepository
+	ProfileRepository                 *repositories.ProfileRepository
+	RandomCoffeePollRepository        *repositories.RandomCoffeePollRepository
+	RandomCoffeeParticipantRepository *repositories.RandomCoffeeParticipantRepository
 }
 
 // TgBotClient represents a Telegram bot client with all required dependencies
@@ -77,17 +81,31 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	promptingTemplateRepository := repositories.NewPromptingTemplateRepository(db.DB)
 	userRepository := repositories.NewUserRepository(db.DB)
 	profileRepository := repositories.NewProfileRepository(db.DB)
+	randomCoffeePollRepository := repositories.NewRandomCoffeePollRepository(db.DB)
+	randomCoffeeParticipantRepository := repositories.NewRandomCoffeeParticipantRepository(db.DB)
+
 	// Initialize services
 	messageSenderService := services.NewMessageSenderService(bot)
+	pollSenderService := services.NewPollSenderService(bot)
 	permissionsService := services.NewPermissionsService(appConfig, bot, messageSenderService)
 	summarizationService := services.NewSummarizationService(
 		appConfig, openaiClient, messageSenderService, promptingTemplateRepository,
+	)
+	randomCoffeeService := services.NewRandomCoffeeService(
+		appConfig,
+		pollSenderService,
+		messageSenderService,
+		randomCoffeePollRepository,
+		randomCoffeeParticipantRepository,
+		profileRepository,
 	)
 
 	// Initialize scheduled tasks
 	scheduledTasks := []tasks.Task{
 		tasks.NewSessionKeepAliveTask(30 * time.Minute),
 		tasks.NewDailySummarizationTask(appConfig, summarizationService),
+		tasks.NewRandomCoffeePollTask(appConfig, randomCoffeeService),
+		tasks.NewRandomCoffeePairsTask(appConfig, randomCoffeeService),
 	}
 
 	// Create bot client
@@ -101,16 +119,19 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 
 	// Create dependencies container
 	deps := &HandlerDependencies{
-		OpenAiClient:                openaiClient,
-		AppConfig:                   appConfig,
-		SummarizationService:        summarizationService,
-		MessageSenderService:        messageSenderService,
-		PermissionsService:          permissionsService,
-		EventRepository:             eventRepository,
-		TopicRepository:             topicRepository,
-		PromptingTemplateRepository: promptingTemplateRepository,
-		UserRepository:              userRepository,
-		ProfileRepository:           profileRepository,
+		OpenAiClient:                      openaiClient,
+		AppConfig:                         appConfig,
+		SummarizationService:              summarizationService,
+		RandomCoffeeService:               randomCoffeeService,
+		MessageSenderService:              messageSenderService,
+		PermissionsService:                permissionsService,
+		EventRepository:                   eventRepository,
+		TopicRepository:                   topicRepository,
+		PromptingTemplateRepository:       promptingTemplateRepository,
+		UserRepository:                    userRepository,
+		ProfileRepository:                 profileRepository,
+		RandomCoffeePollRepository:        randomCoffeePollRepository,
+		RandomCoffeeParticipantRepository: randomCoffeeParticipantRepository,
 	}
 
 	// Register all handlers
@@ -140,14 +161,70 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 
 	// Register admin chat handlers
 	adminHandlers := []ext.Handler{
-		adminhandlers.NewCodeHandler(deps.AppConfig, deps.MessageSenderService, deps.PermissionsService),
-		adminhandlers.NewTrySummarizeHandler(deps.AppConfig, deps.SummarizationService, deps.MessageSenderService, deps.PermissionsService),
-		adminhandlers.NewShowTopicsHandler(deps.AppConfig, deps.TopicRepository, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
-		adminhandlers.NewAdminProfilesHandler(deps.AppConfig, deps.MessageSenderService, deps.PermissionsService, deps.UserRepository, deps.ProfileRepository),
-		eventhandlers.NewEventEditHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
-		eventhandlers.NewEventSetupHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
-		eventhandlers.NewEventDeleteHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
-		eventhandlers.NewEventStartHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
+		adminhandlers.NewCodeHandler(
+			deps.AppConfig,
+			deps.MessageSenderService,
+			deps.PermissionsService,
+		),
+		adminhandlers.NewShowTopicsHandler(
+			deps.AppConfig,
+			deps.TopicRepository,
+			deps.EventRepository,
+			deps.MessageSenderService,
+			deps.PermissionsService,
+		),
+		adminhandlers.NewAdminProfilesHandler(
+			deps.AppConfig,
+			deps.MessageSenderService,
+			deps.PermissionsService,
+			deps.UserRepository,
+			deps.ProfileRepository,
+		),
+		eventhandlers.NewEventEditHandler(
+			deps.AppConfig,
+			deps.EventRepository,
+			deps.MessageSenderService,
+			deps.PermissionsService,
+		),
+		eventhandlers.NewEventSetupHandler(
+			deps.AppConfig,
+			deps.EventRepository,
+			deps.MessageSenderService,
+			deps.PermissionsService,
+		),
+		eventhandlers.NewEventDeleteHandler(
+			deps.AppConfig,
+			deps.EventRepository,
+			deps.MessageSenderService,
+			deps.PermissionsService,
+		),
+		eventhandlers.NewEventStartHandler(
+			deps.AppConfig,
+			deps.EventRepository,
+			deps.MessageSenderService,
+			deps.PermissionsService,
+		),
+		testhandlers.NewTrySummarizeHandler(
+			deps.AppConfig,
+			deps.SummarizationService,
+			deps.MessageSenderService,
+			deps.PermissionsService,
+		),
+		testhandlers.NewTryGenerateCoffeePairsHandler(
+			deps.AppConfig,
+			deps.PermissionsService,
+			deps.MessageSenderService,
+			deps.RandomCoffeePollRepository,
+			deps.RandomCoffeeParticipantRepository,
+			deps.ProfileRepository,
+			deps.RandomCoffeeService,
+		),
+		testhandlers.NewTryCreateCoffeePoolHandler(
+			deps.AppConfig,
+			deps.MessageSenderService,
+			deps.PermissionsService,
+			deps.RandomCoffeeService,
+		),
 	}
 
 	// Register private chat handlers
@@ -167,6 +244,7 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 		grouphandlers.NewDeleteJoinLeftMessagesHandler(),
 		grouphandlers.NewRepliesFromClosedThreadsHandler(deps.AppConfig, deps.MessageSenderService),
 		grouphandlers.NewCleanClosedThreadsHandler(deps.AppConfig, deps.MessageSenderService),
+		grouphandlers.NewRandomCoffeePollAnswerHandler(deps.AppConfig, deps.UserRepository, deps.RandomCoffeePollRepository, deps.RandomCoffeeParticipantRepository, deps.MessageSenderService),
 	}
 
 	// Combine all handlers
@@ -199,6 +277,7 @@ func (b *TgBotClient) Start() {
 	}
 
 	log.Printf("Bot Runner: Bot @%s has been started successfully\n", b.bot.User.Username)
+	log.Printf("Bot Runner: Current server time is %s (UTC: %s)", time.Now(), time.Now().UTC())
 	b.updater.Idle()
 }
 

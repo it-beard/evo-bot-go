@@ -47,7 +47,7 @@ func (h *helpHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 
 	user := ctx.EffectiveUser
 	isAdmin := utils.IsUserAdminOrCreator(b, user.Id, h.config)
-	helpText := formatters.FormatHelpMessage(isAdmin)
+	helpText := formatters.FormatHelpMessage(isAdmin, h.config)
 
 	h.messageSenderService.ReplyHtml(msg, helpText, nil)
 

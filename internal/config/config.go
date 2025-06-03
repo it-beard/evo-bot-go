@@ -37,6 +37,17 @@ type Config struct {
 	SummaryTopicID           int
 	SummaryTime              time.Time
 	SummarizationTaskEnabled bool
+
+	// Random Coffee Feature
+	RandomCoffeeTopicID int
+
+	RandomCoffeePollTaskEnabled bool
+	RandomCoffeePollTime        time.Time
+	RandomCoffeePollDay         time.Weekday
+
+	RandomCoffeePairsTaskEnabled bool
+	RandomCoffeePairsTime        time.Time
+	RandomCoffeePairsDay         time.Weekday
 }
 
 // LoadConfig loads the configuration from environment variables
@@ -205,6 +216,124 @@ func LoadConfig() (*Config, error) {
 			return nil, fmt.Errorf("invalid summarization task enabled value: %s", summarizationTaskEnabledStr)
 		}
 		config.SummarizationTaskEnabled = summarizationTaskEnabled
+	}
+
+	// Random coffee topic ID
+	randomCoffeeTopicIDStr := os.Getenv("TG_EVO_BOT_RANDOM_COFFEE_TOPIC_ID")
+	if randomCoffeeTopicIDStr == "" {
+		return nil, fmt.Errorf("TG_EVO_BOT_RANDOM_COFFEE_TOPIC_ID environment variable is not set")
+	}
+
+	randomCoffeeTopicID, err := strconv.Atoi(randomCoffeeTopicIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid random coffee topic ID: %s", randomCoffeeTopicIDStr)
+	}
+	config.RandomCoffeeTopicID = randomCoffeeTopicID
+
+	// Random Coffee Poll Feature
+	randomCoffeePollTaskEnabledStr := os.Getenv("TG_EVO_BOT_RANDOM_COFFEE_POLL_TASK_ENABLED")
+	if randomCoffeePollTaskEnabledStr == "" {
+		// Default to enabled if not specified
+		config.RandomCoffeePollTaskEnabled = true
+	} else {
+		randomCoffeePollTaskEnabled, err := strconv.ParseBool(randomCoffeePollTaskEnabledStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid random coffee poll task enabled value: %s", randomCoffeePollTaskEnabledStr)
+		}
+		config.RandomCoffeePollTaskEnabled = randomCoffeePollTaskEnabled
+	}
+
+	// Meeting poll time
+	randomCoffeePollTimeStr := os.Getenv("TG_EVO_BOT_RANDOM_COFFEE_POLL_TIME")
+	if randomCoffeePollTimeStr == "" {
+		// Default to 2:00 PM if not specified
+		randomCoffeePollTimeStr = "14:00"
+	}
+
+	// Parse the time in 24-hour format
+	randomCoffeePollTime, err := time.Parse("15:04", randomCoffeePollTimeStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid random coffee poll time format: %s", randomCoffeePollTimeStr)
+	}
+	config.RandomCoffeePollTime = randomCoffeePollTime
+
+	// Meeting poll day
+	randomCoffeePollDayStr := os.Getenv("TG_EVO_BOT_RANDOM_COFFEE_POLL_DAY")
+	if randomCoffeePollDayStr == "" {
+		// Default to Friday if not specified
+		config.RandomCoffeePollDay = time.Friday
+	} else {
+		switch strings.ToLower(randomCoffeePollDayStr) {
+		case "sunday":
+			config.RandomCoffeePollDay = time.Sunday
+		case "monday":
+			config.RandomCoffeePollDay = time.Monday
+		case "tuesday":
+			config.RandomCoffeePollDay = time.Tuesday
+		case "wednesday":
+			config.RandomCoffeePollDay = time.Wednesday
+		case "thursday":
+			config.RandomCoffeePollDay = time.Thursday
+		case "friday":
+			config.RandomCoffeePollDay = time.Friday
+		case "saturday":
+			config.RandomCoffeePollDay = time.Saturday
+		default:
+			return nil, fmt.Errorf("invalid random coffee poll day: %s (valid values: sunday, monday, tuesday, wednesday, thursday, friday, saturday)", randomCoffeePollDayStr)
+		}
+	}
+
+	// Random Coffee Pairs Feature
+	randomCoffeePairsTaskEnabledStr := os.Getenv("TG_EVO_BOT_RANDOM_COFFEE_PAIRS_TASK_ENABLED")
+	if randomCoffeePairsTaskEnabledStr == "" {
+		// Default to enabled if not specified
+		config.RandomCoffeePairsTaskEnabled = true
+	} else {
+		randomCoffeePairsTaskEnabled, err := strconv.ParseBool(randomCoffeePairsTaskEnabledStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid random coffee pairs task enabled value: %s", randomCoffeePairsTaskEnabledStr)
+		}
+		config.RandomCoffeePairsTaskEnabled = randomCoffeePairsTaskEnabled
+	}
+
+	// Pairs generation time
+	randomCoffeePairsTimeStr := os.Getenv("TG_EVO_BOT_RANDOM_COFFEE_PAIRS_TIME")
+	if randomCoffeePairsTimeStr == "" {
+		// Default to 12:00 PM if not specified
+		randomCoffeePairsTimeStr = "12:00"
+	}
+
+	// Parse the time in 24-hour format
+	randomCoffeePairsTime, err := time.Parse("15:04", randomCoffeePairsTimeStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid random coffee pairs time format: %s", randomCoffeePairsTimeStr)
+	}
+	config.RandomCoffeePairsTime = randomCoffeePairsTime
+
+	// Pairs generation day
+	randomCoffeePairsDayStr := os.Getenv("TG_EVO_BOT_RANDOM_COFFEE_PAIRS_DAY")
+	if randomCoffeePairsDayStr == "" {
+		// Default to Monday if not specified
+		config.RandomCoffeePairsDay = time.Monday
+	} else {
+		switch strings.ToLower(randomCoffeePairsDayStr) {
+		case "sunday":
+			config.RandomCoffeePairsDay = time.Sunday
+		case "monday":
+			config.RandomCoffeePairsDay = time.Monday
+		case "tuesday":
+			config.RandomCoffeePairsDay = time.Tuesday
+		case "wednesday":
+			config.RandomCoffeePairsDay = time.Wednesday
+		case "thursday":
+			config.RandomCoffeePairsDay = time.Thursday
+		case "friday":
+			config.RandomCoffeePairsDay = time.Friday
+		case "saturday":
+			config.RandomCoffeePairsDay = time.Saturday
+		default:
+			return nil, fmt.Errorf("invalid random coffee pairs day: %s (valid values: sunday, monday, tuesday, wednesday, thursday, friday, saturday)", randomCoffeePairsDayStr)
+		}
 	}
 
 	return config, nil

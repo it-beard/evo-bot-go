@@ -10,6 +10,7 @@ import (
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -181,6 +182,8 @@ func (h *adminProfilesHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) e
 
 	// Check if user has admin permissions and is in a private chat
 	if !h.permissionsService.CheckAdminAndPrivateChat(msg, constants.AdminProfilesCommand) {
+		log.Printf("AdminProfilesHandler: User %d (%s) tried to use /%s without admin permissions.",
+			ctx.EffectiveUser.Id, ctx.EffectiveUser.Username, constants.AdminProfilesCommand)
 		return handlers.EndConversation()
 	}
 
@@ -373,7 +376,7 @@ func (h *adminProfilesHandler) handleCreateByTelegramIDInput(b *gotgbot.Bot, ctx
 	h.userStore.Set(userId, adminProfilesCtxDataKeyTelegramUsername, dbUser.TgUsername)
 
 	// Find or create the profile
-	profile, err := h.profileRepository.GetOrCreateDefaultProfile(dbUser.ID)
+	profile, err := h.profileRepository.GetOrCreate(dbUser.ID)
 	if err != nil {
 		_ = h.messageSenderService.Reply(msg,
 			"Произошла ошибка при получении или создании профиля.", nil)
@@ -430,7 +433,7 @@ func (h *adminProfilesHandler) handleSearchByUsernameInput(b *gotgbot.Bot, ctx *
 	h.userStore.Set(userId, adminProfilesCtxDataKeyTelegramUsername, dbUser.TgUsername)
 
 	// Find or create the profile
-	profile, err := h.profileRepository.GetOrCreateDefaultProfile(dbUser.ID)
+	profile, err := h.profileRepository.GetOrCreate(dbUser.ID)
 	if err != nil {
 		_ = h.messageSenderService.Reply(msg,
 			"Произошла ошибка при получении или создании профиля.", nil)
@@ -494,7 +497,7 @@ func (h *adminProfilesHandler) handleCreateByForwardedMessageInput(b *gotgbot.Bo
 	h.userStore.Set(userId, adminProfilesCtxDataKeyTelegramUsername, dbUser.TgUsername)
 
 	// Find or create the profile
-	profile, err := h.profileRepository.GetOrCreateDefaultProfileWithBio(dbUser.ID, msg.Text)
+	profile, err := h.profileRepository.GetOrCreateWithBio(dbUser.ID, msg.Text)
 	if err != nil {
 		_ = h.messageSenderService.Reply(msg,
 			"Произошла ошибка при создании профиля.", nil)
@@ -528,7 +531,7 @@ func (h *adminProfilesHandler) handleEditMenuCallback(b *gotgbot.Bot, ctx *ext.C
 		return fmt.Errorf("AdminProfilesHandler: failed to get user in handleEditMenuCallback: %w", err)
 	}
 
-	profile, err := h.profileRepository.GetByUserID(dbUserID)
+	profile, err := h.profileRepository.GetOrCreate(dbUserID)
 	if err != nil {
 		return fmt.Errorf("AdminProfilesHandler: failed to get profile in handleEditMenuCallback: %w", err)
 	}
@@ -594,7 +597,7 @@ func (h *adminProfilesHandler) handleSearchUserIDInput(b *gotgbot.Bot, ctx *ext.
 	h.userStore.Set(userId, adminProfilesCtxDataKeyTelegramUsername, dbUser.TgUsername)
 
 	// Find or create the profile
-	profile, err := h.profileRepository.GetOrCreateDefaultProfile(dbUser.ID)
+	profile, err := h.profileRepository.GetOrCreate(dbUser.ID)
 	if err != nil {
 		_ = h.messageSenderService.Reply(msg,
 			"Произошла ошибка при получении профиля.", nil)
@@ -673,7 +676,7 @@ func (h *adminProfilesHandler) handleSearchByFullNameInput(b *gotgbot.Bot, ctx *
 	h.userStore.Set(userId, adminProfilesCtxDataKeyTelegramUsername, user.TgUsername)
 
 	// Find or create the profile
-	profile, err := h.profileRepository.GetOrCreateDefaultProfile(user.ID)
+	profile, err := h.profileRepository.GetOrCreate(user.ID)
 	if err != nil {
 		_ = h.messageSenderService.Reply(msg,
 			"Произошла ошибка при получении профиля.", nil)
@@ -1256,9 +1259,11 @@ func (h *adminProfilesHandler) handleCancelCallback(b *gotgbot.Bot, ctx *ext.Con
 
 func (h *adminProfilesHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
+	userId := ctx.EffectiveUser.Id
 
-	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
-	_ = h.messageSenderService.Reply(msg, "Админ-сессия работы с профилями завершена.", nil)
+	h.RemovePreviousMessage(b, &userId)
+	_ = h.messageSenderService.Send(
+		msg.Chat.Id, "Админ-сессия работы с профилями завершена.", nil)
 	h.userStore.Clear(ctx.EffectiveUser.Id)
 
 	return handlers.EndConversation()
