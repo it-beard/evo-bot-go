@@ -21,12 +21,12 @@ import (
 
 const (
 	// Conversation states
-	profileStateViewOptions            = "profile_state_view_options"
-	profileStateEditMyProfile          = "profile_state_edit_my_profile"
-	profileStateAwaitUsernameForSearch = "profile_state_await_username_for_search"
-	profileStateAwaitBio               = "profile_state_await_bio"
-	profileStateAwaitFirstname         = "profile_state_await_firstname"
-	profileStateAwaitLastname          = "profile_state_await_lastname"
+	profileStateViewOptions         = "profile_state_view_options"
+	profileStateEditMyProfile       = "profile_state_edit_my_profile"
+	profileStateAwaitQueryForSearch = "profile_state_await_query_for_search"
+	profileStateAwaitBio            = "profile_state_await_bio"
+	profileStateAwaitFirstname      = "profile_state_await_firstname"
+	profileStateAwaitLastname       = "profile_state_await_lastname"
 
 	// UserStore keys
 	profileCtxDataKeyField                   = "profile_ctx_data_field"
@@ -83,8 +83,8 @@ func NewProfileHandler(
 				handlers.NewCallback(callbackquery.Equal(constants.ProfileEditMyProfileCallback), h.handleCallback),
 				handlers.NewCallback(callbackquery.Equal(constants.ProfilePublishCallback), h.handleCallback),
 			},
-			profileStateAwaitUsernameForSearch: {
-				handlers.NewMessage(message.Text, h.handleUsernameInput),
+			profileStateAwaitQueryForSearch: {
+				handlers.NewMessage(message.Text, h.handleSearchInput),
 				handlers.NewCallback(callbackquery.Equal(constants.ProfileStartCallback), h.handleCallback),
 				handlers.NewCallback(callbackquery.Equal(constants.ProfileFullCancel), h.handleCallbackCancel),
 			},
@@ -118,7 +118,7 @@ func NewProfileHandler(
 }
 
 func (h *profileHandler) showProfileMenu(b *gotgbot.Bot, msg *gotgbot.Message, userId int64) error {
-	h.RemovePreviouseMessage(b, &userId)
+	h.RemovePreviousMessage(b, &userId)
 
 	profileTextAdditional := ""
 	dbUser, err := h.userRepository.GetByTelegramID(userId)
@@ -228,7 +228,7 @@ func (h *profileHandler) handleViewMyProfile(b *gotgbot.Bot, ctx *ext.Context, m
 		return fmt.Errorf("ProfileHandler: failed to send message in handleViewMyProfile: %w", err)
 	}
 
-	h.RemovePreviouseMessage(b, &user.Id)
+	h.RemovePreviousMessage(b, &user.Id)
 	h.SavePreviousMessageInfo(user.Id, editedMsg)
 	return handlers.NextConversationState(profileStateViewOptions)
 }
@@ -236,7 +236,7 @@ func (h *profileHandler) handleViewMyProfile(b *gotgbot.Bot, ctx *ext.Context, m
 func (h *profileHandler) handleEditMyProfile(b *gotgbot.Bot, ctx *ext.Context, msg *gotgbot.Message) error {
 	currentUser := ctx.Update.CallbackQuery.From
 
-	h.RemovePreviouseMessage(b, &currentUser.Id)
+	h.RemovePreviousMessage(b, &currentUser.Id)
 	editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
 		msg.Chat.Id,
 		fmt.Sprintf("<b>%s</b>", profileMenuEditHeader)+
@@ -256,11 +256,11 @@ func (h *profileHandler) handleEditMyProfile(b *gotgbot.Bot, ctx *ext.Context, m
 func (h *profileHandler) handleViewOtherProfile(b *gotgbot.Bot, ctx *ext.Context, msg *gotgbot.Message) error {
 	user := ctx.Update.CallbackQuery.From
 
-	h.RemovePreviouseMessage(b, &user.Id)
+	h.RemovePreviousMessage(b, &user.Id)
 	editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
 		msg.Chat.Id,
 		fmt.Sprintf("<b>%s</b>", profileMenuSearchHeader)+
-			"\n\nВведи имя пользователя (с @ или без):",
+			"\n\nВведи телеграм-ник пользователя <i>(с @ или без)</i>, либо его имя и фамилию <i>(через пробел)</i>:",
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: buttons.ProfileBackCancelButtons(constants.ProfileStartCallback),
 		})
@@ -269,10 +269,10 @@ func (h *profileHandler) handleViewOtherProfile(b *gotgbot.Bot, ctx *ext.Context
 		return fmt.Errorf("ProfileHandler: failed to send message in handleViewOtherProfile: %w", err)
 	}
 	h.SavePreviousMessageInfo(user.Id, editedMsg)
-	return handlers.NextConversationState(profileStateAwaitUsernameForSearch)
+	return handlers.NextConversationState(profileStateAwaitQueryForSearch)
 }
 
-func (h *profileHandler) handleUsernameInput(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *profileHandler) handleSearchInput(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	username := msg.Text
 	userId := ctx.EffectiveMessage.From.Id
@@ -281,13 +281,23 @@ func (h *profileHandler) handleUsernameInput(b *gotgbot.Bot, ctx *ext.Context) e
 	username = strings.TrimPrefix(username, "@")
 
 	dbUser, err := h.userRepository.GetByTelegramUsername(username)
-	if err != nil && err != sql.ErrNoRows {
-		return fmt.Errorf("ProfileHandler: failed to get user in handleUsernameInput: %w", err)
+	if err != nil && err == sql.ErrNoRows {
+		//try to get user by full name
+		parts := strings.Fields(username)
+		firstname := parts[0]
+		lastname := strings.Join(parts[1:], " ")
+
+		dbUser, err = h.userRepository.SearchByName(firstname, lastname)
+		if err != nil && err != sql.ErrNoRows {
+			return fmt.Errorf("ProfileHandler: failed to search user in handleUsernameInput by full name: %w", err)
+		}
+	} else if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("ProfileHandler: failed to get user in handleUsernameInput by username: %w", err)
 	}
 
 	// If user not found, show search again
 	if err == sql.ErrNoRows {
-		h.RemovePreviouseMessage(b, &userId)
+		h.RemovePreviousMessage(b, &userId)
 		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
 		editedMsg, err := h.messageSenderService.SendMarkdownWithReturnMessage(msg.Chat.Id,
 			fmt.Sprintf("*%s*", profileMenuSearchHeader)+
@@ -312,7 +322,7 @@ func (h *profileHandler) handleUsernameInput(b *gotgbot.Bot, ctx *ext.Context) e
 		return fmt.Errorf("ProfileHandler: failed to get profile in handleUsernameInput: %w", err)
 	}
 
-	h.RemovePreviouseMessage(b, &userId)
+	h.RemovePreviousMessage(b, &userId)
 	b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
 	profileText := fmt.Sprintf("<b>%s</b>\n\n%s", profileMenuSearchHeader, formatters.FormatProfileView(dbUser, profile, false))
 	editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
@@ -366,7 +376,7 @@ func (h *profileHandler) handleEditField(b *gotgbot.Bot, ctx *ext.Context, msg *
 		oldFieldValue = "отсутствует"
 	}
 
-	h.RemovePreviouseMessage(b, &user.Id)
+	h.RemovePreviousMessage(b, &user.Id)
 	editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
 		msg.Chat.Id,
 		fmt.Sprintf("<b>%s</b>", menuHeader)+
@@ -402,7 +412,7 @@ func (h *profileHandler) handleBioInput(b *gotgbot.Bot, ctx *ext.Context) error 
 	h.userStore.Set(msg.From.Id, profileCtxDataKeyLastMessageTimeFromUser, msg.Date)
 
 	if bioLength > constants.ProfileBioLengthLimit {
-		h.RemovePreviouseMessage(b, &msg.From.Id)
+		h.RemovePreviousMessage(b, &msg.From.Id)
 		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
 		errMsg, _ := h.messageSenderService.SendMarkdownWithReturnMessage(
 			msg.Chat.Id,
@@ -425,7 +435,7 @@ func (h *profileHandler) handleBioInput(b *gotgbot.Bot, ctx *ext.Context) error 
 		return fmt.Errorf("ProfileHandler: failed to save bio in handleBioInput: %w", err)
 	}
 
-	h.RemovePreviouseMessage(b, &msg.From.Id)
+	h.RemovePreviousMessage(b, &msg.From.Id)
 	b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
 	sendMsg, err := h.messageSenderService.SendMarkdownWithReturnMessage(msg.Chat.Id,
 		fmt.Sprintf("*%s*", profileMenuEditBioHeader)+
@@ -447,7 +457,7 @@ func (h *profileHandler) handleFirstnameInput(b *gotgbot.Bot, ctx *ext.Context) 
 	firstname := msg.Text
 
 	if len(firstname) > 30 {
-		h.RemovePreviouseMessage(b, &msg.From.Id)
+		h.RemovePreviousMessage(b, &msg.From.Id)
 		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
 		errMsg, _ := h.messageSenderService.SendMarkdownWithReturnMessage(
 			msg.Chat.Id,
@@ -469,7 +479,7 @@ func (h *profileHandler) handleFirstnameInput(b *gotgbot.Bot, ctx *ext.Context) 
 		return fmt.Errorf("ProfileHandler: failed to save firstname in handleFirstnameInput: %w", err)
 	}
 
-	h.RemovePreviouseMessage(b, &msg.From.Id)
+	h.RemovePreviousMessage(b, &msg.From.Id)
 	b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
 	sendMsg, err := h.messageSenderService.SendMarkdownWithReturnMessage(msg.Chat.Id,
 		fmt.Sprintf("*%s*", profileMenuEditFirstnameHeader)+
@@ -491,7 +501,7 @@ func (h *profileHandler) handleLastnameInput(b *gotgbot.Bot, ctx *ext.Context) e
 	lastname := msg.Text
 
 	if len(lastname) > 30 {
-		h.RemovePreviouseMessage(b, &msg.From.Id)
+		h.RemovePreviousMessage(b, &msg.From.Id)
 		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
 		errMsg, _ := h.messageSenderService.SendMarkdownWithReturnMessage(
 			msg.Chat.Id,
@@ -513,7 +523,7 @@ func (h *profileHandler) handleLastnameInput(b *gotgbot.Bot, ctx *ext.Context) e
 		return fmt.Errorf("ProfileHandler: failed to save lastname in handleLastnameInput: %w", err)
 	}
 
-	h.RemovePreviouseMessage(b, &msg.From.Id)
+	h.RemovePreviousMessage(b, &msg.From.Id)
 	b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
 	sendMsg, err := h.messageSenderService.SendMarkdownWithReturnMessage(msg.Chat.Id,
 		fmt.Sprintf("*%s*", profileMenuEditLastnameHeader)+
@@ -561,7 +571,7 @@ func (h *profileHandler) handlePublishProfile(b *gotgbot.Bot, ctx *ext.Context, 
 	}
 
 	if !utils.IsProfileComplete(dbUser, profile) {
-		h.RemovePreviouseMessage(b, &user.Id)
+		h.RemovePreviousMessage(b, &user.Id)
 		editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
 			msg.Chat.Id,
 			fmt.Sprintf("<b>%s</b>", profileMenuPublishHeader)+
@@ -643,7 +653,7 @@ func (h *profileHandler) handlePublishProfile(b *gotgbot.Bot, ctx *ext.Context, 
 	}
 
 	// Show success message
-	h.RemovePreviouseMessage(b, &user.Id)
+	h.RemovePreviousMessage(b, &user.Id)
 	editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
 		msg.Chat.Id,
 		fmt.Sprintf("<b>%s</b>", profileMenuPublishHeader)+
@@ -669,9 +679,15 @@ func (h *profileHandler) handleCallbackCancel(b *gotgbot.Bot, ctx *ext.Context) 
 
 func (h *profileHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
+	userId := ctx.EffectiveUser.Id
 
-	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
-	_ = h.messageSenderService.Reply(msg, "Сессия работы с профилями завершена.", nil)
+	h.RemovePreviousMessage(b, &userId)
+
+	_ = h.messageSenderService.Send(
+		msg.Chat.Id,
+		"Сессия работы с профилями завершена.",
+		nil,
+	)
 	h.userStore.Clear(ctx.EffectiveUser.Id)
 
 	return handlers.EndConversation()
@@ -744,7 +760,7 @@ func (h *profileHandler) MessageRemoveInlineKeyboard(b *gotgbot.Bot, userID *int
 	_ = h.messageSenderService.RemoveInlineKeyboard(chatID, messageID)
 }
 
-func (h *profileHandler) RemovePreviouseMessage(b *gotgbot.Bot, userID *int64) {
+func (h *profileHandler) RemovePreviousMessage(b *gotgbot.Bot, userID *int64) {
 	var chatID, messageID int64
 
 	if userID != nil {
