@@ -27,7 +27,7 @@ type HandlerDependencies struct {
 	OpenAiClient                      *clients.OpenAiClient
 	AppConfig                         *config.Config
 	SummarizationService              *services.SummarizationService
-	RandomCoffeePollService           *services.RandomCoffeePollService
+	RandomCoffeeService               *services.RandomCoffeeService
 	MessageSenderService              *services.MessageSenderService
 	PermissionsService                *services.PermissionsService
 	EventRepository                   *repositories.EventRepository
@@ -91,14 +91,14 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	summarizationService := services.NewSummarizationService(
 		appConfig, openaiClient, messageSenderService, promptingTemplateRepository,
 	)
-	randomCoffeePollService := services.NewRandomCoffeePollService(
+	randomCoffeeService := services.NewRandomCoffeeService(
 		appConfig, pollSenderService, randomCoffeePollRepository)
 
 	// Initialize scheduled tasks
 	scheduledTasks := []tasks.Task{
 		tasks.NewSessionKeepAliveTask(30 * time.Minute),
 		tasks.NewDailySummarizationTask(appConfig, summarizationService),
-		tasks.NewRandomCoffeePollTask(appConfig, randomCoffeePollService),
+		tasks.NewRandomCoffeePollTask(appConfig, randomCoffeeService),
 	}
 
 	// Create bot client
@@ -115,7 +115,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 		OpenAiClient:                      openaiClient,
 		AppConfig:                         appConfig,
 		SummarizationService:              summarizationService,
-		RandomCoffeePollService:           randomCoffeePollService,
+		RandomCoffeeService:               randomCoffeeService,
 		MessageSenderService:              messageSenderService,
 		PermissionsService:                permissionsService,
 		EventRepository:                   eventRepository,
@@ -163,7 +163,7 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 		eventhandlers.NewEventStartHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
 		testhandlers.NewTrySummarizeHandler(deps.AppConfig, deps.SummarizationService, deps.MessageSenderService, deps.PermissionsService),
 		testhandlers.NewTryGenerateCoffeePairsHandler(deps.AppConfig, deps.PermissionsService, deps.MessageSenderService, deps.RandomCoffeePollRepository, deps.RandomCoffeeParticipantRepository, deps.ProfileRepository),
-		testhandlers.NewCoffeeStartHandler(deps.AppConfig, deps.MessageSenderService, deps.PermissionsService, deps.RandomCoffeePollService),
+		testhandlers.NewTryCreateCoffeePoolHandler(deps.AppConfig, deps.MessageSenderService, deps.PermissionsService, deps.RandomCoffeeService),
 	}
 
 	// Register private chat handlers

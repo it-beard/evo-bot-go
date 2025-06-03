@@ -13,28 +13,26 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2"
 )
 
-// RandomCoffeePollService handles the business logic for random coffee polls
-type RandomCoffeePollService struct {
+type RandomCoffeeService struct {
 	config     *config.Config
 	pollSender *PollSenderService
 	pollRepo   *repositories.RandomCoffeePollRepository
 }
 
-// NewRandomCoffeePollService creates a new random coffee poll service
-func NewRandomCoffeePollService(
+// NewRandomCoffeeService creates a new random coffee poll service
+func NewRandomCoffeeService(
 	config *config.Config,
 	pollSender *PollSenderService,
 	pollRepo *repositories.RandomCoffeePollRepository,
-) *RandomCoffeePollService {
-	return &RandomCoffeePollService{
+) *RandomCoffeeService {
+	return &RandomCoffeeService{
 		config:     config,
 		pollSender: pollSender,
 		pollRepo:   pollRepo,
 	}
 }
 
-// SendRandomCoffeePoll sends the random coffee poll
-func (s *RandomCoffeePollService) SendRandomCoffeePoll(ctx context.Context) error {
+func (s *RandomCoffeeService) SendPoll(ctx context.Context) error {
 	chatID := utils.ChatIdToFullChatId(s.config.SuperGroupChatID)
 	if chatID == 0 {
 		log.Println("Random Coffee Poll Service: SuperGroupChatID is not configured. Skipping poll.")
@@ -68,7 +66,7 @@ func (s *RandomCoffeePollService) SendRandomCoffeePoll(ctx context.Context) erro
 }
 
 // savePollToDB saves the poll information to the database
-func (s *RandomCoffeePollService) savePollToDB(sentPollMsg *gotgbot.Message) error {
+func (s *RandomCoffeeService) savePollToDB(sentPollMsg *gotgbot.Message) error {
 	if s.pollRepo == nil {
 		log.Println("Random Coffee Poll Service: pollRepo is nil, skipping DB interaction.")
 		return nil

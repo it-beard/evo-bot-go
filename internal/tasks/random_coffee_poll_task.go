@@ -11,17 +11,17 @@ import (
 
 // RandomCoffeePollTask handles scheduling of random coffee polls
 type RandomCoffeePollTask struct {
-	config                  *config.Config
-	randomCoffeePollService *services.RandomCoffeePollService
-	stop                    chan struct{}
+	config              *config.Config
+	randomCoffeeService *services.RandomCoffeeService
+	stop                chan struct{}
 }
 
 // NewRandomCoffeePollTask creates a new random coffee poll task
-func NewRandomCoffeePollTask(config *config.Config, randomCoffeePollService *services.RandomCoffeePollService) *RandomCoffeePollTask {
+func NewRandomCoffeePollTask(config *config.Config, randomCoffeeService *services.RandomCoffeeService) *RandomCoffeePollTask {
 	return &RandomCoffeePollTask{
-		config:                  config,
-		randomCoffeePollService: randomCoffeePollService,
-		stop:                    make(chan struct{}),
+		config:              config,
+		randomCoffeeService: randomCoffeeService,
+		stop:                make(chan struct{}),
 	}
 }
 
@@ -64,7 +64,7 @@ func (t *RandomCoffeePollTask) run() {
 					ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 					defer cancel()
 
-					if err := t.randomCoffeePollService.SendRandomCoffeePoll(ctx); err != nil {
+					if err := t.randomCoffeeService.SendPoll(ctx); err != nil {
 						log.Printf("Random Coffee Poll Task: Error sending random coffee poll: %v", err)
 					}
 				}()
