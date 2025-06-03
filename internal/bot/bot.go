@@ -162,7 +162,7 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 		eventhandlers.NewEventSetupHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
 		eventhandlers.NewEventDeleteHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
 		eventhandlers.NewEventStartHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
-		randomcoffeehandlers.NewCoffeeGeneratePairsHandler(deps.AppConfig, deps.PermissionsService, deps.MessageSenderService, deps.RandomCoffeePollRepository, deps.RandomCoffeeParticipantRepository),
+		randomcoffeehandlers.NewCoffeeGeneratePairsHandler(deps.AppConfig, deps.PermissionsService, deps.MessageSenderService, deps.RandomCoffeePollRepository, deps.RandomCoffeeParticipantRepository, deps.ProfileRepository),
 		randomcoffeehandlers.NewCoffeeStartHandler(deps.AppConfig, deps.MessageSenderService, deps.PermissionsService, deps.RandomCoffeePollService),
 	}
 

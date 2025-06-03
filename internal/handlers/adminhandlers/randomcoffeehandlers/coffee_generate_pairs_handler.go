@@ -38,6 +38,7 @@ type CoffeeGeneratePairsHandler struct {
 	sender          *services.MessageSenderService
 	pollRepo        *repositories.RandomCoffeePollRepository
 	participantRepo *repositories.RandomCoffeeParticipantRepository
+	profileRepo     *repositories.ProfileRepository
 	userStore       *utils.UserDataStore
 }
 
@@ -47,6 +48,7 @@ func NewCoffeeGeneratePairsHandler(
 	sender *services.MessageSenderService,
 	pollRepo *repositories.RandomCoffeePollRepository,
 	participantRepo *repositories.RandomCoffeeParticipantRepository,
+	profileRepo *repositories.ProfileRepository,
 ) ext.Handler {
 	h := &CoffeeGeneratePairsHandler{
 		config:          config,
@@ -54,6 +56,7 @@ func NewCoffeeGeneratePairsHandler(
 		sender:          sender,
 		pollRepo:        pollRepo,
 		participantRepo: participantRepo,
+		profileRepo:     profileRepo,
 		userStore:       utils.NewUserDataStore(),
 	}
 
@@ -221,18 +224,12 @@ func (h *CoffeeGeneratePairsHandler) generateAndSendPairs() error {
 
 	for i := 0; i < len(participants); i += 2 {
 		user1 := participants[i]
-		user1Display := user1.Firstname
-		if user1.TgUsername != "" {
-			user1Display = fmt.Sprintf("%s (@%s)", user1.Firstname, user1.TgUsername)
-		}
+		user1Display := h.formatUserDisplay(&user1)
 
 		if i+1 < len(participants) {
 			user2 := participants[i+1]
-			user2Display := user2.Firstname
-			if user2.TgUsername != "" {
-				user2Display = fmt.Sprintf("%s (@%s)", user2.Firstname, user2.TgUsername)
-			}
-			pairsText = append(pairsText, fmt.Sprintf("%s - %s", user1Display, user2Display))
+			user2Display := h.formatUserDisplay(&user2)
+			pairsText = append(pairsText, fmt.Sprintf("%s x %s", user1Display, user2Display))
 		} else {
 			unpairedUserText = user1Display
 		}
@@ -241,16 +238,16 @@ func (h *CoffeeGeneratePairsHandler) generateAndSendPairs() error {
 	var messageBuilder strings.Builder
 	messageBuilder.WriteString(fmt.Sprintf("☕️ Пары для рандом кофе (неделя %s):\n\n", latestPoll.WeekStartDate.Format("Mon, Jan 2")))
 	for _, pair := range pairsText {
-		messageBuilder.WriteString(fmt.Sprintf("• %s\n", pair))
+		messageBuilder.WriteString(fmt.Sprintf("➪ %s\n", pair))
 	}
 	if unpairedUserText != "" {
 		messageBuilder.WriteString(fmt.Sprintf("\n😔 %s ищет кофе-компаньона на эту неделю!\n", unpairedUserText))
 	}
 	messageBuilder.WriteString("\n🗓 День, время и формат встречи вы выбираете сами. Просто напиши партнеру в личку, когда и в каком формате тебе удобно встретиться.")
 
-	// Send the pairing message to the SupergroupChatID
+	// Send the pairing message
 	chatID := utils.ChatIdToFullChatId(h.config.SuperGroupChatID)
-	err = h.sender.Send(chatID, messageBuilder.String(), nil)
+	err = h.sender.SendHtml(chatID, messageBuilder.String(), nil)
 	if err != nil {
 		return fmt.Errorf("error sending pairing message to chat %d: %w", chatID, err)
 	}
@@ -304,6 +301,46 @@ func (h *CoffeeGeneratePairsHandler) SavePreviousMessageInfo(userID int64, sentM
 	}
 	h.userStore.SetPreviousMessageInfo(userID, sentMsg.MessageId, sentMsg.Chat.Id,
 		coffeeGeneratePairsCtxDataKeyPreviousMessageID, coffeeGeneratePairsCtxDataKeyPreviousChatID)
+}
+
+// formatUserDisplay formats user display based on whether they have a published profile
+func (h *CoffeeGeneratePairsHandler) formatUserDisplay(user *repositories.User) string {
+	// Get user profile to check if it's published
+	profile, err := h.profileRepo.GetOrCreate(user.ID)
+	if err != nil {
+		log.Printf("CoffeeGeneratePairsHandler: Error getting profile for user %d: %v", user.ID, err)
+		// Fallback to username only
+		if user.TgUsername != "" {
+			return fmt.Sprintf("@%s", user.TgUsername)
+		}
+		return user.Firstname
+	}
+
+	// Check if profile is published (has published_message_id)
+	hasPublishedProfile := profile.PublishedMessageID.Valid && profile.PublishedMessageID.Int64 > 0
+
+	if hasPublishedProfile {
+		// Show full name with username for published profiles, wrap name in link
+		fullName := user.Firstname
+		if user.Lastname != "" {
+			fullName += " " + user.Lastname
+		}
+
+		// Get link to the published profile post
+		profileLink := utils.GetIntroMessageLink(h.config, profile.PublishedMessageID.Int64)
+		linkedName := fmt.Sprintf("<a href=\"%s\">%s</a>", profileLink, fullName)
+
+		if user.TgUsername != "" {
+			return fmt.Sprintf("%s (@%s)", linkedName, user.TgUsername)
+		}
+		return linkedName
+	} else {
+		// Show only username for unpublished profiles
+		if user.TgUsername != "" {
+			return fmt.Sprintf("@%s", user.TgUsername)
+		}
+		return user.Firstname
+	}
 }
 
 // Name method for the handler interface (optional, but good practice)
