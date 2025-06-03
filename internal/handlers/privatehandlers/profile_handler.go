@@ -21,12 +21,12 @@ import (
 
 const (
 	// Conversation states
-	profileStateViewOptions            = "profile_state_view_options"
-	profileStateEditMyProfile          = "profile_state_edit_my_profile"
-	profileStateAwaitUsernameForSearch = "profile_state_await_username_for_search"
-	profileStateAwaitBio               = "profile_state_await_bio"
-	profileStateAwaitFirstname         = "profile_state_await_firstname"
-	profileStateAwaitLastname          = "profile_state_await_lastname"
+	profileStateViewOptions         = "profile_state_view_options"
+	profileStateEditMyProfile       = "profile_state_edit_my_profile"
+	profileStateAwaitQueryForSearch = "profile_state_await_query_for_search"
+	profileStateAwaitBio            = "profile_state_await_bio"
+	profileStateAwaitFirstname      = "profile_state_await_firstname"
+	profileStateAwaitLastname       = "profile_state_await_lastname"
 
 	// UserStore keys
 	profileCtxDataKeyField                   = "profile_ctx_data_field"
@@ -83,8 +83,8 @@ func NewProfileHandler(
 				handlers.NewCallback(callbackquery.Equal(constants.ProfileEditMyProfileCallback), h.handleCallback),
 				handlers.NewCallback(callbackquery.Equal(constants.ProfilePublishCallback), h.handleCallback),
 			},
-			profileStateAwaitUsernameForSearch: {
-				handlers.NewMessage(message.Text, h.handleUsernameInput),
+			profileStateAwaitQueryForSearch: {
+				handlers.NewMessage(message.Text, h.handleSearchInput),
 				handlers.NewCallback(callbackquery.Equal(constants.ProfileStartCallback), h.handleCallback),
 				handlers.NewCallback(callbackquery.Equal(constants.ProfileFullCancel), h.handleCallbackCancel),
 			},
@@ -260,7 +260,7 @@ func (h *profileHandler) handleViewOtherProfile(b *gotgbot.Bot, ctx *ext.Context
 	editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
 		msg.Chat.Id,
 		fmt.Sprintf("<b>%s</b>", profileMenuSearchHeader)+
-			"\n\nВведи имя пользователя (с @ или без):",
+			"\n\nВведи телеграм-ник пользователя <i>(с @ или без)</i>, либо его имя и фамилию <i>(через пробел)</i>:",
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: buttons.ProfileBackCancelButtons(constants.ProfileStartCallback),
 		})
@@ -269,10 +269,10 @@ func (h *profileHandler) handleViewOtherProfile(b *gotgbot.Bot, ctx *ext.Context
 		return fmt.Errorf("ProfileHandler: failed to send message in handleViewOtherProfile: %w", err)
 	}
 	h.SavePreviousMessageInfo(user.Id, editedMsg)
-	return handlers.NextConversationState(profileStateAwaitUsernameForSearch)
+	return handlers.NextConversationState(profileStateAwaitQueryForSearch)
 }
 
-func (h *profileHandler) handleUsernameInput(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *profileHandler) handleSearchInput(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	username := msg.Text
 	userId := ctx.EffectiveMessage.From.Id
@@ -281,8 +281,18 @@ func (h *profileHandler) handleUsernameInput(b *gotgbot.Bot, ctx *ext.Context) e
 	username = strings.TrimPrefix(username, "@")
 
 	dbUser, err := h.userRepository.GetByTelegramUsername(username)
-	if err != nil && err != sql.ErrNoRows {
-		return fmt.Errorf("ProfileHandler: failed to get user in handleUsernameInput: %w", err)
+	if err != nil && err == sql.ErrNoRows {
+		//try to get user by full name
+		parts := strings.Fields(username)
+		firstname := parts[0]
+		lastname := strings.Join(parts[1:], " ")
+
+		dbUser, err = h.userRepository.SearchByName(firstname, lastname)
+		if err != nil && err != sql.ErrNoRows {
+			return fmt.Errorf("ProfileHandler: failed to search user in handleUsernameInput by full name: %w", err)
+		}
+	} else if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("ProfileHandler: failed to get user in handleUsernameInput by username: %w", err)
 	}
 
 	// If user not found, show search again
