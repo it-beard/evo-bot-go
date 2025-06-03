@@ -40,20 +40,19 @@ const (
 	AdminProfilesCancelCallback = AdminProfilesPrefix + "cancel"
 )
 
-const CoffeeGeneratePairsCommand = "coffeeGeneratePairs"
-const CoffeeRestartCommand = "coofeeRestart"
-
-// Coffee Start Handler callback constants
+// Try Create Coffee Pool Handler callback constants
 const (
-	CoffeeStartPrefix          = "coffee_start_"
-	CoffeeStartConfirmCallback = CoffeeStartPrefix + "confirm"
-	CoffeeStartCancelCallback  = CoffeeStartPrefix + "cancel"
+	TryCreateCoffeePoolCommand         = "tryCreateCoffeePool"
+	TryCreateCoffeePoolPrefix          = "try_create_coffee_pool_"
+	TryCreateCoffeePoolConfirmCallback = TryCreateCoffeePoolPrefix + "confirm"
+	TryCreateCoffeePoolCancelCallback  = TryCreateCoffeePoolPrefix + "cancel"
 )
 
-// Coffee Generate Pairs Handler callback constants
+// Try Generate Coffee Pairs Handler callback constants
 const (
-	CoffeeGeneratePairsPrefix          = "coffee_generate_pairs_"
-	CoffeeGeneratePairsConfirmCallback = CoffeeGeneratePairsPrefix + "confirm"
-	CoffeeGeneratePairsBackCallback    = CoffeeGeneratePairsPrefix + "back"
-	CoffeeGeneratePairsCancelCallback  = CoffeeGeneratePairsPrefix + "cancel"
+	TryGenerateCoffeePairsCommand         = "tryGenerateCoffeePairs"
+	TryGenerateCoffeePairsPrefix          = "try_generate_coffee_pairs_"
+	TryGenerateCoffeePairsConfirmCallback = TryGenerateCoffeePairsPrefix + "confirm"
+	TryGenerateCoffeePairsBackCallback    = TryGenerateCoffeePairsPrefix + "back"
+	TryGenerateCoffeePairsCancelCallback  = TryGenerateCoffeePairsPrefix + "cancel"
 )

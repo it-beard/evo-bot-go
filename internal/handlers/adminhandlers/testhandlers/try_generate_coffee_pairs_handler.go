@@ -1,4 +1,4 @@
-package randomcoffeehandlers
+package testhandlers
 
 import (
 	"evo-bot-go/internal/buttons"
@@ -22,17 +22,17 @@ import (
 
 const (
 	// Conversation states
-	coffeeGeneratePairsStateAwaitConfirmation = "coffee_generate_pairs_state_await_confirmation"
+	tryGenerateCoffeePairsStateAwaitConfirmation = "try_generate_coffee_pairs_state_await_confirmation"
 
 	// UserStore keys
-	coffeeGeneratePairsCtxDataKeyPreviousMessageID = "coffee_generate_pairs_ctx_data_previous_message_id"
-	coffeeGeneratePairsCtxDataKeyPreviousChatID    = "coffee_generate_pairs_ctx_data_previous_chat_id"
+	tryGenerateCoffeePairsCtxDataKeyPreviousMessageID = "try_generate_coffee_pairs_ctx_data_previous_message_id"
+	tryGenerateCoffeePairsCtxDataKeyPreviousChatID    = "try_generate_coffee_pairs_ctx_data_previous_chat_id"
 
 	// Menu headers
-	coffeeGeneratePairsMenuHeader = "Генерация пар для Random Coffee"
+	tryGenerateCoffeePairsMenuHeader = "Генерация пар для Random Coffee"
 )
 
-type CoffeeGeneratePairsHandler struct {
+type tryGenerateCoffeePairsHandler struct {
 	config          *config.Config
 	permissions     *services.PermissionsService
 	sender          *services.MessageSenderService
@@ -42,7 +42,7 @@ type CoffeeGeneratePairsHandler struct {
 	userStore       *utils.UserDataStore
 }
 
-func NewCoffeeGeneratePairsHandler(
+func NewTryGenerateCoffeePairsHandler(
 	config *config.Config,
 	permissions *services.PermissionsService,
 	sender *services.MessageSenderService,
@@ -50,7 +50,7 @@ func NewCoffeeGeneratePairsHandler(
 	participantRepo *repositories.RandomCoffeeParticipantRepository,
 	profileRepo *repositories.ProfileRepository,
 ) ext.Handler {
-	h := &CoffeeGeneratePairsHandler{
+	h := &tryGenerateCoffeePairsHandler{
 		config:          config,
 		permissions:     permissions,
 		sender:          sender,
@@ -62,13 +62,13 @@ func NewCoffeeGeneratePairsHandler(
 
 	return handlers.NewConversation(
 		[]ext.Handler{
-			handlers.NewCommand(constants.CoffeeGeneratePairsCommand, h.handleCommand),
+			handlers.NewCommand(constants.TryGenerateCoffeePairsCommand, h.handleCommand),
 		},
 		map[string][]ext.Handler{
-			coffeeGeneratePairsStateAwaitConfirmation: {
-				handlers.NewCallback(callbackquery.Equal(constants.CoffeeGeneratePairsConfirmCallback), h.handleConfirmCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.CoffeeGeneratePairsBackCallback), h.handleBackCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.CoffeeGeneratePairsCancelCallback), h.handleCancelCallback),
+			tryGenerateCoffeePairsStateAwaitConfirmation: {
+				handlers.NewCallback(callbackquery.Equal(constants.TryGenerateCoffeePairsConfirmCallback), h.handleConfirmCallback),
+				handlers.NewCallback(callbackquery.Equal(constants.TryGenerateCoffeePairsBackCallback), h.handleBackCallback),
+				handlers.NewCallback(callbackquery.Equal(constants.TryGenerateCoffeePairsCancelCallback), h.handleCancelCallback),
 			},
 		},
 		&handlers.ConversationOpts{
@@ -85,13 +85,13 @@ func NewCoffeeGeneratePairsHandler(
 }
 
 // Entry point for the /coffeeGeneratePairs command
-func (h *CoffeeGeneratePairsHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *tryGenerateCoffeePairsHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
 	// Check if user has admin permissions and is in a private chat
-	if !h.permissions.CheckAdminAndPrivateChat(msg, constants.CoffeeGeneratePairsCommand) {
-		log.Printf("CoffeeGeneratePairsHandler: User %d (%s) tried to use /%s without admin permissions.",
-			ctx.EffectiveUser.Id, ctx.EffectiveUser.Username, constants.CoffeeGeneratePairsCommand)
+	if !h.permissions.CheckAdminAndPrivateChat(msg, constants.TryGenerateCoffeePairsCommand) {
+		log.Printf("TryGenerateCoffeePairsHandler: User %d (%s) tried to use /%s without admin permissions.",
+			ctx.EffectiveUser.Id, ctx.EffectiveUser.Username, constants.TryGenerateCoffeePairsCommand)
 		return handlers.EndConversation()
 	}
 
@@ -99,7 +99,7 @@ func (h *CoffeeGeneratePairsHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Cont
 }
 
 // Shows the confirmation menu for generating coffee pairs
-func (h *CoffeeGeneratePairsHandler) showConfirmationMenu(b *gotgbot.Bot, msg *gotgbot.Message, userId int64) error {
+func (h *tryGenerateCoffeePairsHandler) showConfirmationMenu(b *gotgbot.Bot, msg *gotgbot.Message, userId int64) error {
 	h.RemovePreviousMessage(b, &userId)
 
 	// Get latest poll info to show in confirmation
@@ -121,7 +121,7 @@ func (h *CoffeeGeneratePairsHandler) showConfirmationMenu(b *gotgbot.Bot, msg *g
 
 	editedMsg, err := h.sender.SendHtmlWithReturnMessage(
 		msg.Chat.Id,
-		fmt.Sprintf("<b>%s</b>", coffeeGeneratePairsMenuHeader)+
+		fmt.Sprintf("<b>%s</b>", tryGenerateCoffeePairsMenuHeader)+
 			"\n\n⚠️ ЭТА КОМАНДА НУЖНА ДЛЯ ТЕСТИРОВАНИЯ ФУНКЦИОНАЛА!"+
 			"\n\nВы уверены, что хотите сгенерировать пары для текущего опроса?"+
 			fmt.Sprintf("\n\n📊 Опрос: неделя %s", latestPoll.WeekStartDate.Format("2006-01-02"))+
@@ -129,20 +129,20 @@ func (h *CoffeeGeneratePairsHandler) showConfirmationMenu(b *gotgbot.Bot, msg *g
 			"\n\n⚠️ Пары будут отправлены в сообщество.",
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: buttons.ConfirmAndCancelButton(
-				constants.CoffeeGeneratePairsConfirmCallback,
-				constants.CoffeeGeneratePairsCancelCallback,
+				constants.TryGenerateCoffeePairsConfirmCallback,
+				constants.TryGenerateCoffeePairsCancelCallback,
 			),
 		})
 
 	if err != nil {
-		return fmt.Errorf("CoffeeGeneratePairsHandler: failed to send message in showConfirmationMenu: %w", err)
+		return fmt.Errorf("TryGenerateCoffeePairsHandler: failed to send message in showConfirmationMenu: %w", err)
 	}
 
 	h.SavePreviousMessageInfo(userId, editedMsg)
-	return handlers.NextConversationState(coffeeGeneratePairsStateAwaitConfirmation)
+	return handlers.NextConversationState(tryGenerateCoffeePairsStateAwaitConfirmation)
 }
 
-func (h *CoffeeGeneratePairsHandler) handleConfirmCallback(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *tryGenerateCoffeePairsHandler) handleConfirmCallback(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	userId := ctx.EffectiveUser.Id
 
@@ -151,12 +151,12 @@ func (h *CoffeeGeneratePairsHandler) handleConfirmCallback(b *gotgbot.Bot, ctx *
 	// Show processing message
 	editedMsg, err := h.sender.SendHtmlWithReturnMessage(
 		msg.Chat.Id,
-		fmt.Sprintf("<b>%s</b>", coffeeGeneratePairsMenuHeader)+
+		fmt.Sprintf("<b>%s</b>", tryGenerateCoffeePairsMenuHeader)+
 			"\n\n⏳ Генерация пар...",
 		nil)
 	h.SavePreviousMessageInfo(userId, editedMsg)
 	if err != nil {
-		return fmt.Errorf("CoffeeGeneratePairsHandler: failed to send processing message: %w", err)
+		return fmt.Errorf("TryGenerateCoffeePairsHandler: failed to send processing message: %w", err)
 	}
 
 	// Execute the pairs generation logic
@@ -167,18 +167,18 @@ func (h *CoffeeGeneratePairsHandler) handleConfirmCallback(b *gotgbot.Bot, ctx *
 		// Send new error message with buttons
 		editedMsg, sendErr := h.sender.SendHtmlWithReturnMessage(
 			msg.Chat.Id,
-			fmt.Sprintf("<b>%s</b>", coffeeGeneratePairsMenuHeader)+
+			fmt.Sprintf("<b>%s</b>", tryGenerateCoffeePairsMenuHeader)+
 				"\n\n❌ Ошибка при генерации пар:"+
 				fmt.Sprintf("\n<code>%s</code>", err.Error())+
 				"\n\nВернуться к подтверждению?",
 			&gotgbot.SendMessageOpts{
 				ReplyMarkup: buttons.BackAndCancelButton(
-					constants.CoffeeGeneratePairsBackCallback,
-					constants.CoffeeGeneratePairsCancelCallback,
+					constants.TryGenerateCoffeePairsBackCallback,
+					constants.TryGenerateCoffeePairsCancelCallback,
 				),
 			})
 		if sendErr != nil {
-			return fmt.Errorf("CoffeeGeneratePairsHandler: failed to send error message: %w", sendErr)
+			return fmt.Errorf("TryGenerateCoffeePairsHandler: failed to send error message: %w", sendErr)
 		}
 
 		h.SavePreviousMessageInfo(userId, editedMsg)
@@ -190,12 +190,12 @@ func (h *CoffeeGeneratePairsHandler) handleConfirmCallback(b *gotgbot.Bot, ctx *
 	// Send success message
 	err = h.sender.SendHtml(
 		msg.Chat.Id,
-		fmt.Sprintf("<b>%s</b>", coffeeGeneratePairsMenuHeader)+
+		fmt.Sprintf("<b>%s</b>", tryGenerateCoffeePairsMenuHeader)+
 			"\n\n✅ Пары успешно сгенерированы и отправлены в супергруппу!",
 		nil)
 
 	if err != nil {
-		return fmt.Errorf("CoffeeGeneratePairsHandler: failed to send success message: %w", err)
+		return fmt.Errorf("TryGenerateCoffeePairsHandler: failed to send success message: %w", err)
 	}
 
 	h.userStore.Clear(userId)
@@ -203,7 +203,7 @@ func (h *CoffeeGeneratePairsHandler) handleConfirmCallback(b *gotgbot.Bot, ctx *
 }
 
 // Generate pairs and send them to the supergroup
-func (h *CoffeeGeneratePairsHandler) generateAndSendPairs() error {
+func (h *tryGenerateCoffeePairsHandler) generateAndSendPairs() error {
 	latestPoll, err := h.pollRepo.GetLatestPoll()
 	if err != nil {
 		return fmt.Errorf("error getting latest poll: %w", err)
@@ -264,22 +264,22 @@ func (h *CoffeeGeneratePairsHandler) generateAndSendPairs() error {
 		return fmt.Errorf("error sending pairing message to chat %d: %w", chatID, err)
 	}
 
-	log.Printf("CoffeeGeneratePairsHandler: Successfully sent pairings for poll ID %d to chat %d.", latestPoll.ID, h.config.SuperGroupChatID)
+	log.Printf("TryGenerateCoffeePairsHandler: Successfully sent pairings for poll ID %d to chat %d.", latestPoll.ID, h.config.SuperGroupChatID)
 	return nil
 }
 
-func (h *CoffeeGeneratePairsHandler) handleBackCallback(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *tryGenerateCoffeePairsHandler) handleBackCallback(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	userId := ctx.EffectiveUser.Id
 
 	return h.showConfirmationMenu(b, msg, userId)
 }
 
-func (h *CoffeeGeneratePairsHandler) handleCancelCallback(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *tryGenerateCoffeePairsHandler) handleCancelCallback(b *gotgbot.Bot, ctx *ext.Context) error {
 	return h.handleCancel(b, ctx)
 }
 
-func (h *CoffeeGeneratePairsHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *tryGenerateCoffeePairsHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	userId := ctx.EffectiveUser.Id
 
@@ -289,21 +289,21 @@ func (h *CoffeeGeneratePairsHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Conte
 		"Генерация пар для Random Coffee отменена.",
 		nil)
 	if err != nil {
-		return fmt.Errorf("CoffeeGeneratePairsHandler: failed to send cancel message: %w", err)
+		return fmt.Errorf("TryGenerateCoffeePairsHandler: failed to send cancel message: %w", err)
 	}
 	h.userStore.Clear(userId)
 
 	return handlers.EndConversation()
 }
 
-func (h *CoffeeGeneratePairsHandler) RemovePreviousMessage(b *gotgbot.Bot, userID *int64) {
+func (h *tryGenerateCoffeePairsHandler) RemovePreviousMessage(b *gotgbot.Bot, userID *int64) {
 	var chatID, messageID int64
 
 	if userID != nil {
 		messageID, chatID = h.userStore.GetPreviousMessageInfo(
 			*userID,
-			coffeeGeneratePairsCtxDataKeyPreviousMessageID,
-			coffeeGeneratePairsCtxDataKeyPreviousChatID,
+			tryGenerateCoffeePairsCtxDataKeyPreviousMessageID,
+			tryGenerateCoffeePairsCtxDataKeyPreviousChatID,
 		)
 	}
 
@@ -314,20 +314,25 @@ func (h *CoffeeGeneratePairsHandler) RemovePreviousMessage(b *gotgbot.Bot, userI
 	b.DeleteMessage(chatID, messageID, nil)
 }
 
-func (h *CoffeeGeneratePairsHandler) SavePreviousMessageInfo(userID int64, sentMsg *gotgbot.Message) {
+func (h *tryGenerateCoffeePairsHandler) SavePreviousMessageInfo(userID int64, sentMsg *gotgbot.Message) {
 	if sentMsg == nil {
 		return
 	}
-	h.userStore.SetPreviousMessageInfo(userID, sentMsg.MessageId, sentMsg.Chat.Id,
-		coffeeGeneratePairsCtxDataKeyPreviousMessageID, coffeeGeneratePairsCtxDataKeyPreviousChatID)
+	h.userStore.SetPreviousMessageInfo(
+		userID,
+		sentMsg.MessageId,
+		sentMsg.Chat.Id,
+		tryGenerateCoffeePairsCtxDataKeyPreviousMessageID,
+		tryGenerateCoffeePairsCtxDataKeyPreviousChatID,
+	)
 }
 
 // formatUserDisplay formats user display based on whether they have a published profile
-func (h *CoffeeGeneratePairsHandler) formatUserDisplay(user *repositories.User) string {
+func (h *tryGenerateCoffeePairsHandler) formatUserDisplay(user *repositories.User) string {
 	// Get user profile to check if it's published
 	profile, err := h.profileRepo.GetOrCreate(user.ID)
 	if err != nil {
-		log.Printf("CoffeeGeneratePairsHandler: Error getting profile for user %d: %v", user.ID, err)
+		log.Printf("TryGenerateCoffeePairsHandler: Error getting profile for user %d: %v", user.ID, err)
 		// Fallback to username only
 		if user.TgUsername != "" {
 			return fmt.Sprintf("@%s", user.TgUsername)
@@ -360,9 +365,4 @@ func (h *CoffeeGeneratePairsHandler) formatUserDisplay(user *repositories.User) 
 		}
 		return user.Firstname
 	}
-}
-
-// Name method for the handler interface (optional, but good practice)
-func (h *CoffeeGeneratePairsHandler) Name() string {
-	return "CoffeeGeneratePairsHandler"
 }

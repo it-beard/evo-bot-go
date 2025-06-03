@@ -11,7 +11,7 @@ import (
 	"evo-bot-go/internal/handlers"
 	"evo-bot-go/internal/handlers/adminhandlers"
 	"evo-bot-go/internal/handlers/adminhandlers/eventhandlers"
-	"evo-bot-go/internal/handlers/adminhandlers/randomcoffeehandlers"
+	"evo-bot-go/internal/handlers/adminhandlers/testhandlers"
 	"evo-bot-go/internal/handlers/grouphandlers"
 	"evo-bot-go/internal/handlers/privatehandlers"
 	"evo-bot-go/internal/handlers/privatehandlers/topicshandlers"
@@ -155,15 +155,15 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 	// Register admin chat handlers
 	adminHandlers := []ext.Handler{
 		adminhandlers.NewCodeHandler(deps.AppConfig, deps.MessageSenderService, deps.PermissionsService),
-		adminhandlers.NewTrySummarizeHandler(deps.AppConfig, deps.SummarizationService, deps.MessageSenderService, deps.PermissionsService),
 		adminhandlers.NewShowTopicsHandler(deps.AppConfig, deps.TopicRepository, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
 		adminhandlers.NewAdminProfilesHandler(deps.AppConfig, deps.MessageSenderService, deps.PermissionsService, deps.UserRepository, deps.ProfileRepository),
 		eventhandlers.NewEventEditHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
 		eventhandlers.NewEventSetupHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
 		eventhandlers.NewEventDeleteHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
 		eventhandlers.NewEventStartHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
-		randomcoffeehandlers.NewCoffeeGeneratePairsHandler(deps.AppConfig, deps.PermissionsService, deps.MessageSenderService, deps.RandomCoffeePollRepository, deps.RandomCoffeeParticipantRepository, deps.ProfileRepository),
-		randomcoffeehandlers.NewCoffeeStartHandler(deps.AppConfig, deps.MessageSenderService, deps.PermissionsService, deps.RandomCoffeePollService),
+		testhandlers.NewTrySummarizeHandler(deps.AppConfig, deps.SummarizationService, deps.MessageSenderService, deps.PermissionsService),
+		testhandlers.NewTryGenerateCoffeePairsHandler(deps.AppConfig, deps.PermissionsService, deps.MessageSenderService, deps.RandomCoffeePollRepository, deps.RandomCoffeeParticipantRepository, deps.ProfileRepository),
+		testhandlers.NewCoffeeStartHandler(deps.AppConfig, deps.MessageSenderService, deps.PermissionsService, deps.RandomCoffeePollService),
 	}
 
 	// Register private chat handlers

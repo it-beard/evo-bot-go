@@ -1,4 +1,4 @@
-package randomcoffeehandlers
+package testhandlers
 
 import (
 	"context"
@@ -19,17 +19,17 @@ import (
 
 const (
 	// Conversation states
-	coffeeStartStateAwaitConfirmation = "coffee_start_state_await_confirmation"
+	tryCreateCoffeePoolStateAwaitConfirmation = "try_create_coffee_pool_state_await_confirmation"
 
 	// UserStore keys
-	coffeeStartCtxDataKeyPreviousMessageID = "coffee_start_ctx_data_previous_message_id"
-	coffeeStartCtxDataKeyPreviousChatID    = "coffee_start_ctx_data_previous_chat_id"
+	tryCreateCoffeePoolCtxDataKeyPreviousMessageID = "try_create_coffee_pool_ctx_data_previous_message_id"
+	tryCreateCoffeePoolCtxDataKeyPreviousChatID    = "try_create_coffee_pool_ctx_data_previous_chat_id"
 
 	// Menu headers
-	coffeeStartMenuHeader = "Запуск опроса по кофейным встречам"
+	tryCreateCoffeePoolMenuHeader = "Запуск опроса по кофейным встречам"
 )
 
-type coffeeStartHandler struct {
+type tryCreateCoffeePoolHandler struct {
 	config               *config.Config
 	messageSenderService *services.MessageSenderService
 	permissionsService   *services.PermissionsService
@@ -43,7 +43,7 @@ func NewCoffeeStartHandler(
 	permissionsService *services.PermissionsService,
 	randomCoffeeService *services.RandomCoffeePollService,
 ) ext.Handler {
-	h := &coffeeStartHandler{
+	h := &tryCreateCoffeePoolHandler{
 		config:               config,
 		messageSenderService: messageSenderService,
 		permissionsService:   permissionsService,
@@ -53,12 +53,12 @@ func NewCoffeeStartHandler(
 
 	return handlers.NewConversation(
 		[]ext.Handler{
-			handlers.NewCommand(constants.CoffeeRestartCommand, h.handleCommand),
+			handlers.NewCommand(constants.TryCreateCoffeePoolCommand, h.handleCommand),
 		},
 		map[string][]ext.Handler{
-			coffeeStartStateAwaitConfirmation: {
-				handlers.NewCallback(callbackquery.Equal(constants.CoffeeStartConfirmCallback), h.handleConfirmCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.CoffeeStartCancelCallback), h.handleCancelCallback),
+			tryCreateCoffeePoolStateAwaitConfirmation: {
+				handlers.NewCallback(callbackquery.Equal(constants.TryCreateCoffeePoolConfirmCallback), h.handleConfirmCallback),
+				handlers.NewCallback(callbackquery.Equal(constants.TryCreateCoffeePoolCancelCallback), h.handleCancelCallback),
 			},
 		},
 		&handlers.ConversationOpts{
@@ -75,13 +75,13 @@ func NewCoffeeStartHandler(
 }
 
 // Entry point for the /coofeeRestart command
-func (h *coffeeStartHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *tryCreateCoffeePoolHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
 	// Check if user has admin permissions and is in a private chat
-	if !h.permissionsService.CheckAdminAndPrivateChat(msg, constants.CoffeeRestartCommand) {
+	if !h.permissionsService.CheckAdminAndPrivateChat(msg, constants.TryCreateCoffeePoolCommand) {
 		log.Printf("CoffeeStartHandler: User %d (%s) tried to use /%s without admin permissions.",
-			ctx.EffectiveUser.Id, ctx.EffectiveUser.Username, constants.CoffeeRestartCommand)
+			ctx.EffectiveUser.Id, ctx.EffectiveUser.Username, constants.TryCreateCoffeePoolCommand)
 		return handlers.EndConversation()
 	}
 
@@ -89,19 +89,19 @@ func (h *coffeeStartHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) err
 }
 
 // Shows the confirmation menu for starting a new coffee poll
-func (h *coffeeStartHandler) showConfirmationMenu(b *gotgbot.Bot, msg *gotgbot.Message, userId int64) error {
+func (h *tryCreateCoffeePoolHandler) showConfirmationMenu(b *gotgbot.Bot, msg *gotgbot.Message, userId int64) error {
 	h.RemovePreviousMessage(b, &userId)
 
 	editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
 		msg.Chat.Id,
-		fmt.Sprintf("<b>%s</b>", coffeeStartMenuHeader)+
+		fmt.Sprintf("<b>%s</b>", tryCreateCoffeePoolMenuHeader)+
 			"\n\n⚠️ ЭТА КОМАНДА НУЖНА ДЛЯ ТЕСТИРОВАНИЯ ФУНКЦИОНАЛА!"+
 			"\n\nВы уверены, что хотите запустить новый опрос по кофейным встречам?"+
 			fmt.Sprintf("\n\nОпрос будет отправлен в топик \"Random Coffee\" (ID: %d).", h.config.RandomCoffeeTopicID),
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: buttons.ConfirmAndCancelButton(
-				constants.CoffeeStartConfirmCallback,
-				constants.CoffeeStartCancelCallback,
+				constants.TryCreateCoffeePoolConfirmCallback,
+				constants.TryCreateCoffeePoolCancelCallback,
 			),
 		})
 
@@ -110,11 +110,11 @@ func (h *coffeeStartHandler) showConfirmationMenu(b *gotgbot.Bot, msg *gotgbot.M
 	}
 
 	h.SavePreviousMessageInfo(userId, editedMsg)
-	return handlers.NextConversationState(coffeeStartStateAwaitConfirmation)
+	return handlers.NextConversationState(tryCreateCoffeePoolStateAwaitConfirmation)
 }
 
 // Handle the "Да" (Confirm) button click
-func (h *coffeeStartHandler) handleConfirmCallback(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *tryCreateCoffeePoolHandler) handleConfirmCallback(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	userId := ctx.EffectiveUser.Id
 
@@ -123,7 +123,7 @@ func (h *coffeeStartHandler) handleConfirmCallback(b *gotgbot.Bot, ctx *ext.Cont
 	// Show processing message
 	processingMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
 		msg.Chat.Id,
-		fmt.Sprintf("<b>%s</b>", coffeeStartMenuHeader)+
+		fmt.Sprintf("<b>%s</b>", tryCreateCoffeePoolMenuHeader)+
 			"\n\n⏳ Создание опроса...",
 		nil)
 
@@ -136,7 +136,7 @@ func (h *coffeeStartHandler) handleConfirmCallback(b *gotgbot.Bot, ctx *ext.Cont
 	if err != nil {
 		// Update message with error
 		_, _, editErr := b.EditMessageText(
-			fmt.Sprintf("<b>%s</b>", coffeeStartMenuHeader)+
+			fmt.Sprintf("<b>%s</b>", tryCreateCoffeePoolMenuHeader)+
 				"\n\n❌ Ошибка при создании опроса:"+
 				fmt.Sprintf("\n<code>%s</code>", err.Error()),
 			&gotgbot.EditMessageTextOpts{
@@ -152,7 +152,7 @@ func (h *coffeeStartHandler) handleConfirmCallback(b *gotgbot.Bot, ctx *ext.Cont
 
 	// Update message with success
 	_, _, err = b.EditMessageText(
-		fmt.Sprintf("<b>%s</b>", coffeeStartMenuHeader)+
+		fmt.Sprintf("<b>%s</b>", tryCreateCoffeePoolMenuHeader)+
 			"\n\n✅ Опрос по кофейным встречам успешно создан и отправлен в группу!",
 		&gotgbot.EditMessageTextOpts{
 			ChatId:    msg.Chat.Id,
@@ -169,11 +169,11 @@ func (h *coffeeStartHandler) handleConfirmCallback(b *gotgbot.Bot, ctx *ext.Cont
 }
 
 // Handle the "Нет" (Cancel) button click
-func (h *coffeeStartHandler) handleCancelCallback(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *tryCreateCoffeePoolHandler) handleCancelCallback(b *gotgbot.Bot, ctx *ext.Context) error {
 	return h.handleCancel(b, ctx)
 }
 
-func (h *coffeeStartHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *tryCreateCoffeePoolHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	userId := ctx.EffectiveUser.Id
 
@@ -190,14 +190,14 @@ func (h *coffeeStartHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) erro
 	return handlers.EndConversation()
 }
 
-func (h *coffeeStartHandler) MessageRemoveInlineKeyboard(b *gotgbot.Bot, userID *int64) {
+func (h *tryCreateCoffeePoolHandler) MessageRemoveInlineKeyboard(b *gotgbot.Bot, userID *int64) {
 	var chatID, messageID int64
 
 	if userID != nil {
 		messageID, chatID = h.userStore.GetPreviousMessageInfo(
 			*userID,
-			coffeeStartCtxDataKeyPreviousMessageID,
-			coffeeStartCtxDataKeyPreviousChatID,
+			tryCreateCoffeePoolCtxDataKeyPreviousMessageID,
+			tryCreateCoffeePoolCtxDataKeyPreviousChatID,
 		)
 	}
 
@@ -208,14 +208,14 @@ func (h *coffeeStartHandler) MessageRemoveInlineKeyboard(b *gotgbot.Bot, userID 
 	_ = h.messageSenderService.RemoveInlineKeyboard(chatID, messageID)
 }
 
-func (h *coffeeStartHandler) RemovePreviousMessage(b *gotgbot.Bot, userID *int64) {
+func (h *tryCreateCoffeePoolHandler) RemovePreviousMessage(b *gotgbot.Bot, userID *int64) {
 	var chatID, messageID int64
 
 	if userID != nil {
 		messageID, chatID = h.userStore.GetPreviousMessageInfo(
 			*userID,
-			coffeeStartCtxDataKeyPreviousMessageID,
-			coffeeStartCtxDataKeyPreviousChatID,
+			tryCreateCoffeePoolCtxDataKeyPreviousMessageID,
+			tryCreateCoffeePoolCtxDataKeyPreviousChatID,
 		)
 	}
 
@@ -226,10 +226,15 @@ func (h *coffeeStartHandler) RemovePreviousMessage(b *gotgbot.Bot, userID *int64
 	b.DeleteMessage(chatID, messageID, nil)
 }
 
-func (h *coffeeStartHandler) SavePreviousMessageInfo(userID int64, sentMsg *gotgbot.Message) {
+func (h *tryCreateCoffeePoolHandler) SavePreviousMessageInfo(userID int64, sentMsg *gotgbot.Message) {
 	if sentMsg == nil {
 		return
 	}
-	h.userStore.SetPreviousMessageInfo(userID, sentMsg.MessageId, sentMsg.Chat.Id,
-		coffeeStartCtxDataKeyPreviousMessageID, coffeeStartCtxDataKeyPreviousChatID)
+	h.userStore.SetPreviousMessageInfo(
+		userID,
+		sentMsg.MessageId,
+		sentMsg.Chat.Id,
+		tryCreateCoffeePoolCtxDataKeyPreviousMessageID,
+		tryCreateCoffeePoolCtxDataKeyPreviousChatID,
+	)
 }

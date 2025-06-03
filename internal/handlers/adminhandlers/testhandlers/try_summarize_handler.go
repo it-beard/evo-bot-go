@@ -1,4 +1,4 @@
-package adminhandlers
+package testhandlers
 
 import (
 	"context"

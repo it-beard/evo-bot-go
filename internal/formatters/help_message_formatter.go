@@ -1,14 +1,15 @@
 package formatters
 
 import (
+	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
 	"fmt"
 )
 
 // FormatHelpMessage generates the help message text with appropriate commands based on user permissions
-func FormatHelpMessage(isAdmin bool) string {
-	helpText := "<b>📋 Доступные команды</b>\n\n" +
-		"<b>🏠 Базовые</b>\n" +
+func FormatHelpMessage(isAdmin bool, config *config.Config) string {
+	helpText := "<b>📋 Функционал бота</b>\n\n" +
+		"<b>🏠 Базовые команды</b>\n" +
 		"└ /start - Приветственное сообщение\n" +
 		"└ /help - Показать список моих команд\n" +
 		"└ /cancel - Принудительно отменяет любой диалог\n\n" +
@@ -21,12 +22,13 @@ func FormatHelpMessage(isAdmin bool) string {
 		"<b>📅 Мероприятия</b>\n" +
 		"└ /events - Показать список предстоящих мероприятий\n" +
 		"└ /topics - Просмотреть темы и вопросы к предстоящим мероприятиям\n" +
-		"└ /topicAdd - Предложить тему или вопрос к предстоящему мероприятию\n\n"
+		"└ /topicAdd - Предложить тему или вопрос к предстоящему мероприятию"
 
-	featuresDescription := "\n<b>🎲 Еженедельный Random Coffee:</b>\n" +
-		"- Опрос для участия в случайных встречах на следующей неделе (обычно по пятницам).\n" +
-		"- Используйте опрос, чтобы указать свое участие.\n" +
-		"- Пары объявляются (обычно по понедельникам) после запуска команды администратором."
+	featuresDescription := "\n\n<b>☕️ Random Coffee</b>\n" +
+		"Я создаю еженедельные опросы для участия в клубных встречах. " +
+		"Используй опрос, чтобы поучаствовать в созвонах и познакомиться с другими клубчанами. " +
+		fmt.Sprintf("Пары для созвонов объявляются в начале недели в канале <a href=\"https://t.me/c/%d/%d\">«Random Coffee»</a>.",
+			config.SuperGroupChatID, config.RandomCoffeeTopicID)
 
 	helpText += featuresDescription
 
@@ -39,14 +41,17 @@ func FormatHelpMessage(isAdmin bool) string {
 			fmt.Sprintf("└ /%s - Создать новое мероприятие\n", constants.EventSetupCommand) +
 			fmt.Sprintf("└ /%s - Редактировать мероприятие\n", constants.EventEditCommand) +
 			fmt.Sprintf("└ /%s - Удалить мероприятие\n", constants.EventDeleteCommand) +
-			fmt.Sprintf("└ /%s - Просмотреть темы и вопросы к предстоящим мероприятиям *с возможностью удаления*\n", constants.ShowTopicsCommand) +
-			fmt.Sprintf("└ /%s - Ручной запуск генерации пар для Random Coffee\n", constants.CoffeeGeneratePairsCommand) +
-			fmt.Sprintf("└ /%s - Запустить новый опрос по кофейным встречам\n", constants.CoffeeRestartCommand) +
+			fmt.Sprintf("└ /%s - Просмотреть темы и вопросы к предстоящим мероприятиям <b>с возможностью удаления</b>\n", constants.ShowTopicsCommand) +
 			fmt.Sprintf("└ /%s - Ввести код для авторизации TG-клиента (задом наперед)\n", constants.CodeCommand) +
-			fmt.Sprintf("└ /%s - Тестирование саммаризации общения в клубе\n", constants.TrySummarizeCommand) +
-			fmt.Sprintf("└ /%s - Управление профилями клубчан\n", constants.AdminProfilesCommand)
+			fmt.Sprintf("└ /%s - Управление профилями клубчан", constants.AdminProfilesCommand)
+
+		testCommandsHelpText := "\n\n<b>⚙️ Команды для тестирования</b>\n" +
+			fmt.Sprintf("└ /%s - Ручная генерация саммаризации общения в клубе\n", constants.TrySummarizeCommand) +
+			fmt.Sprintf("└ /%s - Ручное создание нового опроса по Random Coffee\n", constants.TryCreateCoffeePoolCommand) +
+			fmt.Sprintf("└ /%s - Ручная генерация пар для Random Coffee\n", constants.TryGenerateCoffeePairsCommand)
 
 		helpText += adminHelpText
+		helpText += testCommandsHelpText
 	}
 
 	return helpText
