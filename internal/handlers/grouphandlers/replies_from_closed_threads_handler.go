@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"unicode/utf8"
 
+	"evo-bot-go/internal/clients"
 	"evo-bot-go/internal/config"
-	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
@@ -64,14 +64,14 @@ func (h *RepliesFromClosedThreadsHandler) handle(b *gotgbot.Bot, ctx *ext.Contex
 		if err := h.forwardReplyMessage(ctx); err != nil {
 			log.Printf(
 				"%s: error >> failed to forward reply message: %v",
-				constants.RepliesFromClosedThreadsHandlerName,
+				utils.GetCurrentTypeName(),
 				err)
 		}
 		_, err := msg.Delete(b, nil)
 		if err != nil {
 			log.Printf(
 				"%s: error >> failed to delete original message after forwarding: %v",
-				constants.RepliesFromClosedThreadsHandlerName,
+				utils.GetCurrentTypeName(),
 				err)
 		}
 	}
@@ -87,11 +87,11 @@ func (h *RepliesFromClosedThreadsHandler) forwardReplyMessage(ctx *ext.Context) 
 		msg.ReplyToMessage.MessageId)
 
 	// Get the topic name
-	topicName, topicErr := utils.GetTopicName(int(msg.MessageThreadId))
+	topicName, topicErr := clients.TgGetTopicName(int(msg.MessageThreadId))
 	if topicErr != nil {
 		log.Printf(
 			"%s: warning >> failed to get topic name: %v",
-			constants.RepliesFromClosedThreadsHandlerName,
+			utils.GetCurrentTypeName(),
 			topicErr)
 		// Continue with a default topic name
 		topicName = "Topic"
@@ -164,7 +164,7 @@ func (h *RepliesFromClosedThreadsHandler) forwardReplyMessage(ctx *ext.Context) 
 	// Forward the message
 	_, err := h.messageSenderService.SendCopy(msg.Chat.Id, &h.config.ForwardingTopicID, finalMessage, updatedEntities, msg)
 	if err != nil {
-		return fmt.Errorf("%s: error >> failed to forward reply message: %w", constants.RepliesFromClosedThreadsHandlerName, err)
+		return fmt.Errorf("%s: error >> failed to forward reply message: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	return nil

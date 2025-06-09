@@ -72,8 +72,12 @@ func (h *codeHandler) startCodeConversation(b *gotgbot.Bot, ctx *ext.Context) er
 
 	// Check if user has admin permissions and is in a private chat
 	if !h.permissionsService.CheckAdminAndPrivateChat(msg, constants.ShowTopicsCommand) {
-		log.Printf("CodeHandler: User %d (%s) tried to use /%s without admin permissions.",
-			ctx.EffectiveUser.Id, ctx.EffectiveUser.Username, constants.ShowTopicsCommand)
+		log.Printf("%s: User %d (%s) tried to use /%s without admin permissions.",
+			utils.GetCurrentTypeName(),
+			ctx.EffectiveUser.Id,
+			ctx.EffectiveUser.Username,
+			constants.ShowTopicsCommand,
+		)
 		return handlers.EndConversation()
 	}
 
@@ -117,7 +121,7 @@ func (h *codeHandler) processCode(b *gotgbot.Bot, ctx *ext.Context) error {
 		h.messageSenderService.Reply(msg, "Код принят", nil)
 	} else {
 		h.messageSenderService.Reply(msg, "Произошла ошибка при сохранении кода", nil)
-		log.Printf("CodeHandler: Error during code storage: %v", err)
+		log.Printf("%s: Error during code storage: %v", utils.GetCurrentTypeName(), err)
 	}
 
 	// Clean up user data

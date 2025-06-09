@@ -80,8 +80,12 @@ func (h *tryCreateCoffeePoolHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Cont
 
 	// Check if user has admin permissions and is in a private chat
 	if !h.permissionsService.CheckAdminAndPrivateChat(msg, constants.TryCreateCoffeePoolCommand) {
-		log.Printf("TryCreateCoffeePoolHandler: User %d (%s) tried to use /%s without admin permissions.",
-			ctx.EffectiveUser.Id, ctx.EffectiveUser.Username, constants.TryCreateCoffeePoolCommand)
+		log.Printf("%s: User %d (%s) tried to use /%s without admin permissions.",
+			utils.GetCurrentTypeName(),
+			ctx.EffectiveUser.Id,
+			ctx.EffectiveUser.Username,
+			constants.TryCreateCoffeePoolCommand,
+		)
 		return handlers.EndConversation()
 	}
 
@@ -106,7 +110,7 @@ func (h *tryCreateCoffeePoolHandler) showConfirmationMenu(b *gotgbot.Bot, msg *g
 		})
 
 	if err != nil {
-		return fmt.Errorf("TryCreateCoffeePoolHandler: failed to send message in showConfirmationMenu: %w", err)
+		return fmt.Errorf("%s: failed to send message in showConfirmationMenu: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	h.SavePreviousMessageInfo(userId, editedMsg)
@@ -128,7 +132,7 @@ func (h *tryCreateCoffeePoolHandler) handleConfirmCallback(b *gotgbot.Bot, ctx *
 		nil)
 
 	if err != nil {
-		return fmt.Errorf("TryCreateCoffeePoolHandler: failed to send processing message: %w", err)
+		return fmt.Errorf("%s: failed to send processing message: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	// Create the poll using the service
@@ -145,9 +149,9 @@ func (h *tryCreateCoffeePoolHandler) handleConfirmCallback(b *gotgbot.Bot, ctx *
 				ParseMode: "HTML",
 			})
 		if editErr != nil {
-			return fmt.Errorf("TryCreateCoffeePoolHandler: failed to edit error message: %w", editErr)
+			return fmt.Errorf("%s: failed to edit error message: %w", utils.GetCurrentTypeName(), editErr)
 		}
-		return fmt.Errorf("TryCreateCoffeePoolHandler: failed to create coffee poll: %w", err)
+		return fmt.Errorf("%s: failed to create coffee poll: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	// Update message with success
@@ -161,7 +165,7 @@ func (h *tryCreateCoffeePoolHandler) handleConfirmCallback(b *gotgbot.Bot, ctx *
 		})
 
 	if err != nil {
-		return fmt.Errorf("TryCreateCoffeePoolHandler: failed to update success message: %w", err)
+		return fmt.Errorf("%s: failed to update success message: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	h.userStore.Clear(userId)
@@ -183,7 +187,7 @@ func (h *tryCreateCoffeePoolHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Conte
 		"Создание опроса по кофейным встречам отменено.",
 		nil)
 	if err != nil {
-		return fmt.Errorf("TryCreateCoffeePoolHandler: failed to send cancel message: %w", err)
+		return fmt.Errorf("%s: failed to send cancel message: %w", utils.GetCurrentTypeName(), err)
 	}
 	h.userStore.Clear(userId)
 

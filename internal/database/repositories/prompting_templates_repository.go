@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"database/sql"
+	"evo-bot-go/internal/utils"
 	"fmt"
 )
 
@@ -34,7 +35,7 @@ func (r *PromptingTemplateRepository) Get(templateKey string) (string, error) {
 		if err == sql.ErrNoRows {
 			return "", nil // Return empty string if template not found
 		}
-		return "", fmt.Errorf("failed to get prompting template: %w", err)
+		return "", fmt.Errorf("%s: failed to get prompting template: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	return templateText, nil

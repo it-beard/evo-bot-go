@@ -66,6 +66,7 @@ type adminProfilesHandler struct {
 	config               *config.Config
 	messageSenderService *services.MessageSenderService
 	permissionsService   *services.PermissionsService
+	profileService       *services.ProfileService
 	userRepository       *repositories.UserRepository
 	profileRepository    *repositories.ProfileRepository
 	userStore            *utils.UserDataStore
@@ -75,6 +76,7 @@ func NewAdminProfilesHandler(
 	config *config.Config,
 	messageSenderService *services.MessageSenderService,
 	permissionsService *services.PermissionsService,
+	profileService *services.ProfileService,
 	userRepository *repositories.UserRepository,
 	profileRepository *repositories.ProfileRepository,
 ) ext.Handler {
@@ -82,6 +84,7 @@ func NewAdminProfilesHandler(
 		config:               config,
 		messageSenderService: messageSenderService,
 		permissionsService:   permissionsService,
+		profileService:       profileService,
 		userRepository:       userRepository,
 		profileRepository:    profileRepository,
 		userStore:            utils.NewUserDataStore(),
@@ -182,8 +185,12 @@ func (h *adminProfilesHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) e
 
 	// Check if user has admin permissions and is in a private chat
 	if !h.permissionsService.CheckAdminAndPrivateChat(msg, constants.AdminProfilesCommand) {
-		log.Printf("AdminProfilesHandler: User %d (%s) tried to use /%s without admin permissions.",
-			ctx.EffectiveUser.Id, ctx.EffectiveUser.Username, constants.AdminProfilesCommand)
+		log.Printf("%s: User %d (%s) tried to use /%s without admin permissions.",
+			utils.GetCurrentTypeName(),
+			ctx.EffectiveUser.Id,
+			ctx.EffectiveUser.Username,
+			constants.AdminProfilesCommand,
+		)
 		return handlers.EndConversation()
 	}
 
@@ -208,7 +215,7 @@ func (h *adminProfilesHandler) showMainMenu(b *gotgbot.Bot, msg *gotgbot.Message
 		})
 
 	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to send message in showMainMenu: %w", err)
+		return fmt.Errorf("%s: failed to send message in showMainMenu: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	h.SavePreviousMessageInfo(userId, editedMsg)
@@ -230,7 +237,7 @@ func (h *adminProfilesHandler) handleSearchByUsernameCallback(b *gotgbot.Bot, ct
 		})
 
 	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to send message in handleCallbackEdit: %w", err)
+		return fmt.Errorf("%s: failed to send message in handleCallbackEdit: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	h.SavePreviousMessageInfo(userId, editedMsg)
@@ -252,7 +259,7 @@ func (h *adminProfilesHandler) handleSearchByTelegramIDCallback(b *gotgbot.Bot, 
 		})
 
 	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to send message in handleSearchByIDCallback: %w", err)
+		return fmt.Errorf("%s: failed to send message in handleSearchByIDCallback: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	h.SavePreviousMessageInfo(userId, editedMsg)
@@ -274,7 +281,7 @@ func (h *adminProfilesHandler) handleSearchByFullNameCallback(b *gotgbot.Bot, ct
 		})
 
 	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to send message in handleSearchByNameCallback: %w", err)
+		return fmt.Errorf("%s: failed to send message in handleSearchByNameCallback: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	h.SavePreviousMessageInfo(userId, editedMsg)
@@ -296,7 +303,7 @@ func (h *adminProfilesHandler) handleCreateByForwardedMessageCallback(b *gotgbot
 		})
 
 	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to send message in handleCallbackCreate: %w", err)
+		return fmt.Errorf("%s: failed to send message in handleCallbackCreate: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	h.SavePreviousMessageInfo(userId, editedMsg)
@@ -318,7 +325,7 @@ func (h *adminProfilesHandler) handleCreateByTelegramIDCallback(b *gotgbot.Bot, 
 		})
 
 	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to send message in handleCreateByIDCallback: %w", err)
+		return fmt.Errorf("%s: failed to send message in handleCreateByIDCallback: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	h.SavePreviousMessageInfo(userId, editedMsg)
@@ -344,7 +351,7 @@ func (h *adminProfilesHandler) handleCreateByTelegramIDInput(b *gotgbot.Bot, ctx
 				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
 			})
 		if err != nil {
-			return fmt.Errorf("AdminProfilesHandler: failed to send message in handleUserIDInput: %w", err)
+			return fmt.Errorf("%s: failed to send message in handleUserIDInput: %w", utils.GetCurrentTypeName(), err)
 		}
 
 		h.SavePreviousMessageInfo(userId, editedMsg)
@@ -354,19 +361,19 @@ func (h *adminProfilesHandler) handleCreateByTelegramIDInput(b *gotgbot.Bot, ctx
 	// Check if user exists, create if not
 	dbUser, err := h.userRepository.GetByTelegramID(telegramID)
 	if err != nil && err != sql.ErrNoRows {
-		return fmt.Errorf("AdminProfilesHandler: failed to get user in handleUserIDInput: %w", err)
+		return fmt.Errorf("%s: failed to get user in handleUserIDInput: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	// If user not found, create a new user with minimal info
 	if err == sql.ErrNoRows {
 		userID, err := h.userRepository.Create(telegramID, "", "", "")
 		if err != nil {
-			return fmt.Errorf("AdminProfilesHandler: failed to create user in handleUserIDInput: %w", err)
+			return fmt.Errorf("%s: failed to create user in handleUserIDInput: %w", utils.GetCurrentTypeName(), err)
 		}
 
 		dbUser, err = h.userRepository.GetByID(userID)
 		if err != nil {
-			return fmt.Errorf("AdminProfilesHandler: failed to get created user in handleUserIDInput: %w", err)
+			return fmt.Errorf("%s: failed to get created user in handleUserIDInput: %w", utils.GetCurrentTypeName(), err)
 		}
 	}
 
@@ -380,7 +387,7 @@ func (h *adminProfilesHandler) handleCreateByTelegramIDInput(b *gotgbot.Bot, ctx
 	if err != nil {
 		_ = h.messageSenderService.Reply(msg,
 			"Произошла ошибка при получении или создании профиля.", nil)
-		return fmt.Errorf("AdminProfilesHandler: failed to get/create profile in handleUserIDInput: %w", err)
+		return fmt.Errorf("%s: failed to get/create profile in handleUserIDInput: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	h.userStore.Set(userId, adminProfilesCtxDataKeyProfileID, profile.ID)
@@ -404,7 +411,7 @@ func (h *adminProfilesHandler) handleSearchByUsernameInput(b *gotgbot.Bot, ctx *
 
 	dbUser, err := h.userRepository.GetByTelegramUsername(username)
 	if err != nil && err != sql.ErrNoRows {
-		return fmt.Errorf("AdminProfilesHandler: failed to get user in handleUsernameInput: %w", err)
+		return fmt.Errorf("%s: failed to get user in handleUsernameInput: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	// If user not found, show search again
@@ -420,7 +427,7 @@ func (h *adminProfilesHandler) handleSearchByUsernameInput(b *gotgbot.Bot, ctx *
 				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
 			})
 		if err != nil {
-			return fmt.Errorf("AdminProfilesHandler: failed to send message in handleUsernameInput: %w", err)
+			return fmt.Errorf("%s: failed to send message in handleUsernameInput: %w", utils.GetCurrentTypeName(), err)
 		}
 
 		h.SavePreviousMessageInfo(userId, editedMsg)
@@ -437,7 +444,7 @@ func (h *adminProfilesHandler) handleSearchByUsernameInput(b *gotgbot.Bot, ctx *
 	if err != nil {
 		_ = h.messageSenderService.Reply(msg,
 			"Произошла ошибка при получении или создании профиля.", nil)
-		return fmt.Errorf("AdminProfilesHandler: failed to get/create profile in handleUsernameInput: %w", err)
+		return fmt.Errorf("%s: failed to get/create profile in handleUsernameInput: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	h.userStore.Set(userId, adminProfilesCtxDataKeyProfileID, profile.ID)
@@ -473,7 +480,7 @@ func (h *adminProfilesHandler) handleCreateByForwardedMessageInput(b *gotgbot.Bo
 			})
 
 		if err != nil {
-			return fmt.Errorf("AdminProfilesHandler: failed to send message in handleForwardedMessage: %w", err)
+			return fmt.Errorf("%s: failed to send message in handleForwardedMessage: %w", utils.GetCurrentTypeName(), err)
 		}
 
 		h.SavePreviousMessageInfo(userId, editedMsg)
@@ -484,11 +491,11 @@ func (h *adminProfilesHandler) handleCreateByForwardedMessageInput(b *gotgbot.Bo
 	forwardedUser := msg.ForwardOrigin.MergeMessageOrigin().SenderUser
 
 	// Get the user from the database if exists, or create a new one
-	dbUser, err := h.userRepository.GetOrCreateUser(forwardedUser)
+	dbUser, err := h.userRepository.GetOrCreate(forwardedUser)
 	if err != nil {
 		_ = h.messageSenderService.Reply(msg,
 			"Произошла ошибка при создании пользователя.", nil)
-		return fmt.Errorf("AdminProfilesHandler: failed to create user in handleForwardedMessage: %w", err)
+		return fmt.Errorf("%s: failed to create user in handleForwardedMessage: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	// Store the user ID for future use
@@ -501,7 +508,7 @@ func (h *adminProfilesHandler) handleCreateByForwardedMessageInput(b *gotgbot.Bo
 	if err != nil {
 		_ = h.messageSenderService.Reply(msg,
 			"Произошла ошибка при создании профиля.", nil)
-		return fmt.Errorf("AdminProfilesHandler: failed to create profile in handleForwardedMessage: %w", err)
+		return fmt.Errorf("%s: failed to create profile in handleForwardedMessage: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	h.userStore.Set(userId, adminProfilesCtxDataKeyProfileID, profile.ID)
@@ -522,18 +529,18 @@ func (h *adminProfilesHandler) handleEditMenuCallback(b *gotgbot.Bot, ctx *ext.C
 	h.RemovePreviousMessage(b, &userId)
 	userIDVal, ok := h.userStore.Get(userId, adminProfilesCtxDataKeyUserID)
 	if !ok {
-		return fmt.Errorf("AdminProfilesHandler: user ID not found in user store")
+		return fmt.Errorf("%s: user ID not found in user store", utils.GetCurrentTypeName())
 	}
 	dbUserID := userIDVal.(int)
 
 	user, err := h.userRepository.GetByID(dbUserID)
 	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to get user in handleEditMenuCallback: %w", err)
+		return fmt.Errorf("%s: failed to get user in handleEditMenuCallback: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	profile, err := h.profileRepository.GetOrCreate(dbUserID)
 	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to get profile in handleEditMenuCallback: %w", err)
+		return fmt.Errorf("%s: failed to get profile in handleEditMenuCallback: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	return h.showProfileEditMenu(b, msg, userId, user, profile)
@@ -558,7 +565,7 @@ func (h *adminProfilesHandler) handleSearchUserIDInput(b *gotgbot.Bot, ctx *ext.
 				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
 			})
 		if err != nil {
-			return fmt.Errorf("AdminProfilesHandler: failed to send message in handleSearchUserIDInput: %w", err)
+			return fmt.Errorf("%s: failed to send message in handleSearchUserIDInput: %w", utils.GetCurrentTypeName(), err)
 		}
 
 		h.SavePreviousMessageInfo(userId, editedMsg)
@@ -568,7 +575,7 @@ func (h *adminProfilesHandler) handleSearchUserIDInput(b *gotgbot.Bot, ctx *ext.
 	// Check if user exists
 	dbUser, err := h.userRepository.GetByTelegramID(telegramID)
 	if err != nil && err != sql.ErrNoRows {
-		return fmt.Errorf("AdminProfilesHandler: failed to get user in handleSearchUserIDInput: %w", err)
+		return fmt.Errorf("%s: failed to get user in handleSearchUserIDInput: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	// If user not found, show search again
@@ -584,7 +591,7 @@ func (h *adminProfilesHandler) handleSearchUserIDInput(b *gotgbot.Bot, ctx *ext.
 				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
 			})
 		if err != nil {
-			return fmt.Errorf("AdminProfilesHandler: failed to send message in handleSearchUserIDInput: %w", err)
+			return fmt.Errorf("%s: failed to send message in handleSearchUserIDInput: %w", utils.GetCurrentTypeName(), err)
 		}
 
 		h.SavePreviousMessageInfo(userId, editedMsg)
@@ -601,7 +608,7 @@ func (h *adminProfilesHandler) handleSearchUserIDInput(b *gotgbot.Bot, ctx *ext.
 	if err != nil {
 		_ = h.messageSenderService.Reply(msg,
 			"Произошла ошибка при получении профиля.", nil)
-		return fmt.Errorf("AdminProfilesHandler: failed to get profile in handleSearchUserIDInput: %w", err)
+		return fmt.Errorf("%s: failed to get profile in handleSearchUserIDInput: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	h.userStore.Set(userId, adminProfilesCtxDataKeyProfileID, profile.ID)
@@ -634,7 +641,7 @@ func (h *adminProfilesHandler) handleSearchByFullNameInput(b *gotgbot.Bot, ctx *
 				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
 			})
 		if err != nil {
-			return fmt.Errorf("AdminProfilesHandler: failed to send message in handleSearchByFullNameInput: %w", err)
+			return fmt.Errorf("%s: failed to send message in handleSearchByFullNameInput: %w", utils.GetCurrentTypeName(), err)
 		}
 
 		h.SavePreviousMessageInfo(userId, editedMsg)
@@ -647,7 +654,7 @@ func (h *adminProfilesHandler) handleSearchByFullNameInput(b *gotgbot.Bot, ctx *
 	// Search for the user by first and last name
 	user, err := h.userRepository.SearchByName(firstname, lastname)
 	if err != nil && err != sql.ErrNoRows {
-		return fmt.Errorf("AdminProfilesHandler: failed to search user in handleSearchNameInput: %w", err)
+		return fmt.Errorf("%s: failed to search user in handleSearchNameInput: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	// If user not found, show search again
@@ -663,7 +670,7 @@ func (h *adminProfilesHandler) handleSearchByFullNameInput(b *gotgbot.Bot, ctx *
 				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
 			})
 		if err != nil {
-			return fmt.Errorf("AdminProfilesHandler: failed to send message in handleSearchNameInput: %w", err)
+			return fmt.Errorf("%s: failed to send message in handleSearchNameInput: %w", utils.GetCurrentTypeName(), err)
 		}
 
 		h.SavePreviousMessageInfo(userId, editedMsg)
@@ -680,7 +687,7 @@ func (h *adminProfilesHandler) handleSearchByFullNameInput(b *gotgbot.Bot, ctx *
 	if err != nil {
 		_ = h.messageSenderService.Reply(msg,
 			"Произошла ошибка при получении профиля.", nil)
-		return fmt.Errorf("AdminProfilesHandler: failed to get profile in handleSearchNameInput: %w", err)
+		return fmt.Errorf("%s: failed to get profile in handleSearchNameInput: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	h.userStore.Set(userId, adminProfilesCtxDataKeyProfileID, profile.ID)
@@ -705,7 +712,7 @@ func (h *adminProfilesHandler) showProfileEditMenu(b *gotgbot.Bot, msg *gotgbot.
 		})
 
 	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to send message in showProfileEditMenu: %w", err)
+		return fmt.Errorf("%s: failed to send message in showProfileEditMenu: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	h.SavePreviousMessageInfo(userId, editedMsg)
@@ -722,26 +729,26 @@ func (h *adminProfilesHandler) handleEditFieldCallback(b *gotgbot.Bot, ctx *ext.
 	// Get stored user and profile IDs
 	userIDVal, ok := h.userStore.Get(userId, adminProfilesCtxDataKeyUserID)
 	if !ok {
-		return fmt.Errorf("AdminProfilesHandler: user ID not found in user store")
+		return fmt.Errorf("%s: user ID not found in user store", utils.GetCurrentTypeName())
 	}
 	dbUserID := userIDVal.(int)
 
 	// Get the user from database
 	dbUser, err := h.userRepository.GetByID(dbUserID)
 	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to get user in handleCallbackEditField: %w", err)
+		return fmt.Errorf("%s: failed to get user in handleCallbackEditField: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	// Get the profile from database
 	profileIDVal, ok := h.userStore.Get(userId, adminProfilesCtxDataKeyProfileID)
 	if !ok {
-		return fmt.Errorf("AdminProfilesHandler: profile ID not found in user store")
+		return fmt.Errorf("%s: profile ID not found in user store", utils.GetCurrentTypeName())
 	}
 	profileID := profileIDVal.(int)
 
 	profile, err := h.profileRepository.GetByID(profileID)
 	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to get profile in handleCallbackEditField: %w", err)
+		return fmt.Errorf("%s: failed to get profile in handleCallbackEditField: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	var callToAction string
@@ -783,7 +790,7 @@ func (h *adminProfilesHandler) handleEditFieldCallback(b *gotgbot.Bot, ctx *ext.
 			oldField = "Текущее значение: ✅ Разрешено"
 		}
 	default:
-		return fmt.Errorf("AdminProfilesHandler: unknown callback data: %s", data)
+		return fmt.Errorf("%s: unknown callback data: %s", utils.GetCurrentTypeName(), data)
 	}
 
 	// Store field being edited for use in input handlers
@@ -810,7 +817,7 @@ func (h *adminProfilesHandler) handleEditFieldCallback(b *gotgbot.Bot, ctx *ext.
 		})
 
 	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to send message in handleCallbackEditField: %w", err)
+		return fmt.Errorf("%s: failed to send message in handleCallbackEditField: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	h.SavePreviousMessageInfo(userId, editedMsg)
@@ -835,26 +842,26 @@ func (h *adminProfilesHandler) handlePublishProfile(b *gotgbot.Bot, ctx *ext.Con
 	// Get user data
 	userIDVal, ok := h.userStore.Get(userId, adminProfilesCtxDataKeyUserID)
 	if !ok {
-		return fmt.Errorf("AdminProfilesHandler: user ID not found in user store")
+		return fmt.Errorf("%s: user ID not found in user store", utils.GetCurrentTypeName())
 	}
 	dbUserID := userIDVal.(int)
 
 	// Get user from database
 	dbUser, err := h.userRepository.GetByID(dbUserID)
 	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to get user in handlePublishProfile: %w", err)
+		return fmt.Errorf("%s: failed to get user in handlePublishProfile: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	// Get profile from database
 	profileIDVal, ok := h.userStore.Get(userId, adminProfilesCtxDataKeyProfileID)
 	if !ok {
-		return fmt.Errorf("AdminProfilesHandler: profile ID not found in user store")
+		return fmt.Errorf("%s: profile ID not found in user store", utils.GetCurrentTypeName())
 	}
 	profileID := profileIDVal.(int)
 
 	profile, err := h.profileRepository.GetByID(profileID)
 	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to get profile in handlePublishProfile: %w", err)
+		return fmt.Errorf("%s: failed to get profile in handlePublishProfile: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	firstNameString := "└ ❌ Имя"
@@ -875,7 +882,7 @@ func (h *adminProfilesHandler) handlePublishProfile(b *gotgbot.Bot, ctx *ext.Con
 		}
 	}
 
-	if !utils.IsProfileComplete(dbUser, profile) {
+	if !h.profileService.IsProfileComplete(dbUser, profile) {
 		h.RemovePreviousMessage(b, &userId)
 		editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
 			msg.Chat.Id,
@@ -891,7 +898,7 @@ func (h *adminProfilesHandler) handlePublishProfile(b *gotgbot.Bot, ctx *ext.Con
 			})
 
 		if err != nil {
-			return fmt.Errorf("AdminProfilesHandler: failed to send message in handlePublishProfile: %w", err)
+			return fmt.Errorf("%s: failed to send message in handlePublishProfile: %w", utils.GetCurrentTypeName(), err)
 		}
 
 		h.SavePreviousMessageInfo(userId, editedMsg)
@@ -927,7 +934,7 @@ func (h *adminProfilesHandler) handlePublishProfile(b *gotgbot.Bot, ctx *ext.Con
 					},
 				})
 			if err != nil {
-				return fmt.Errorf("AdminProfilesHandler: failed to publish profile: %w", err)
+				return fmt.Errorf("%s: failed to publish profile: %w", utils.GetCurrentTypeName(), err)
 			}
 		} else {
 			// Message updated successfully, store the message ID for database update
@@ -948,14 +955,14 @@ func (h *adminProfilesHandler) handlePublishProfile(b *gotgbot.Bot, ctx *ext.Con
 				},
 			})
 		if err != nil {
-			return fmt.Errorf("AdminProfilesHandler: failed to publish profile: %w", err)
+			return fmt.Errorf("%s: failed to publish profile: %w", utils.GetCurrentTypeName(), err)
 		}
 	}
 
 	// Update profile with the published message ID
 	err = h.profileRepository.UpdatePublishedMessageID(profile.ID, publishedMsg.MessageId)
 	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to update published message ID: %w", err)
+		return fmt.Errorf("%s: failed to update published message ID: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	// Show success message
@@ -969,7 +976,7 @@ func (h *adminProfilesHandler) handlePublishProfile(b *gotgbot.Bot, ctx *ext.Con
 		})
 
 	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to send success message: %w", err)
+		return fmt.Errorf("%s: failed to send success message: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	h.SavePreviousMessageInfo(userId, editedMsg)
@@ -1013,7 +1020,7 @@ func (h *adminProfilesHandler) handleBioInput(b *gotgbot.Bot, ctx *ext.Context) 
 	// Get profile ID from store
 	profileIDVal, ok := h.userStore.Get(userId, adminProfilesCtxDataKeyProfileID)
 	if !ok {
-		return fmt.Errorf("AdminProfilesHandler: profile ID not found in user store")
+		return fmt.Errorf("%s: profile ID not found in user store", utils.GetCurrentTypeName())
 	}
 	profileID := profileIDVal.(int)
 
@@ -1022,7 +1029,7 @@ func (h *adminProfilesHandler) handleBioInput(b *gotgbot.Bot, ctx *ext.Context) 
 		"bio": bio,
 	})
 	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to update bio: %w", err)
+		return fmt.Errorf("%s: failed to update bio: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	return h.returnToProfileView(b, ctx)
@@ -1052,7 +1059,7 @@ func (h *adminProfilesHandler) handleFirstnameInput(b *gotgbot.Bot, ctx *ext.Con
 	// Get user ID from store
 	userIDVal, ok := h.userStore.Get(userId, adminProfilesCtxDataKeyUserID)
 	if !ok {
-		return fmt.Errorf("AdminProfilesHandler: user ID not found in user store")
+		return fmt.Errorf("%s: user ID not found in user store", utils.GetCurrentTypeName())
 	}
 	dbUserID := userIDVal.(int)
 
@@ -1061,7 +1068,7 @@ func (h *adminProfilesHandler) handleFirstnameInput(b *gotgbot.Bot, ctx *ext.Con
 		"firstname": firstname,
 	})
 	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to update firstname: %w", err)
+		return fmt.Errorf("%s: failed to update firstname: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	return h.returnToProfileView(b, ctx)
@@ -1091,7 +1098,7 @@ func (h *adminProfilesHandler) handleLastnameInput(b *gotgbot.Bot, ctx *ext.Cont
 	// Get user ID from store
 	userIDVal, ok := h.userStore.Get(userId, adminProfilesCtxDataKeyUserID)
 	if !ok {
-		return fmt.Errorf("AdminProfilesHandler: user ID not found in user store")
+		return fmt.Errorf("%s: user ID not found in user store", utils.GetCurrentTypeName())
 	}
 	dbUserID := userIDVal.(int)
 
@@ -1100,7 +1107,7 @@ func (h *adminProfilesHandler) handleLastnameInput(b *gotgbot.Bot, ctx *ext.Cont
 		"lastname": lastname,
 	})
 	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to update lastname: %w", err)
+		return fmt.Errorf("%s: failed to update lastname: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	return h.returnToProfileView(b, ctx)
@@ -1135,7 +1142,7 @@ func (h *adminProfilesHandler) handleUsernameInput(b *gotgbot.Bot, ctx *ext.Cont
 	// Get user ID from store
 	userIDVal, ok := h.userStore.Get(userId, adminProfilesCtxDataKeyUserID)
 	if !ok {
-		return fmt.Errorf("AdminProfilesHandler: user ID not found in user store")
+		return fmt.Errorf("%s: user ID not found in user store", utils.GetCurrentTypeName())
 	}
 	dbUserID := userIDVal.(int)
 
@@ -1144,7 +1151,7 @@ func (h *adminProfilesHandler) handleUsernameInput(b *gotgbot.Bot, ctx *ext.Cont
 		"tg_username": username,
 	})
 	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to update username: %w", err)
+		return fmt.Errorf("%s: failed to update username: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	return h.returnToProfileView(b, ctx)
@@ -1162,26 +1169,26 @@ func (h *adminProfilesHandler) returnToProfileView(b *gotgbot.Bot, ctx *ext.Cont
 	// Get user data
 	userIDVal, ok := h.userStore.Get(userId, adminProfilesCtxDataKeyUserID)
 	if !ok {
-		return fmt.Errorf("AdminProfilesHandler: user ID not found in user store")
+		return fmt.Errorf("%s: user ID not found in user store", utils.GetCurrentTypeName())
 	}
 	dbUserID := userIDVal.(int)
 
 	// Get user from database
 	dbUser, err := h.userRepository.GetByID(dbUserID)
 	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to get user in returnToProfileView: %w", err)
+		return fmt.Errorf("%s: failed to get user in returnToProfileView: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	// Get profile from database
 	profileIDVal, ok := h.userStore.Get(userId, adminProfilesCtxDataKeyProfileID)
 	if !ok {
-		return fmt.Errorf("AdminProfilesHandler: profile ID not found in user store")
+		return fmt.Errorf("%s: profile ID not found in user store", utils.GetCurrentTypeName())
 	}
 	profileID := profileIDVal.(int)
 
 	profile, err := h.profileRepository.GetByID(profileID)
 	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to get profile in returnToProfileView: %w", err)
+		return fmt.Errorf("%s: failed to get profile in returnToProfileView: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	successMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
@@ -1190,7 +1197,7 @@ func (h *adminProfilesHandler) returnToProfileView(b *gotgbot.Bot, ctx *ext.Cont
 		nil)
 
 	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to send success message: %w", err)
+		return fmt.Errorf("%s: failed to send success message: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	// Show updated profile after a brief delay
@@ -1209,21 +1216,21 @@ func (h *adminProfilesHandler) handleToggleCoffeeBanCallback(b *gotgbot.Bot, ctx
 	// Get user data
 	userIDVal, ok := h.userStore.Get(userId, adminProfilesCtxDataKeyUserID)
 	if !ok {
-		return fmt.Errorf("AdminProfilesHandler: user ID not found in user store")
+		return fmt.Errorf("%s: user ID not found in user store", utils.GetCurrentTypeName())
 	}
 	dbUserID := userIDVal.(int)
 
 	// Get user from database
 	dbUser, err := h.userRepository.GetByID(dbUserID)
 	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to get user in handleToggleCoffeeBanCallback: %w", err)
+		return fmt.Errorf("%s: failed to get user in handleToggleCoffeeBanCallback: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	// Toggle the coffee ban status
 	newStatus := !dbUser.HasCoffeeBan
 	err = h.userRepository.SetCoffeeBan(dbUserID, newStatus)
 	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to update coffee ban status: %w", err)
+		return fmt.Errorf("%s: failed to update coffee ban status: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	// Update the message with new buttons
@@ -1246,7 +1253,7 @@ func (h *adminProfilesHandler) handleToggleCoffeeBanCallback(b *gotgbot.Bot, ctx
 		})
 
 	if err != nil {
-		return fmt.Errorf("AdminProfilesHandler: failed to send message in handleToggleCoffeeBanCallback: %w", err)
+		return fmt.Errorf("%s: failed to send message in handleToggleCoffeeBanCallback: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	h.SavePreviousMessageInfo(userId, editedMsg)

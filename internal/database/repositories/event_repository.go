@@ -3,6 +3,7 @@ package repositories
 import (
 	"database/sql"
 	"evo-bot-go/internal/constants"
+	"evo-bot-go/internal/utils"
 	"fmt"
 	"log"
 	"time"
@@ -39,7 +40,7 @@ func (r *EventRepository) CreateEvent(name string, eventType constants.EventType
 	query := `INSERT INTO events (name, type, status) VALUES ($1, $2, $3) RETURNING id`
 	err := r.db.QueryRow(query, name, eventType, constants.EventStatusActual).Scan(&id)
 	if err != nil {
-		return 0, fmt.Errorf("failed to insert event: %w", err)
+		return 0, fmt.Errorf("%s: failed to insert event: %w", utils.GetCurrentTypeName(), err)
 	}
 	return id, nil
 }
@@ -50,7 +51,7 @@ func (r *EventRepository) CreateEventWithStartedAt(name string, eventType consta
 	query := `INSERT INTO events (name, type, status, started_at) VALUES ($1, $2, $3, $4) RETURNING id`
 	err := r.db.QueryRow(query, name, eventType, constants.EventStatusActual, startedAt).Scan(&id)
 	if err != nil {
-		return 0, fmt.Errorf("failed to insert event with started_at: %w", err)
+		return 0, fmt.Errorf("%s: failed to insert event with started_at: %w", utils.GetCurrentTypeName(), err)
 	}
 	return id, nil
 }
@@ -66,7 +67,7 @@ func (r *EventRepository) GetLastActualEvents(limit int) ([]Event, error) {
 
 	rows, err := r.db.Query(query, constants.EventStatusActual, limit)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query last events: %w", err)
+		return nil, fmt.Errorf("%s: failed to query last events: %w", utils.GetCurrentTypeName(), err)
 	}
 	defer rows.Close()
 
@@ -74,13 +75,13 @@ func (r *EventRepository) GetLastActualEvents(limit int) ([]Event, error) {
 	for rows.Next() {
 		var e Event
 		if err := rows.Scan(&e.ID, &e.Name, &e.Type, &e.Status, &e.StartedAt, &e.CreatedAt, &e.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("failed to scan event row: %w", err)
+			return nil, fmt.Errorf("%s: failed to scan event row: %w", utils.GetCurrentTypeName(), err)
 		}
 		events = append(events, e)
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error during rows iteration for events: %w", err)
+		return nil, fmt.Errorf("%s: error during rows iteration for events: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	return events, nil
@@ -96,7 +97,7 @@ func (r *EventRepository) GetLastEvents(limit int) ([]Event, error) {
 
 	rows, err := r.db.Query(query, limit)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query last events: %w", err)
+		return nil, fmt.Errorf("%s: failed to query last events: %w", utils.GetCurrentTypeName(), err)
 	}
 	defer rows.Close()
 
@@ -104,13 +105,13 @@ func (r *EventRepository) GetLastEvents(limit int) ([]Event, error) {
 	for rows.Next() {
 		var e Event
 		if err := rows.Scan(&e.ID, &e.Name, &e.Type, &e.Status, &e.StartedAt, &e.CreatedAt, &e.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("failed to scan event row: %w", err)
+			return nil, fmt.Errorf("%s: failed to scan event row: %w", utils.GetCurrentTypeName(), err)
 		}
 		events = append(events, e)
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error during rows iteration for events: %w", err)
+		return nil, fmt.Errorf("%s: error during rows iteration for events: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	return events, nil
@@ -121,15 +122,15 @@ func (r *EventRepository) UpdateEventName(id int, newName string) error {
 	query := `UPDATE events SET name = $1, updated_at = NOW() WHERE id = $2`
 	result, err := r.db.Exec(query, newName, id)
 	if err != nil {
-		return fmt.Errorf("failed to update event name for ID %d: %w", id, err)
+		return fmt.Errorf("%s: failed to update event name for ID %d: %w", utils.GetCurrentTypeName(), id, err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		// Log the error but don't fail the operation if rowsAffected can't be retrieved
-		log.Printf("Could not get rows affected after update: %v", err)
+		log.Printf("%s: Could not get rows affected after update: %v", utils.GetCurrentTypeName(), err)
 	} else if rowsAffected == 0 {
-		return fmt.Errorf("no event found with ID %d to update", id)
+		return fmt.Errorf("%s: no event found with ID %d to update", utils.GetCurrentTypeName(), id)
 	}
 
 	return nil
@@ -140,14 +141,14 @@ func (r *EventRepository) UpdateEventStatus(id int, status constants.EventStatus
 	query := `UPDATE events SET status = $1, updated_at = NOW() WHERE id = $2`
 	result, err := r.db.Exec(query, status, id)
 	if err != nil {
-		return fmt.Errorf("failed to update event status for ID %d: %w", id, err)
+		return fmt.Errorf("%s: failed to update event status for ID %d: %w", utils.GetCurrentTypeName(), id, err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		log.Printf("Could not get rows affected after update: %v", err)
+		log.Printf("%s: Could not get rows affected after update: %v", utils.GetCurrentTypeName(), err)
 	} else if rowsAffected == 0 {
-		return fmt.Errorf("no event found with ID %d to update status", id)
+		return fmt.Errorf("%s: no event found with ID %d to update status", utils.GetCurrentTypeName(), id)
 	}
 
 	return nil
@@ -158,14 +159,14 @@ func (r *EventRepository) UpdateEventStartedAt(id int, startedAt time.Time) erro
 	query := `UPDATE events SET started_at = $1, updated_at = NOW() WHERE id = $2`
 	result, err := r.db.Exec(query, startedAt, id)
 	if err != nil {
-		return fmt.Errorf("failed to update event started_at for ID %d: %w", id, err)
+		return fmt.Errorf("%s: failed to update event started_at for ID %d: %w", utils.GetCurrentTypeName(), id, err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		log.Printf("Could not get rows affected after update: %v", err)
+		log.Printf("%s: Could not get rows affected after update: %v", utils.GetCurrentTypeName(), err)
 	} else if rowsAffected == 0 {
-		return fmt.Errorf("no event found with ID %d to update started_at", id)
+		return fmt.Errorf("%s: no event found with ID %d to update started_at", utils.GetCurrentTypeName(), id)
 	}
 
 	return nil
@@ -176,14 +177,14 @@ func (r *EventRepository) UpdateEventType(id int, eventType constants.EventType)
 	query := `UPDATE events SET type = $1, updated_at = NOW() WHERE id = $2`
 	result, err := r.db.Exec(query, string(eventType), id)
 	if err != nil {
-		return fmt.Errorf("failed to update event type for ID %d: %w", id, err)
+		return fmt.Errorf("%s: failed to update event type for ID %d: %w", utils.GetCurrentTypeName(), id, err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		log.Printf("Could not get rows affected after update: %v", err)
+		log.Printf("%s: Could not get rows affected after update: %v", utils.GetCurrentTypeName(), err)
 	} else if rowsAffected == 0 {
-		return fmt.Errorf("no event found with ID %d to update type", id)
+		return fmt.Errorf("%s: no event found with ID %d to update type", utils.GetCurrentTypeName(), id)
 	}
 
 	return nil
@@ -194,13 +195,13 @@ func (r *EventRepository) DeleteEvent(id int) error {
 	// First, get all topics related to this event
 	topics, err := r.topicRepository.GetTopicsByEventID(id)
 	if err != nil {
-		return fmt.Errorf("failed to get topics for event ID %d: %w", id, err)
+		return fmt.Errorf("%s: failed to get topics for event ID %d: %w", utils.GetCurrentTypeName(), id, err)
 	}
 
 	// Delete all related topics
 	for _, topic := range topics {
 		if err := r.topicRepository.DeleteTopic(topic.ID); err != nil {
-			return fmt.Errorf("failed to delete related topic with ID %d: %w", topic.ID, err)
+			return fmt.Errorf("%s: failed to delete related topic with ID %d: %w", utils.GetCurrentTypeName(), topic.ID, err)
 		}
 	}
 
@@ -208,14 +209,14 @@ func (r *EventRepository) DeleteEvent(id int) error {
 	query := `DELETE FROM events WHERE id = $1`
 	result, err := r.db.Exec(query, id)
 	if err != nil {
-		return fmt.Errorf("failed to delete event with ID %d: %w", id, err)
+		return fmt.Errorf("%s: failed to delete event with ID %d: %w", utils.GetCurrentTypeName(), id, err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		log.Printf("Could not get rows affected after delete: %v", err)
+		log.Printf("%s: Could not get rows affected after delete: %v", utils.GetCurrentTypeName(), err)
 	} else if rowsAffected == 0 {
-		return fmt.Errorf("no event found with ID %d to delete", id)
+		return fmt.Errorf("%s: no event found with ID %d to delete", utils.GetCurrentTypeName(), id)
 	}
 
 	return nil
@@ -240,11 +241,11 @@ func (r *EventRepository) GetEventByID(id int) (*Event, error) {
 	)
 
 	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("no event found with ID %d", id)
+		return nil, fmt.Errorf("%s: no event found with ID %d", utils.GetCurrentTypeName(), id)
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get event with ID %d: %w", id, err)
+		return nil, fmt.Errorf("%s: failed to get event with ID %d: %w", utils.GetCurrentTypeName(), id, err)
 	}
 
 	return &event, nil

@@ -89,8 +89,12 @@ func (h *eventSetupHandler) startSetup(b *gotgbot.Bot, ctx *ext.Context) error {
 
 	// Check if user has admin permissions and is in a private chat
 	if !h.permissionsService.CheckAdminAndPrivateChat(msg, constants.ShowTopicsCommand) {
-		log.Printf("EventSetupHandler: User %d (%s) tried to use /%s without admin permissions.",
-			ctx.EffectiveUser.Id, ctx.EffectiveUser.Username, constants.ShowTopicsCommand)
+		log.Printf("%s: User %d (%s) tried to use /%s without admin permissions.",
+			utils.GetCurrentTypeName(),
+			ctx.EffectiveUser.Id,
+			ctx.EffectiveUser.Username,
+			constants.ShowTopicsCommand,
+		)
 		return handlers.EndConversation()
 	}
 
@@ -200,7 +204,7 @@ func (h *eventSetupHandler) handleEventType(b *gotgbot.Bot, ctx *ext.Context) er
 	id, err := h.eventRepository.CreateEvent(eventName, eventType)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Произошла ошибка при создании записи о мероприятии.", nil)
-		log.Printf("EventSetupHandler: Error during event creation: %v", err)
+		log.Printf("%s: Error during event creation: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 
@@ -267,7 +271,7 @@ func (h *eventSetupHandler) handleEventStartedAt(b *gotgbot.Bot, ctx *ext.Contex
 	err = h.eventRepository.UpdateEventStartedAt(eventID, startedAt)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Произошла ошибка при обновлении даты начала мероприятия.", nil)
-		log.Printf("EventSetupHandler: Error during event update: %v", err)
+		log.Printf("%s: Error during event update: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 

@@ -105,8 +105,12 @@ func (h *eventEditHandler) startEdit(b *gotgbot.Bot, ctx *ext.Context) error {
 
 	// Check if user has admin permissions and is in a private chat
 	if !h.permissionsService.CheckAdminAndPrivateChat(msg, constants.ShowTopicsCommand) {
-		log.Printf("EventEditHandler: User %d (%s) tried to use /%s without admin permissions.",
-			ctx.EffectiveUser.Id, ctx.EffectiveUser.Username, constants.ShowTopicsCommand)
+		log.Printf("%s: User %d (%s) tried to use /%s without admin permissions.",
+			utils.GetCurrentTypeName(),
+			ctx.EffectiveUser.Id,
+			ctx.EffectiveUser.Username,
+			constants.ShowTopicsCommand,
+		)
 		return handlers.EndConversation()
 	}
 
@@ -114,7 +118,7 @@ func (h *eventEditHandler) startEdit(b *gotgbot.Bot, ctx *ext.Context) error {
 	events, err := h.eventRepository.GetLastEvents(constants.EventEditGetLastLimit)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Произошла ошибка при получении списка мероприятий.", nil)
-		log.Printf("EventEditHandler: Error during event retrieval: %v", err)
+		log.Printf("%s: Error during event retrieval: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 
@@ -154,7 +158,7 @@ func (h *eventEditHandler) handleSelectEvent(b *gotgbot.Bot, ctx *ext.Context) e
 	// Check if content with this ID exists
 	_, err = h.eventRepository.GetEventByID(eventID)
 	if err != nil {
-		log.Printf("Error checking content with ID %d: %v", eventID, err)
+		log.Printf("%s: Error checking content with ID %d: %v", utils.GetCurrentTypeName(), eventID, err)
 		h.messageSenderService.Reply(
 			msg,
 			fmt.Sprintf("Мероприятие с ID %d не найдено. Пожалуйста, введи существующий ID или используй кнопку для отмены.", eventID),
@@ -209,7 +213,7 @@ func (h *eventEditHandler) handleSelectEditType(b *gotgbot.Bot, ctx *ext.Context
 	event, err := h.eventRepository.GetEventByID(eventID)
 	if err != nil {
 		h.messageSenderService.Reply(msg, fmt.Sprintf("Ошибка при получении мероприятия с ID %d", eventID), nil)
-		log.Printf("EventEditHandler: Error during event retrieval: %v", err)
+		log.Printf("%s: Error during event retrieval: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 
@@ -316,7 +320,7 @@ func (h *eventEditHandler) handleEditName(b *gotgbot.Bot, ctx *ext.Context) erro
 	err := h.eventRepository.UpdateEventName(eventID, newName)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Произошла ошибка при обновлении названия мероприятия.", nil)
-		log.Printf("EventEditHandler: Error during event update: %v", err)
+		log.Printf("%s: Error during event update: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 
@@ -376,7 +380,7 @@ func (h *eventEditHandler) handleEditStartedAt(b *gotgbot.Bot, ctx *ext.Context)
 	err = h.eventRepository.UpdateEventStartedAt(eventID, startedAt)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Произошла ошибка при обновлении даты начала мероприятия.", nil)
-		log.Printf("EventEditHandler: Error during event update: %v", err)
+		log.Printf("%s: Error during event update: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 
@@ -461,7 +465,7 @@ func (h *eventEditHandler) handleEditType(b *gotgbot.Bot, ctx *ext.Context) erro
 	err = h.eventRepository.UpdateEventType(eventID, validEventType)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Произошла ошибка при обновлении типа мероприятия.", nil)
-		log.Printf("EventEditHandler: Error during event update: %v", err)
+		log.Printf("%s: Error during event update: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 

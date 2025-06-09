@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"evo-bot-go/internal/config"
-	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
@@ -106,7 +105,7 @@ func (h *CleanClosedThreadsHandler) handle(b *gotgbot.Bot, ctx *ext.Context) err
 	if err != nil {
 		return fmt.Errorf(
 			"%s: error >> failed to delete message: %w",
-			constants.CleanClosedThreadsHandlerName,
+			utils.GetCurrentTypeName(),
 			err)
 	}
 
@@ -127,7 +126,7 @@ func (h *CleanClosedThreadsHandler) handle(b *gotgbot.Bot, ctx *ext.Context) err
 	if err != nil {
 		return fmt.Errorf(
 			"%s: error >> failed to send message about deletion: %w",
-			constants.CleanClosedThreadsHandlerName,
+			utils.GetCurrentTypeName(),
 			err)
 	}
 	// Send copy of the message to user
@@ -135,7 +134,7 @@ func (h *CleanClosedThreadsHandler) handle(b *gotgbot.Bot, ctx *ext.Context) err
 	if err != nil {
 		return fmt.Errorf(
 			"%s: error >> failed to send copy message: %w",
-			constants.CleanClosedThreadsHandlerName,
+			utils.GetCurrentTypeName(),
 			err)
 	}
 
@@ -144,11 +143,11 @@ func (h *CleanClosedThreadsHandler) handle(b *gotgbot.Bot, ctx *ext.Context) err
 		"%s: Deleted message in topic %s\n"+
 			"User ID: %d\n"+
 			"Content: \"%s\"",
-		constants.CleanClosedThreadsHandlerName, threadUrl, msg.From.Id, msg.Text)
+		utils.GetCurrentTypeName(),
+		threadUrl,
+		msg.From.Id,
+		msg.Text,
+	)
 
 	return nil
-}
-
-func (h *CleanClosedThreadsHandler) Name() string {
-	return constants.CleanClosedThreadsHandlerName
 }

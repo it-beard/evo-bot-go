@@ -429,9 +429,9 @@ func (s *MessageSenderService) RemoveInlineKeyboard(chatID int64, messageID int6
 }
 
 // PinMessageWithNotification pins a message with optional notification to all users
-func (s *MessageSenderService) PinMessageWithNotification(chatID int64, messageID int64, disableNotification bool) error {
+func (s *MessageSenderService) PinMessage(chatID int64, messageID int64, withNotification bool) error {
 	_, err := s.bot.PinChatMessage(chatID, messageID, &gotgbot.PinChatMessageOpts{
-		DisableNotification: disableNotification,
+		DisableNotification: !withNotification,
 	})
 
 	if err != nil {

@@ -101,7 +101,7 @@ func (h *topicAddHandler) startTopicAdd(b *gotgbot.Bot, ctx *ext.Context) error 
 	events, err := h.eventRepository.GetLastActualEvents(10)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Ошибка при получении списка мероприятий.", nil)
-		log.Printf("TopicAddHandler: Error during events retrieval: %v", err)
+		log.Printf("%s: Error during events retrieval: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 
@@ -152,7 +152,7 @@ func (h *topicAddHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Context)
 			fmt.Sprintf("Не удалось найти мероприятие с ID %d. Пожалуйста, проверь ID.", eventID),
 			nil,
 		)
-		log.Printf("TopicAddHandler: Error during event retrieval: %v", err)
+		log.Printf("%s: Error during event retrieval: %v", utils.GetCurrentTypeName(), err)
 		return nil // Stay in the same state
 	}
 
@@ -186,7 +186,7 @@ func (h *topicAddHandler) handleTopicEntry(b *gotgbot.Bot, ctx *ext.Context) err
 			"Тема не может быть пустой. Пожалуйста, введи текст темы или отмените операцию.",
 			nil,
 		)
-		log.Printf("TopicAddHandler: Empty topic text")
+		log.Printf("%s: Empty topic text", utils.GetCurrentTypeName())
 		return nil // Stay in the same state
 	}
 
@@ -198,7 +198,7 @@ func (h *topicAddHandler) handleTopicEntry(b *gotgbot.Bot, ctx *ext.Context) err
 			"Произошла ошибка: не найден выбранное мероприятие. Пожалуйста, начни заново.",
 			nil,
 		)
-		log.Printf("TopicAddHandler: Event ID not found in user store")
+		log.Printf("%s: Event ID not found in user store", utils.GetCurrentTypeName())
 		return handlers.EndConversation()
 	}
 
@@ -212,7 +212,7 @@ func (h *topicAddHandler) handleTopicEntry(b *gotgbot.Bot, ctx *ext.Context) err
 	_, err := h.topicRepository.CreateTopic(topicText, userNickname, eventID)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Ой! Что-то пошло не так...", nil)
-		log.Printf("TopicAddHandler: Error during topic creation in database: %v", err)
+		log.Printf("%s: Error during topic creation in database: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 

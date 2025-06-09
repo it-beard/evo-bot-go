@@ -7,10 +7,30 @@ import (
 	"log"
 )
 
+const (
+	createMigrationsTableSQL = `
+		CREATE TABLE IF NOT EXISTS migrations (
+			id SERIAL PRIMARY KEY,
+			name TEXT NOT NULL UNIQUE,
+			timestamp TEXT NOT NULL,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)
+	`
+)
+
+// initMigrationsSchema initializes the migrations table schema
+func initMigrationsSchema(db *sql.DB) error {
+	if _, err := db.Exec(createMigrationsTableSQL); err != nil {
+		return fmt.Errorf("failed to create migrations table: %w", err)
+	}
+
+	return nil
+}
+
 // Registry returns all available migrations in order
 func Registry() []implementations.Migration {
 	return []implementations.Migration{
-		implementations.NewAddStartedAtToContents(),
+		implementations.NewInitialMigration(),
 		implementations.NewChangeUserIdToNullableString(),
 		implementations.NewRenameUserIdToUserNickname(),
 		implementations.NewRenameContentsToEvents(),
@@ -22,12 +42,19 @@ func Registry() []implementations.Migration {
 		implementations.NewRemoveSocialLinksFromProfiles(),
 		implementations.NewAddRandomCoffeePollTables(),
 		implementations.NewRemoveChatIdFromRandomCoffeePolls(),
+		implementations.NewAddIsClubMemberToUsers(),
+		implementations.NewAddRandomCoffeePairsTable(),
 		// Add new migrations here
 	}
 }
 
 // RunMigrations checks and runs all pending migrations
 func RunMigrations(db *sql.DB) error {
+	// Initialize the migrations table
+	if err := initMigrationsSchema(db); err != nil {
+		return fmt.Errorf("failed to initialize migrations schema: %w", err)
+	}
+
 	// Get all registered migrations
 	allMigrations := Registry()
 

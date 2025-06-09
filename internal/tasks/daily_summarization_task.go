@@ -7,6 +7,7 @@ import (
 
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/services"
+	"evo-bot-go/internal/utils"
 )
 
 // DailySummarizationTask handles scheduling of daily summarization tasks
@@ -28,16 +29,16 @@ func NewDailySummarizationTask(config *config.Config, summarizationService *serv
 // Start starts the daily summarization task
 func (s *DailySummarizationTask) Start() {
 	if !s.config.SummarizationTaskEnabled {
-		log.Println("Summarization Task: Daily summarization task is disabled")
+		log.Printf("%s: Daily summarization task is disabled", utils.GetCurrentTypeName())
 		return
 	}
-	log.Println("Summarization Task: Starting daily summarization task with time ", s.config.SummaryTime)
+	log.Printf("%s: Starting daily summarization task with time %02d:%02d UTC", utils.GetCurrentTypeName(), s.config.SummaryTime.Hour(), s.config.SummaryTime.Minute())
 	go s.run()
 }
 
 // Stop stops the daily summarization task
 func (s *DailySummarizationTask) Stop() {
-	log.Println("Summarization Task: Stopping daily summarization task")
+	log.Printf("%s: Stopping daily summarization task", utils.GetCurrentTypeName())
 	close(s.stop)
 }
 
@@ -45,7 +46,7 @@ func (s *DailySummarizationTask) Stop() {
 func (s *DailySummarizationTask) run() {
 	// Calculate time until next run
 	nextRun := s.calculateNextRun()
-	log.Printf("Summarization Task: Next summarization scheduled for: %v", nextRun)
+	log.Printf("%s: Next summarization scheduled for: %v", utils.GetCurrentTypeName(), nextRun)
 
 	ticker := time.NewTicker(time.Minute) // Check every minute
 	defer ticker.Stop()
@@ -57,7 +58,7 @@ func (s *DailySummarizationTask) run() {
 		case now := <-ticker.C:
 			// Check if it's time to run
 			if now.After(nextRun) {
-				log.Println("Summarization Task: Running scheduled summarization")
+				log.Printf("%s: Running scheduled summarization", utils.GetCurrentTypeName())
 
 				// Run summarization in a separate goroutine
 				go func() {
@@ -66,13 +67,13 @@ func (s *DailySummarizationTask) run() {
 
 					// For scheduled tasks, always send to the chat (not to DM)
 					if err := s.summarizationService.RunDailySummarization(ctx, false); err != nil {
-						log.Printf("Summarization Task: Error running daily summarization: %v", err)
+						log.Printf("%s: Error running daily summarization: %v", utils.GetCurrentTypeName(), err)
 					}
 				}()
 
 				// Calculate next run time
 				nextRun = s.calculateNextRun()
-				log.Printf("Summarization Task: Next summarization scheduled for: %v", nextRun)
+				log.Printf("%s: Next summarization scheduled for: %v", utils.GetCurrentTypeName(), nextRun)
 			}
 		}
 	}

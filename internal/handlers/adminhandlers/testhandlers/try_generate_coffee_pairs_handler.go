@@ -90,8 +90,12 @@ func (h *tryGenerateCoffeePairsHandler) handleCommand(b *gotgbot.Bot, ctx *ext.C
 
 	// Check if user has admin permissions and is in a private chat
 	if !h.permissions.CheckAdminAndPrivateChat(msg, constants.TryGenerateCoffeePairsCommand) {
-		log.Printf("TryGenerateCoffeePairsHandler: User %d (%s) tried to use /%s without admin permissions.",
-			ctx.EffectiveUser.Id, ctx.EffectiveUser.Username, constants.TryGenerateCoffeePairsCommand)
+		log.Printf("%s: User %d (%s) tried to use /%s without admin permissions.",
+			utils.GetCurrentTypeName(),
+			ctx.EffectiveUser.Id,
+			ctx.EffectiveUser.Username,
+			constants.TryGenerateCoffeePairsCommand,
+		)
 		return handlers.EndConversation()
 	}
 
@@ -135,7 +139,7 @@ func (h *tryGenerateCoffeePairsHandler) showConfirmationMenu(b *gotgbot.Bot, msg
 		})
 
 	if err != nil {
-		return fmt.Errorf("TryGenerateCoffeePairsHandler: failed to send message in showConfirmationMenu: %w", err)
+		return fmt.Errorf("%s: failed to send message in showConfirmationMenu: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	h.SavePreviousMessageInfo(userId, editedMsg)
@@ -156,7 +160,7 @@ func (h *tryGenerateCoffeePairsHandler) handleConfirmCallback(b *gotgbot.Bot, ct
 		nil)
 	h.SavePreviousMessageInfo(userId, editedMsg)
 	if err != nil {
-		return fmt.Errorf("TryGenerateCoffeePairsHandler: failed to send processing message: %w", err)
+		return fmt.Errorf("%s: failed to send processing message: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	// Execute the pairs generation logic
@@ -178,7 +182,7 @@ func (h *tryGenerateCoffeePairsHandler) handleConfirmCallback(b *gotgbot.Bot, ct
 				),
 			})
 		if sendErr != nil {
-			return fmt.Errorf("TryGenerateCoffeePairsHandler: failed to send error message: %w", sendErr)
+			return fmt.Errorf("%s: failed to send error message: %w", utils.GetCurrentTypeName(), sendErr)
 		}
 
 		h.SavePreviousMessageInfo(userId, editedMsg)
@@ -195,7 +199,7 @@ func (h *tryGenerateCoffeePairsHandler) handleConfirmCallback(b *gotgbot.Bot, ct
 		nil)
 
 	if err != nil {
-		return fmt.Errorf("TryGenerateCoffeePairsHandler: failed to send success message: %w", err)
+		return fmt.Errorf("%s: failed to send success message: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	h.userStore.Clear(userId)
@@ -223,7 +227,7 @@ func (h *tryGenerateCoffeePairsHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Co
 		"Генерация пар для Random Coffee отменена.",
 		nil)
 	if err != nil {
-		return fmt.Errorf("TryGenerateCoffeePairsHandler: failed to send cancel message: %w", err)
+		return fmt.Errorf("%s: failed to send cancel message: %w", utils.GetCurrentTypeName(), err)
 	}
 	h.userStore.Clear(userId)
 

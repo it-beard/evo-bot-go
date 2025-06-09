@@ -1,5 +1,0 @@
-package constants
-
-const CleanClosedThreadsHandlerName = "clean_closed_thread_handler"
-const DeleteJoinLeftMessagesHandlerName = "delete_join_left_messages_handler"
-const RepliesFromClosedThreadsHandlerName = "replies_from_closed_threads_handler"

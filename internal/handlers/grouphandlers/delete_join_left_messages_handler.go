@@ -1,7 +1,7 @@
 package grouphandlers
 
 import (
-	"evo-bot-go/internal/constants"
+	"evo-bot-go/internal/utils"
 	"fmt"
 	"log"
 
@@ -29,15 +29,16 @@ func (h *deleteJoinLeftMessagesHandler) check(msg *gotgbot.Message) bool {
 func (h *deleteJoinLeftMessagesHandler) handle(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
+	// Delete message
 	_, err := msg.Delete(b, nil)
 	if err != nil {
-		return fmt.Errorf("%s: Error deleting message: %v", constants.DeleteJoinLeftMessagesHandlerName, err)
+		return fmt.Errorf("%s: Error deleting message: %v", utils.GetCurrentTypeName(), err)
 	}
 
 	if msg.NewChatMembers != nil {
-		log.Printf("%s: New user joined. Username: %v. User ID: %v", constants.DeleteJoinLeftMessagesHandlerName, msg.NewChatMembers[0].Username, msg.NewChatMembers[0].Id)
+		log.Printf("%s: New user joined. Username: %v. User ID: %v", utils.GetCurrentTypeName(), msg.NewChatMembers[0].Username, msg.NewChatMembers[0].Id)
 	} else if msg.LeftChatMember != nil {
-		log.Printf("%s: User left. Username: %v. User ID: %v", constants.DeleteJoinLeftMessagesHandlerName, msg.LeftChatMember.Username, msg.LeftChatMember.Id)
+		log.Printf("%s: User left. Username: %v. User ID: %v", utils.GetCurrentTypeName(), msg.LeftChatMember.Username, msg.LeftChatMember.Id)
 	}
 
 	return nil

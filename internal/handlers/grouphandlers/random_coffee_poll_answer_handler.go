@@ -4,6 +4,7 @@ import (
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/database/repositories"
 	"evo-bot-go/internal/services"
+	"evo-bot-go/internal/utils"
 	"log"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -41,13 +42,13 @@ func (h *RandomCoffeePollAnswerHandler) handleUpdate(b *gotgbot.Bot, ctx *ext.Co
 	pollAnswer := ctx.PollAnswer
 	if pollAnswer == nil {
 		// This case should ideally not be reached if pollanswer.All filter is working as expected.
-		log.Println("RandomCoffeePollAnswerHandler: Received nil PollAnswer")
+		log.Printf("%s: Received nil PollAnswer", utils.GetCurrentTypeName())
 		return nil
 	}
 
 	// 0. Check if user is bot
 	if pollAnswer.User.IsBot {
-		log.Printf("RandomCoffeePollAnswerHandler: Bot tried to vote. Ignoring.")
+		log.Printf("%s: Bot tried to vote. Ignoring.", utils.GetCurrentTypeName())
 		if len(pollAnswer.OptionIds) > 0 && pollAnswer.OptionIds[0] == 0 {
 			err := h.messageSenderService.SendHtml(
 				h.config.AdminUserID,
@@ -55,22 +56,22 @@ func (h *RandomCoffeePollAnswerHandler) handleUpdate(b *gotgbot.Bot, ctx *ext.Co
 				nil,
 			)
 			if err != nil {
-				log.Printf("RandomCoffeePollAnswerHandler: Error sending message to admin: %v", err)
+				log.Printf("%s: Error sending message to admin: %v", utils.GetCurrentTypeName(), err)
 			}
 		}
 		return nil
 	}
 
 	// 1. Get internal user ID from database
-	internalUser, err := h.userRepo.GetOrCreateUser(pollAnswer.User)
+	internalUser, err := h.userRepo.GetOrCreate(pollAnswer.User)
 	if err != nil {
-		log.Printf("RandomCoffeePollAnswerHandler: Error getting user by tg_id %d: %v", pollAnswer.User.Id, err)
+		log.Printf("%s: Error getting user by tg_id %d: %v", utils.GetCurrentTypeName(), pollAnswer.User.Id, err)
 		return nil // Returning nil to avoid stopping the bot for one failed handler
 	}
 
 	// 2. Check if user is banned from coffee
 	if internalUser.HasCoffeeBan {
-		log.Printf("RandomCoffeePollAnswerHandler: User %d is banned. Ignoring.", pollAnswer.User.Id)
+		log.Printf("%s: User %d is banned. Ignoring.", utils.GetCurrentTypeName(), pollAnswer.User.Id)
 		if len(pollAnswer.OptionIds) > 0 && pollAnswer.OptionIds[0] == 0 {
 			err := h.messageSenderService.SendHtml(
 				internalUser.TgID,
@@ -79,7 +80,7 @@ func (h *RandomCoffeePollAnswerHandler) handleUpdate(b *gotgbot.Bot, ctx *ext.Co
 				nil,
 			)
 			if err != nil {
-				log.Printf("RandomCoffeePollAnswerHandler: Error sending message to user %d: %v", pollAnswer.User.Id, err)
+				log.Printf("%s: Error sending message to user %d: %v", utils.GetCurrentTypeName(), pollAnswer.User.Id, err)
 			}
 		}
 		return nil
@@ -88,21 +89,21 @@ func (h *RandomCoffeePollAnswerHandler) handleUpdate(b *gotgbot.Bot, ctx *ext.Co
 	// 3. Get our poll from the database using Telegram's Poll ID
 	retrievedPoll, err := h.pollRepo.GetPollByTelegramPollID(pollAnswer.PollId)
 	if err != nil {
-		log.Printf("RandomCoffeePollAnswerHandler: Error fetching poll by telegram_poll_id %s: %v", pollAnswer.PollId, err)
+		log.Printf("%s: Error fetching poll by telegram_poll_id %s: %v", utils.GetCurrentTypeName(), pollAnswer.PollId, err)
 		return nil
 	}
 	if retrievedPoll == nil {
 		// This poll answer is not for a poll we are tracking (e.g., some other poll in the chat, or an old poll).
-		log.Printf("RandomCoffeePollAnswerHandler: Poll with telegram_poll_id %s not found in our DB. Ignoring.", pollAnswer.PollId)
+		log.Printf("%s: Poll with telegram_poll_id %s not found in our DB. Ignoring.", utils.GetCurrentTypeName(), pollAnswer.PollId)
 		return nil
 	}
 
 	if len(pollAnswer.OptionIds) == 0 { // Vote retracted
 		err = h.participantRepo.RemoveParticipant(retrievedPoll.ID, int64(internalUser.ID))
 		if err != nil {
-			log.Printf("RandomCoffeePollAnswerHandler: Error removing participant (PollID: %d, UserID: %d): %v", retrievedPoll.ID, internalUser.ID, err)
+			log.Printf("%s: Error removing participant (PollID: %d, UserID: %d): %v", utils.GetCurrentTypeName(), retrievedPoll.ID, internalUser.ID, err)
 		} else {
-			log.Printf("RandomCoffeePollAnswerHandler: Participant (PollID: %d, UserID: %d) removed due to vote retraction.", retrievedPoll.ID, internalUser.ID)
+			log.Printf("%s: Participant (PollID: %d, UserID: %d) removed due to vote retraction.", utils.GetCurrentTypeName(), retrievedPoll.ID, internalUser.ID)
 		}
 	} else { // New vote or changed vote
 		// Assuming "Yes, I'll participate" is the first option (index 0) and "No" is the second (index 1)
@@ -117,15 +118,10 @@ func (h *RandomCoffeePollAnswerHandler) handleUpdate(b *gotgbot.Bot, ctx *ext.Co
 		}
 		err = h.participantRepo.UpsertParticipant(participant)
 		if err != nil {
-			log.Printf("RandomCoffeePollAnswerHandler: Error upserting participant (PollID: %d, UserID: %d, Participating: %t): %v", retrievedPoll.ID, internalUser.ID, isParticipating, err)
+			log.Printf("%s: Error upserting participant (PollID: %d, UserID: %d, Participating: %t): %v", utils.GetCurrentTypeName(), retrievedPoll.ID, internalUser.ID, isParticipating, err)
 		} else {
-			log.Printf("RandomCoffeePollAnswerHandler: Participant (PollID: %d, UserID: %d, Participating: %t) upserted.", retrievedPoll.ID, internalUser.ID, isParticipating)
+			log.Printf("%s: Participant (PollID: %d, UserID: %d, Participating: %t) upserted.", utils.GetCurrentTypeName(), retrievedPoll.ID, internalUser.ID, isParticipating)
 		}
 	}
 	return nil
-}
-
-// Name method for the handler interface (optional, but good practice)
-func (h *RandomCoffeePollAnswerHandler) Name() string {
-	return "RandomCoffeePollAnswerHandler"
 }

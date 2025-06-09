@@ -2,6 +2,8 @@ package repositories
 
 import (
 	"database/sql"
+	"evo-bot-go/internal/utils"
+	"fmt"
 	"time"
 )
 
@@ -49,7 +51,7 @@ func (r *RandomCoffeeParticipantRepository) GetParticipant(pollID int64, userID 
 		if err == sql.ErrNoRows {
 			return nil, nil // Or a specific "not found" error
 		}
-		return nil, err
+		return nil, fmt.Errorf("%s: failed to get participant: %w", utils.GetCurrentTypeName(), err)
 	}
 	return p, nil
 }
@@ -64,7 +66,7 @@ func (r *RandomCoffeeParticipantRepository) GetParticipatingUsers(pollID int64) 
 	`
 	rows, err := r.db.Query(query, pollID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: failed to get participating users: %w", utils.GetCurrentTypeName(), err)
 	}
 	defer rows.Close()
 
@@ -78,7 +80,7 @@ func (r *RandomCoffeeParticipantRepository) GetParticipatingUsers(pollID int64) 
 		users = append(users, user)
 	}
 	if err = rows.Err(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: error during rows iteration for participating users: %w", utils.GetCurrentTypeName(), err)
 	}
 	return users, nil
 }

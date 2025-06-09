@@ -94,7 +94,7 @@ func (h *topicsHandler) startTopics(b *gotgbot.Bot, ctx *ext.Context) error {
 	events, err := h.eventRepository.GetLastActualEvents(10)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Ошибка при получении списка мероприятий.", nil)
-		log.Printf("TopicsHandler: Error during events retrieval: %v", err)
+		log.Printf("%s: Error during events retrieval: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 
@@ -145,7 +145,7 @@ func (h *topicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Context) e
 			fmt.Sprintf("Не удалось найти мероприятие с ID %d. Пожалуйста, проверь ID.", eventID),
 			nil,
 		)
-		log.Printf("TopicsHandler: Error during event retrieval: %v", err)
+		log.Printf("%s: Error during event retrieval: %v", utils.GetCurrentTypeName(), err)
 		return nil // Stay in the same state
 	}
 
@@ -153,7 +153,7 @@ func (h *topicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Context) e
 	topics, err := h.topicRepository.GetTopicsByEventID(eventID)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Ошибка при получении тем и вопросов для выбранного мероприятия.", nil)
-		log.Printf("TopicsHandler: Error during topics retrieval: %v", err)
+		log.Printf("%s: Error during topics retrieval: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 

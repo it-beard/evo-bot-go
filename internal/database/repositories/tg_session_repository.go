@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gotd/td/session"
 	"evo-bot-go/internal/database"
+	"evo-bot-go/internal/utils"
+
+	"github.com/gotd/td/session"
 )
 
 // SessionRepository implements the session.Storage interface for
@@ -36,7 +38,7 @@ func (r *TgSessionRepository) LoadSession(ctx context.Context) ([]byte, error) {
 		// No session found, return empty data
 		return nil, nil
 	} else if err != nil {
-		return nil, fmt.Errorf("failed to load session: %w", err)
+		return nil, fmt.Errorf("%s: failed to load session: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	return data, nil
@@ -52,7 +54,7 @@ func (r *TgSessionRepository) StoreSession(ctx context.Context, data []byte) err
 	`, data, time.Now())
 
 	if err != nil {
-		return fmt.Errorf("failed to store session: %w", err)
+		return fmt.Errorf("%s: failed to store session: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	return nil
