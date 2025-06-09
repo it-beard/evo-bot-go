@@ -24,7 +24,6 @@ package implementations
 
 import (
 	"database/sql"
-	"evo-bot-go/internal/database/migrations/base"
 )
 
 type MyNewMigration struct {
@@ -34,8 +33,8 @@ type MyNewMigration struct {
 func NewMyNewMigration() *MyNewMigration {
 	return &MyNewMigration{
 		BaseMigration: BaseMigration{
-			Name:      "my_new_migration",
-			Timestamp: "20240403", // Today's date in YYYYMMDD format
+			name:      "my_new_migration",
+			timestamp: "20240403", // Today's date in YYYYMMDD format
 		},
 	}
 }
@@ -53,13 +52,14 @@ func (m *MyNewMigration) Rollback(db *sql.DB) error {
 }
 ```
 
-Then add it to the registry in migrator.go:
+Then add it to the registry in `migrator.go`:
 
 ```go
-func Registry() []Migration {
-	return []Migration{
+// Registry returns all available migrations in order
+func Registry() []implementations.Migration {
+	return []implementations.Migration{
 		// old migrations
-		implementations.NewMyNewMigration(),
+		NewMyNewMigration(),
 		// Add new migrations here
 	}
 }
@@ -81,7 +81,6 @@ No manual execution is required. Simply add a new migration to the registry and 
 
 - `migrator.go` - Contains the Migration interface, Registry, and RunMigrations function
 - `implementations/` - Directory containing individual migration implementations
-- `base/` - Contains base types for migrations
 
 ## Rollback Behavior
 
