@@ -76,8 +76,12 @@ func (h *trySummarizeHandler) startSummarizeConversation(b *gotgbot.Bot, ctx *ex
 
 	// Check if user has admin permissions and is in a private chat
 	if !h.permissionsService.CheckAdminAndPrivateChat(msg, constants.ShowTopicsCommand) {
-		log.Printf("TrySummarizeHandler: User %d (%s) tried to use /%s without admin permissions.",
-			ctx.EffectiveUser.Id, ctx.EffectiveUser.Username, constants.ShowTopicsCommand)
+		log.Printf("%s: User %d (%s) tried to use /%s without admin permissions.",
+			utils.GetCurrentTypeName(),
+			ctx.EffectiveUser.Id,
+			ctx.EffectiveUser.Username,
+			constants.ShowTopicsCommand,
+		)
 		return handlers.EndConversation()
 	}
 

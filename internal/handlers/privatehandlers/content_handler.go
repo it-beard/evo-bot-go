@@ -162,14 +162,14 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 	messages, err := clients.GetChatMessages(h.config.SuperGroupChatID, h.config.ContentTopicID)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Произошла ошибка при получении сообщений из чата.", nil)
-		log.Printf("ContentHandler: Error during messages retrieval: %v", err)
+		log.Printf("%s: Error during messages retrieval: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 
 	dataMessages, err := h.prepareTelegramMessages(messages)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Произошла ошибка при подготовке сообщений для поиска.", nil)
-		log.Printf("ContentHandler: Error during messages preparation: %v", err)
+		log.Printf("%s: Error during messages preparation: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 
@@ -179,7 +179,7 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 	templateText, err := h.promptingTemplateRepository.Get(prompts.GetContentPromptTemplateDbKey)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Произошла ошибка при получении шаблона для поиска контента.", nil)
-		log.Printf("ContentHandler: Error during template retrieval: %v", err)
+		log.Printf("%s: Error during template retrieval: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 
@@ -194,7 +194,7 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 	// Save the prompt into a temporary file for logging purposes.
 	err = os.WriteFile("last-prompt-log.txt", []byte(prompt), 0644)
 	if err != nil {
-		log.Printf("Error writing prompt to file: %v", err)
+		log.Printf("%s: Error writing prompt to file: %v", utils.GetCurrentTypeName(), err)
 	}
 
 	// Start periodic typing action every 5 seconds while waiting for the OpenAI response.
@@ -217,21 +217,21 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 	responseOpenAi, err := h.openaiClient.GetCompletion(typingCtx, prompt)
 	// Check if context was cancelled
 	if typingCtx.Err() != nil {
-		log.Printf("Request was cancelled")
+		log.Printf("%s: Request was cancelled", utils.GetCurrentTypeName())
 		return handlers.EndConversation()
 	}
 
 	// Continue only if no errors
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Произошла ошибка при получении ответа от OpenAI.", nil)
-		log.Printf("ContentHandler: Error during OpenAI response retrieval: %v", err)
+		log.Printf("%s: Error during OpenAI response retrieval: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 
 	err = h.messageSenderService.ReplyMarkdown(msg, responseOpenAi, nil)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Произошла ошибка при отправке ответа.", nil)
-		log.Printf("ContentHandler: Error during message sending: %v", err)
+		log.Printf("%s: Error during message sending: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 

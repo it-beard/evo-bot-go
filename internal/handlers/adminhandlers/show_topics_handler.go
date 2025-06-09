@@ -88,8 +88,12 @@ func (h *showTopicsHandler) startShowTopics(b *gotgbot.Bot, ctx *ext.Context) er
 
 	// Check if user has admin permissions and is in a private chat
 	if !h.permissionsService.CheckAdminAndPrivateChat(msg, constants.ShowTopicsCommand) {
-		log.Printf("ShowTopicsHandler: User %d (%s) tried to use /%s without admin permissions.",
-			ctx.EffectiveUser.Id, ctx.EffectiveUser.Username, constants.ShowTopicsCommand)
+		log.Printf("%s: User %d (%s) tried to use /%s without admin permissions.",
+			utils.GetCurrentTypeName(),
+			ctx.EffectiveUser.Id,
+			ctx.EffectiveUser.Username,
+			constants.ShowTopicsCommand,
+		)
 		return handlers.EndConversation()
 	}
 
@@ -97,7 +101,7 @@ func (h *showTopicsHandler) startShowTopics(b *gotgbot.Bot, ctx *ext.Context) er
 	events, err := h.eventRepository.GetLastEvents(10)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Ошибка при получении списка мероприятий.", nil)
-		log.Printf("ShowTopicsHandler: Error during event retrieval: %v", err)
+		log.Printf("%s: Error during event retrieval: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 
@@ -150,7 +154,7 @@ func (h *showTopicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Contex
 			fmt.Sprintf("Не удалось найти мероприятие с ID %d. Пожалуйста, проверь ID.", eventID),
 			nil,
 		)
-		log.Printf("ShowTopicsHandler: Error during event retrieval: %v", err)
+		log.Printf("%s: Error during event retrieval: %v", utils.GetCurrentTypeName(), err)
 		return nil // Stay in the same state
 	}
 
@@ -158,7 +162,7 @@ func (h *showTopicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Contex
 	topics, err := h.topicRepository.GetTopicsByEventID(eventID)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Ошибка при получении тем для выбранного мероприятия.", nil)
-		log.Printf("ShowTopicsHandler: Error during topic retrieval: %v", err)
+		log.Printf("%s: Error during topic retrieval: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 
@@ -222,7 +226,7 @@ func (h *showTopicsHandler) handleTopicDeletion(b *gotgbot.Bot, ctx *ext.Context
 			fmt.Sprintf("Не удалось найти тему с ID %d. Пожалуйста, проверь ID.", topicID),
 			nil,
 		)
-		log.Printf("ShowTopicsHandler: Error during topic retrieval: %v", err)
+		log.Printf("%s: Error during topic retrieval: %v", utils.GetCurrentTypeName(), err)
 		return nil // Stay in the same state
 	}
 
@@ -245,7 +249,7 @@ func (h *showTopicsHandler) handleTopicDeletion(b *gotgbot.Bot, ctx *ext.Context
 	err = h.topicRepository.DeleteTopic(topicID)
 	if err != nil {
 		h.messageSenderService.Reply(msg, fmt.Sprintf("Ошибка при удалении темы с ID %d.", topicID), nil)
-		log.Printf("ShowTopicsHandler: Error during topic deletion: %v", err)
+		log.Printf("%s: Error during topic deletion: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 
@@ -256,7 +260,7 @@ func (h *showTopicsHandler) handleTopicDeletion(b *gotgbot.Bot, ctx *ext.Context
 	topics, err := h.topicRepository.GetTopicsByEventID(eventID)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Ошибка при получении обновленного списка тем.", nil)
-		log.Printf("ShowTopicsHandler: Error during topic retrieval: %v", err)
+		log.Printf("%s: Error during topic retrieval: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 
@@ -264,7 +268,7 @@ func (h *showTopicsHandler) handleTopicDeletion(b *gotgbot.Bot, ctx *ext.Context
 	event, err := h.eventRepository.GetEventByID(eventID)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Ошибка при получении информации о мероприятии.", nil)
-		log.Printf("ShowTopicsHandler: Error during event retrieval: %v", err)
+		log.Printf("%s: Error during event retrieval: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 

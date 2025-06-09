@@ -6,6 +6,7 @@ import (
 	"evo-bot-go/internal/database/repositories"
 	"evo-bot-go/internal/formatters"
 	"evo-bot-go/internal/services"
+	"evo-bot-go/internal/utils"
 	"fmt"
 	"log"
 
@@ -54,7 +55,7 @@ func (h *eventsHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 	events, err := h.eventRepository.GetLastActualEvents(10) // Fetch last 10 actual events
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Ошибка при получении списка мероприятий.", nil)
-		log.Printf("EventsHandler: Error during events retrieval: %v", err)
+		log.Printf("%s: Error during events retrieval: %v", utils.GetCurrentTypeName(), err)
 		return nil
 	}
 
