@@ -91,9 +91,16 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	messageSenderService := services.NewMessageSenderService(bot)
 	profileService := services.NewProfileService(bot)
 	pollSenderService := services.NewPollSenderService(bot)
-	permissionsService := services.NewPermissionsService(appConfig, bot, messageSenderService)
+	permissionsService := services.NewPermissionsService(
+		appConfig,
+		bot,
+		messageSenderService,
+	)
 	summarizationService := services.NewSummarizationService(
-		appConfig, openaiClient, messageSenderService, promptingTemplateRepository,
+		appConfig,
+		openaiClient,
+		messageSenderService,
+		promptingTemplateRepository,
 	)
 	randomCoffeeService := services.NewRandomCoffeeService(
 		appConfig,
