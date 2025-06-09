@@ -142,7 +142,7 @@ func (r *ProfileRepository) GetOrCreateWithBio(userID int, bio string) (*Profile
 	// Try to get profile
 	profile, err := r.getByUserID(userID)
 	if err != nil && err != sql.ErrNoRows {
-		return nil, fmt.Errorf("ProfileRepository: failed to get profile in GetOrCreateByUserId: %w", err)
+		return nil, fmt.Errorf("ProfileRepository: failed to get profile in GetOrCreateWithBio: %w", err)
 	}
 
 	// If profile exists, return it
@@ -157,19 +157,19 @@ func (r *ProfileRepository) GetOrCreateWithBio(userID int, bio string) (*Profile
 		return nil, fmt.Errorf("ProfileRepository: user with ID %d not found, cannot create profile", userID)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("ProfileRepository: failed to verify user exists in GetOrCreateByUserId: %w", err)
+		return nil, fmt.Errorf("ProfileRepository: failed to verify user exists in GetOrCreateWithBio: %w", err)
 	}
 
 	// User exists, create profile
 	_, err = r.Create(userID, bio)
 	if err != nil {
-		return nil, fmt.Errorf("ProfileRepository: failed to create profile in GetOrCreateByUserId: %w", err)
+		return nil, fmt.Errorf("ProfileRepository: failed to create profile in GetOrCreateWithBio: %w", err)
 	}
 
 	// Get the newly created profile
 	newProfile, err := r.getByUserID(userID)
 	if err != nil {
-		return nil, fmt.Errorf("ProfileRepository: failed to get created profile in GetOrCreateByUserId: %w", err)
+		return nil, fmt.Errorf("ProfileRepository: failed to get created profile in GetOrCreateWithBio: %w", err)
 	}
 
 	return newProfile, nil

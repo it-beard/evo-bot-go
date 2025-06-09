@@ -484,7 +484,7 @@ func (h *adminProfilesHandler) handleCreateByForwardedMessageInput(b *gotgbot.Bo
 	forwardedUser := msg.ForwardOrigin.MergeMessageOrigin().SenderUser
 
 	// Get the user from the database if exists, or create a new one
-	dbUser, err := h.userRepository.GetOrCreateUser(forwardedUser)
+	dbUser, err := h.userRepository.GetOrCreate(forwardedUser)
 	if err != nil {
 		_ = h.messageSenderService.Reply(msg,
 			"Произошла ошибка при создании пользователя.", nil)

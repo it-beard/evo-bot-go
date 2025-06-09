@@ -231,7 +231,7 @@ func (r *UserRepository) SetCoffeeBan(id int, banned bool) error {
 	return nil
 }
 
-func (h *UserRepository) GetOrCreateUser(tgUser *gotgbot.User) (*User, error) {
+func (h *UserRepository) GetOrCreate(tgUser *gotgbot.User) (*User, error) {
 	// Try to get user by Telegram ID
 	dbUser, err := h.GetByTelegramID(int64(tgUser.Id))
 	if err == nil {

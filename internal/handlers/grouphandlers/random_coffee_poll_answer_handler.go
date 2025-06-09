@@ -62,7 +62,7 @@ func (h *RandomCoffeePollAnswerHandler) handleUpdate(b *gotgbot.Bot, ctx *ext.Co
 	}
 
 	// 1. Get internal user ID from database
-	internalUser, err := h.userRepo.GetOrCreateUser(pollAnswer.User)
+	internalUser, err := h.userRepo.GetOrCreate(pollAnswer.User)
 	if err != nil {
 		log.Printf("RandomCoffeePollAnswerHandler: Error getting user by tg_id %d: %v", pollAnswer.User.Id, err)
 		return nil // Returning nil to avoid stopping the bot for one failed handler
