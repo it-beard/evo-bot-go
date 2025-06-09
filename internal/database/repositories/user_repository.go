@@ -264,6 +264,23 @@ func (h *UserRepository) GetOrCreate(tgUser *gotgbot.User) (*User, error) {
 	return dbUser, nil
 }
 
+// GetOrFullCreate gets or creates a user with default profile
+func (h *UserRepository) GetOrFullCreate(user *gotgbot.User) (*User, error) {
+	dbUser, err := h.GetOrCreate(user)
+	if err != nil {
+		return nil, fmt.Errorf("ProfileHandler: failed to get user in getOrCreateWithProfile: %w", err)
+	}
+
+	// Get or create profile
+	profileRepo := NewProfileRepository(h.db)
+	_, err = profileRepo.GetOrCreate(dbUser.ID)
+	if err != nil {
+		return nil, fmt.Errorf("ProfileHandler: failed to get profile in getOrCreateWithProfile: %w", err)
+	}
+
+	return dbUser, nil
+}
+
 // SearchByName searches for users with matching first and last name
 func (r *UserRepository) SearchByName(firstname, lastname string) (*User, error) {
 	query := `

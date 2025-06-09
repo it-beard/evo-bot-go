@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"time"
+
+	"github.com/PaulSonOfLars/gotgbot/v2"
 )
 
 // Profile represents a row in the profiles table
@@ -177,6 +179,17 @@ func (r *ProfileRepository) GetOrCreateWithBio(userID int, bio string) (*Profile
 
 func (r *ProfileRepository) GetOrCreate(userID int) (*Profile, error) {
 	return r.GetOrCreateWithBio(userID, "")
+}
+
+// GetOrFullCreate gets or creates a user with default profile
+func (r *ProfileRepository) GetOrFullCreate(user *gotgbot.User) (*Profile, error) {
+	// Get or create user
+	userRepo := NewUserRepository(r.db)
+	dbUser, err := userRepo.GetOrCreate(user)
+	if err != nil {
+		return nil, fmt.Errorf("ProfileRepository: failed to get user in GetOrCreateWithUser: %w", err)
+	}
+	return r.GetOrCreateWithBio(dbUser.ID, "")
 }
 
 // GetByUserID retrieves a profile by user ID

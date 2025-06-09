@@ -241,7 +241,7 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 
 	// Register group chat handlers
 	groupHandlers := []ext.Handler{
-		grouphandlers.NewDeleteJoinLeftMessagesHandler(),
+		grouphandlers.NewDeleteJoinLeftMessagesHandler(deps.UserRepository),
 		grouphandlers.NewRepliesFromClosedThreadsHandler(deps.AppConfig, deps.MessageSenderService),
 		grouphandlers.NewCleanClosedThreadsHandler(deps.AppConfig, deps.MessageSenderService),
 		grouphandlers.NewRandomCoffeePollAnswerHandler(deps.AppConfig, deps.UserRepository, deps.RandomCoffeePollRepository, deps.RandomCoffeeParticipantRepository, deps.MessageSenderService),
