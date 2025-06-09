@@ -75,7 +75,7 @@ func (s *SummarizationService) RunDailySummarization(ctx context.Context, sendTo
 // summarizeTopicMessages summarizes a single topic
 func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topicID int, since time.Time, sendToDM bool) error {
 	// Get topic name
-	topicName, err := utils.GetTopicName(topicID)
+	topicName, err := clients.TgGetTopicName(topicID)
 	if err != nil {
 		return fmt.Errorf("%s: failed to get topic name: %w", utils.GetCurrentTypeName(), err)
 	}

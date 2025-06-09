@@ -201,6 +201,37 @@ func TgGetChatMessageById(chatID int64, messageID int) (*tg.Message, error) {
 	return message, nil
 }
 
+// GetTopicName retrieves the topic name from the topic ID using the Telegram API
+func TgGetTopicName(topicId int) (string, error) {
+	// hack for 0 topic (1 in links)
+	if topicId == 0 {
+		return "Оффтопчик", nil
+	}
+	// Convert topicId to int since GetChatMessageById expects an int
+	topicIdInt := int(topicId)
+
+	// Load configuration
+	appConfig, err := config.LoadConfig()
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
+	chatId := appConfig.SuperGroupChatID
+
+	// Get the topic message by ID
+	message, err := TgGetChatMessageById(chatId, topicIdInt)
+	if err != nil {
+		return "Topic", fmt.Errorf("failed to get thread message: %w", err)
+	}
+
+	// Extract and truncate the topic name if needed
+	topicName := message.Message
+	if topicName == "" {
+		topicName = "Topic"
+	}
+
+	return topicName, nil
+}
+
 // GetChatMessages retrieves messages from a chat topic
 func GetChatMessages(chatID int64, topicID int) ([]tg.Message, error) {
 	tgClient, err := NewTelegramClient()

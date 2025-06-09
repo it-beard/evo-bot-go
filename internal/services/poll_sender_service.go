@@ -1,6 +1,7 @@
 package services
 
 import (
+	"evo-bot-go/internal/utils"
 	"log"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -25,10 +26,10 @@ func (s *PollSenderService) SendPoll(
 	answers []gotgbot.InputPollOption,
 	options *gotgbot.SendPollOpts,
 ) (*gotgbot.Message, error) {
-	log.Printf("Poll Sender Service: Sending poll to chat ID %d", chatID)
+	log.Printf("%s: Sending poll to chat ID %d", utils.GetCurrentTypeName(), chatID)
 
 	if options != nil && options.MessageThreadId != 0 {
-		log.Printf("Poll Sender Service: Poll will be sent to topic ID %d", options.MessageThreadId)
+		log.Printf("%s: Poll will be sent to topic ID %d", utils.GetCurrentTypeName(), options.MessageThreadId)
 	}
 
 	sentPollMsg, err := s.bot.SendPoll(
@@ -38,12 +39,13 @@ func (s *PollSenderService) SendPoll(
 		options,
 	)
 	if err != nil {
-		log.Printf("Poll Sender Service: Failed to send poll: %v", err)
+		log.Printf("%s: Failed to send poll: %v", utils.GetCurrentTypeName(), err)
 		return nil, err
 	}
 
 	log.Printf(
-		"Poll Sender Service: Poll sent successfully. MessageID: %d, ChatID: %d",
+		"%s: Poll sent successfully. MessageID: %d, ChatID: %d",
+		utils.GetCurrentTypeName(),
 		sentPollMsg.MessageId,
 		sentPollMsg.Chat.Id,
 	)
@@ -56,14 +58,14 @@ func (s *PollSenderService) StopPoll(
 	messageID int64,
 	options *gotgbot.StopPollOpts,
 ) (*gotgbot.Poll, error) {
-	log.Printf("Poll Sender Service: Stopping poll in chat ID %d, message ID %d", chatID, messageID)
+	log.Printf("%s: Stopping poll in chat ID %d, message ID %d", utils.GetCurrentTypeName(), chatID, messageID)
 
 	stoppedPoll, err := s.bot.StopPoll(chatID, messageID, options)
 	if err != nil {
-		log.Printf("Poll Sender Service: Failed to stop poll: %v", err)
+		log.Printf("%s: Failed to stop poll: %v", utils.GetCurrentTypeName(), err)
 		return nil, err
 	}
 
-	log.Printf("Poll Sender Service: Poll stopped successfully. Poll ID: %s", stoppedPoll.Id)
+	log.Printf("%s: Poll stopped successfully. Poll ID: %s", utils.GetCurrentTypeName(), stoppedPoll.Id)
 	return stoppedPoll, nil
 }

@@ -46,21 +46,35 @@ func NewRandomCoffeeService(
 func (s *RandomCoffeeService) SendPoll(ctx context.Context) error {
 	chatID := utils.ChatIdToFullChatId(s.config.SuperGroupChatID)
 	if chatID == 0 {
-		log.Println("Random Coffee Poll Service: SuperGroupChatID is not configured. Skipping poll.")
+		log.Printf("%s: SuperGroupChatID is not configured. Skipping poll.", utils.GetCurrentTypeName())
 		return nil
 	}
 
 	if s.config.RandomCoffeeTopicID == 0 {
-		return fmt.Errorf("Random Coffee Poll Service: RandomCoffeeTopicID is not configured")
+		return fmt.Errorf("%s: RandomCoffeeTopicID is not configured", utils.GetCurrentTypeName())
+	}
+
+	// Send reqular message with link to rules and new random coffee poll
+	message :=
+		fmt.Sprintf("Привет! Открываю запись на новый <b>Random Coffee</b> <i>(<a href=\"https://t.me/c/%d/%d/%d\">правила участия</a>)</i>.",
+			s.config.SuperGroupChatID,
+			s.config.RandomCoffeeTopicID,
+			s.config.RandomCoffeeTopicID+1, // next message id (small hack)
+		) + " Голосуй в опросе ниже, если хочешь участвовать ⬇️"
+
+	opts := &gotgbot.SendMessageOpts{
+		MessageThreadId: int64(s.config.RandomCoffeeTopicID),
+	}
+	err := s.messageSender.SendHtml(chatID, message, opts)
+	if err != nil {
+		return fmt.Errorf("%s: Failed to send regular message: %v", utils.GetCurrentTypeName(), err)
 	}
 
 	// Send the poll
-	question := "📝 Готов/а ли ты участвовать в рандомных кофе-встречах на следующей неделе?" +
-		"\n\nКак это работает: в конце каждой недели я буду спрашивать здесь, хочешь ли ты участвовать во встречах. " +
-		"Если ответишь «да», то в понедельник тебя могут объединить в пару с другим участником/цей для неформального общения!"
+	question := "Будешь участвовать в Random Coffee на следующей неделе? ☕️"
 	answers := []gotgbot.InputPollOption{
-		{Text: "Да, участвую! ☕️"},
-		{Text: "Нет, пропускаю эту неделю"},
+		{Text: "Да! 🤗"},
+		{Text: "Не в этот раз 💁🏽"},
 	}
 	options := &gotgbot.SendPollOpts{
 		IsAnonymous:           false,
@@ -72,6 +86,16 @@ func (s *RandomCoffeeService) SendPoll(ctx context.Context) error {
 		return err
 	}
 
+	// Pin the poll with notification
+	err = s.messageSender.PinMessage(
+		sentPollMsg.Chat.Id,
+		sentPollMsg.MessageId,
+		true,
+	)
+	if err != nil {
+		return fmt.Errorf("%s: Failed to pin poll: %v", utils.GetCurrentTypeName(), err)
+	}
+
 	// Save to database
 	return s.savePollToDB(sentPollMsg)
 }
@@ -79,7 +103,7 @@ func (s *RandomCoffeeService) SendPoll(ctx context.Context) error {
 // savePollToDB saves the poll information to the database
 func (s *RandomCoffeeService) savePollToDB(sentPollMsg *gotgbot.Message) error {
 	if s.pollRepo == nil {
-		log.Println("Random Coffee Poll Service: pollRepo is nil, skipping DB interaction.")
+		log.Printf("%s: pollRepo is nil, skipping DB interaction.", utils.GetCurrentTypeName())
 		return nil
 	}
 
@@ -100,7 +124,8 @@ func (s *RandomCoffeeService) savePollToDB(sentPollMsg *gotgbot.Message) error {
 		)
 
 	log.Printf(
-		"Random Coffee Poll Service: Calculated WeekStartDate: %s (UTC)",
+		"%s: Calculated WeekStartDate: %s (UTC)",
+		utils.GetCurrentTypeName(),
 		weekStartDate.Format("2006-01-02"),
 	)
 
@@ -112,12 +137,19 @@ func (s *RandomCoffeeService) savePollToDB(sentPollMsg *gotgbot.Message) error {
 
 	pollID, err := s.pollRepo.CreatePoll(newPollEntry)
 	if err != nil {
-		log.Printf("Random Coffee Poll Service: Failed to save random coffee poll to DB: %v. Poll Message ID: %d", err, sentPollMsg.MessageId)
+		log.Printf("%s: Failed to save random coffee poll to DB: %v. Poll Message ID: %d",
+			utils.GetCurrentTypeName(),
+			err,
+			sentPollMsg.MessageId)
 		return err
 	}
 
-	log.Printf("Random Coffee Poll Service: Random coffee poll saved to DB with ID: %d, Original MessageID: %d, WeekStartDate: %s",
-		pollID, sentPollMsg.MessageId, weekStartDate.Format("2006-01-02"))
+	log.Printf("%s: Random coffee poll saved to DB with ID: %d, Original MessageID: %d, WeekStartDate: %s",
+		utils.GetCurrentTypeName(),
+		pollID,
+		sentPollMsg.MessageId,
+		weekStartDate.Format("2006-01-02"),
+	)
 
 	return nil
 }
@@ -125,25 +157,25 @@ func (s *RandomCoffeeService) savePollToDB(sentPollMsg *gotgbot.Message) error {
 func (s *RandomCoffeeService) GenerateAndSendPairs() error {
 	latestPoll, err := s.pollRepo.GetLatestPoll()
 	if err != nil {
-		return fmt.Errorf("error getting latest poll: %w", err)
+		return fmt.Errorf("%s: error getting latest poll: %w", utils.GetCurrentTypeName(), err)
 	}
 	if latestPoll == nil {
-		return fmt.Errorf("опрос для рандом кофе не найден")
+		return fmt.Errorf("%s: опрос для рандом кофе не найден", utils.GetCurrentTypeName())
 	}
 
 	// Stop the poll first before generating pairs
 	chatID := utils.ChatIdToFullChatId(s.config.SuperGroupChatID)
 	_, err = s.pollSender.StopPoll(chatID, latestPoll.MessageID, nil)
 	if err != nil {
-		log.Printf("RandomCoffeeService: Warning - failed to stop poll (message ID %d): %v", latestPoll.MessageID, err)
+		log.Printf("%s: Warning - failed to stop poll (message ID %d): %v", utils.GetCurrentTypeName(), latestPoll.MessageID, err)
 		// Continue anyway - we might still be able to generate pairs
 	} else {
-		log.Printf("RandomCoffeeService: Successfully stopped poll (message ID %d)", latestPoll.MessageID)
+		log.Printf("%s: Successfully stopped poll (message ID %d)", utils.GetCurrentTypeName(), latestPoll.MessageID)
 	}
 
 	participants, err := s.participantRepo.GetParticipatingUsers(latestPoll.ID)
 	if err != nil {
-		return fmt.Errorf("error getting participants for poll ID %d: %w", latestPoll.ID, err)
+		return fmt.Errorf("%s: error getting participants for poll ID %d: %w", utils.GetCurrentTypeName(), latestPoll.ID, err)
 	}
 
 	if len(participants) < 2 {
@@ -189,17 +221,17 @@ func (s *RandomCoffeeService) GenerateAndSendPairs() error {
 
 	err = s.messageSender.SendHtml(chatID, messageBuilder.String(), opts)
 	if err != nil {
-		return fmt.Errorf("error sending pairing message to chat %d: %w", chatID, err)
+		return fmt.Errorf("%s: error sending pairing message to chat %d: %w", utils.GetCurrentTypeName(), chatID, err)
 	}
 
-	log.Printf("RandomCoffeeService: Successfully sent pairings for poll ID %d to chat %d.", latestPoll.ID, s.config.SuperGroupChatID)
+	log.Printf("%s: Successfully sent pairings for poll ID %d to chat %d.", utils.GetCurrentTypeName(), latestPoll.ID, s.config.SuperGroupChatID)
 	return nil
 }
 
 func (s *RandomCoffeeService) formatUserDisplay(user *repositories.User) string {
 	profile, err := s.profileRepo.GetOrCreate(user.ID)
 	if err != nil {
-		log.Printf("RandomCoffeeService: Error getting profile for user %d: %v", user.ID, err)
+		log.Printf("%s: Error getting profile for user %d: %v", utils.GetCurrentTypeName(), user.ID, err)
 		if user.TgUsername != "" {
 			return fmt.Sprintf("@%s", user.TgUsername)
 		}

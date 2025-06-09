@@ -326,7 +326,11 @@ func (h *eventStartHandler) handleCallbackYes(b *gotgbot.Bot, ctx *ext.Context) 
 
 	// Pin the announcement message with notification for all users
 	if err == nil && sentAnnouncementMsg != nil {
-		err = h.messageSenderService.PinMessageWithNotification(sentAnnouncementMsg.Chat.Id, sentAnnouncementMsg.MessageId, false)
+		err = h.messageSenderService.PinMessage(
+			sentAnnouncementMsg.Chat.Id,
+			sentAnnouncementMsg.MessageId,
+			true,
+		)
 		if err != nil {
 			log.Printf("%s: Error pinning announcement message: %v", utils.GetCurrentTypeName(), err)
 		}

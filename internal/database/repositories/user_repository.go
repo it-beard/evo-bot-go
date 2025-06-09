@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"database/sql"
+	"evo-bot-go/internal/utils"
 	"fmt"
 	"log"
 	"time"
@@ -263,7 +264,7 @@ func (h *UserRepository) GetOrCreate(tgUser *gotgbot.User) (*User, error) {
 
 	// If error is not "no rows", it's a real error
 	if err != sql.ErrNoRows {
-		return nil, fmt.Errorf("ProfileHandler: failed to get user in getOrCreateUser: %w", err)
+		return nil, fmt.Errorf("%s: failed to get user in getOrCreateUser: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	// User doesn't exist, create new user
@@ -274,13 +275,13 @@ func (h *UserRepository) GetOrCreate(tgUser *gotgbot.User) (*User, error) {
 		tgUser.Username,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("ProfileHandler: failed to create user in getOrCreateUser: %w", err)
+		return nil, fmt.Errorf("%s: failed to create user in getOrCreateUser: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	// Get the newly created user
 	dbUser, err = h.GetByID(userID)
 	if err != nil {
-		return nil, fmt.Errorf("ProfileHandler: failed to get created user in getOrCreateUser: %w", err)
+		return nil, fmt.Errorf("%s: failed to get created user in getOrCreateUser: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	return dbUser, nil
@@ -290,14 +291,14 @@ func (h *UserRepository) GetOrCreate(tgUser *gotgbot.User) (*User, error) {
 func (h *UserRepository) GetOrFullCreate(user *gotgbot.User) (*User, error) {
 	dbUser, err := h.GetOrCreate(user)
 	if err != nil {
-		return nil, fmt.Errorf("ProfileHandler: failed to get user in getOrCreateWithProfile: %w", err)
+		return nil, fmt.Errorf("%s: failed to get user in getOrCreateWithProfile: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	// Get or create profile
 	profileRepo := NewProfileRepository(h.db)
 	_, err = profileRepo.GetOrCreate(dbUser.ID)
 	if err != nil {
-		return nil, fmt.Errorf("ProfileHandler: failed to get profile in getOrCreateWithProfile: %w", err)
+		return nil, fmt.Errorf("%s: failed to get profile in getOrCreateWithProfile: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	return dbUser, nil
@@ -330,7 +331,7 @@ func (r *UserRepository) SearchByName(firstname, lastname string) (*User, error)
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to search user by name: %w", err)
+		return nil, fmt.Errorf("%s: failed to search user by name: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	return &user, nil

@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"unicode/utf8"
 
+	"evo-bot-go/internal/clients"
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/services"
-	"evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -87,7 +87,7 @@ func (h *RepliesFromClosedThreadsHandler) forwardReplyMessage(ctx *ext.Context) 
 		msg.ReplyToMessage.MessageId)
 
 	// Get the topic name
-	topicName, topicErr := utils.GetTopicName(int(msg.MessageThreadId))
+	topicName, topicErr := clients.TgGetTopicName(int(msg.MessageThreadId))
 	if topicErr != nil {
 		log.Printf(
 			"%s: warning >> failed to get topic name: %v",

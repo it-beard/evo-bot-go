@@ -26,6 +26,7 @@ import (
 type HandlerDependencies struct {
 	OpenAiClient                      *clients.OpenAiClient
 	AppConfig                         *config.Config
+	ProfileService                    *services.ProfileService
 	SummarizationService              *services.SummarizationService
 	RandomCoffeeService               *services.RandomCoffeeService
 	MessageSenderService              *services.MessageSenderService
@@ -86,6 +87,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 
 	// Initialize services
 	messageSenderService := services.NewMessageSenderService(bot)
+	profileService := services.NewProfileService(bot)
 	pollSenderService := services.NewPollSenderService(bot)
 	permissionsService := services.NewPermissionsService(appConfig, bot, messageSenderService)
 	summarizationService := services.NewSummarizationService(
@@ -121,6 +123,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	deps := &HandlerDependencies{
 		OpenAiClient:                      openaiClient,
 		AppConfig:                         appConfig,
+		ProfileService:                    profileService,
 		SummarizationService:              summarizationService,
 		RandomCoffeeService:               randomCoffeeService,
 		MessageSenderService:              messageSenderService,
@@ -177,6 +180,7 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 			deps.AppConfig,
 			deps.MessageSenderService,
 			deps.PermissionsService,
+			deps.ProfileService,
 			deps.UserRepository,
 			deps.ProfileRepository,
 		),
@@ -229,23 +233,60 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 
 	// Register private chat handlers
 	privateHandlers := []ext.Handler{
-		privatehandlers.NewHelpHandler(deps.AppConfig, deps.MessageSenderService, deps.PermissionsService),
-		privatehandlers.NewToolsHandler(deps.AppConfig, deps.OpenAiClient, deps.MessageSenderService, deps.PromptingTemplateRepository, deps.PermissionsService),
-		privatehandlers.NewContentHandler(deps.AppConfig, deps.OpenAiClient, deps.MessageSenderService, deps.PromptingTemplateRepository, deps.PermissionsService),
-		privatehandlers.NewIntroHandler(deps.AppConfig, deps.OpenAiClient, deps.MessageSenderService, deps.PromptingTemplateRepository, deps.PermissionsService),
-		privatehandlers.NewEventsHandler(deps.AppConfig, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
-		privatehandlers.NewProfileHandler(deps.AppConfig, deps.MessageSenderService, deps.PermissionsService, deps.UserRepository, deps.ProfileRepository),
-		topicshandlers.NewTopicsHandler(deps.AppConfig, deps.TopicRepository, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
-		topicshandlers.NewTopicAddHandler(deps.AppConfig, deps.TopicRepository, deps.EventRepository, deps.MessageSenderService, deps.PermissionsService),
+		privatehandlers.NewHelpHandler(
+			deps.AppConfig,
+			deps.MessageSenderService,
+			deps.PermissionsService,
+		),
+		privatehandlers.NewToolsHandler(
+			deps.AppConfig,
+			deps.OpenAiClient,
+			deps.MessageSenderService,
+			deps.PromptingTemplateRepository,
+			deps.PermissionsService,
+		),
+		privatehandlers.NewEventsHandler(
+			deps.AppConfig,
+			deps.EventRepository,
+			deps.MessageSenderService,
+			deps.PermissionsService,
+		),
+		privatehandlers.NewProfileHandler(
+			deps.AppConfig,
+			deps.MessageSenderService,
+			deps.PermissionsService,
+			deps.ProfileService,
+			deps.UserRepository,
+			deps.ProfileRepository,
+		),
+		topicshandlers.NewTopicsHandler(
+			deps.AppConfig,
+			deps.TopicRepository,
+			deps.EventRepository,
+			deps.MessageSenderService,
+			deps.PermissionsService,
+		),
 	}
 
 	// Register group chat handlers
 	groupHandlers := []ext.Handler{
 		grouphandlers.NewJoinLeftHandler(deps.UserRepository),
 		grouphandlers.NewDeleteJoinLeftMessagesHandler(),
-		grouphandlers.NewRepliesFromClosedThreadsHandler(deps.AppConfig, deps.MessageSenderService),
-		grouphandlers.NewCleanClosedThreadsHandler(deps.AppConfig, deps.MessageSenderService),
-		grouphandlers.NewRandomCoffeePollAnswerHandler(deps.AppConfig, deps.UserRepository, deps.RandomCoffeePollRepository, deps.RandomCoffeeParticipantRepository, deps.MessageSenderService),
+		grouphandlers.NewRepliesFromClosedThreadsHandler(
+			deps.AppConfig,
+			deps.MessageSenderService,
+		),
+		grouphandlers.NewCleanClosedThreadsHandler(
+			deps.AppConfig,
+			deps.MessageSenderService,
+		),
+		grouphandlers.NewRandomCoffeePollAnswerHandler(
+			deps.AppConfig,
+			deps.UserRepository,
+			deps.RandomCoffeePollRepository,
+			deps.RandomCoffeeParticipantRepository,
+			deps.MessageSenderService,
+		),
 	}
 
 	// Combine all handlers

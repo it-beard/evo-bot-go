@@ -49,6 +49,7 @@ type profileHandler struct {
 	config               *config.Config
 	messageSenderService *services.MessageSenderService
 	permissionsService   *services.PermissionsService
+	profileService       *services.ProfileService
 	userRepository       *repositories.UserRepository
 	profileRepository    *repositories.ProfileRepository
 	userStore            *utils.UserDataStore
@@ -58,6 +59,7 @@ func NewProfileHandler(
 	config *config.Config,
 	messageSenderService *services.MessageSenderService,
 	permissionsService *services.PermissionsService,
+	profileService *services.ProfileService,
 	userRepository *repositories.UserRepository,
 	profileRepository *repositories.ProfileRepository,
 ) ext.Handler {
@@ -65,6 +67,7 @@ func NewProfileHandler(
 		config:               config,
 		messageSenderService: messageSenderService,
 		permissionsService:   permissionsService,
+		profileService:       profileService,
 		userRepository:       userRepository,
 		profileRepository:    profileRepository,
 		userStore:            utils.NewUserDataStore(),
@@ -570,7 +573,7 @@ func (h *profileHandler) handlePublishProfile(b *gotgbot.Bot, ctx *ext.Context, 
 		}
 	}
 
-	if !utils.IsProfileComplete(dbUser, profile) {
+	if !h.profileService.IsProfileComplete(dbUser, profile) {
 		h.RemovePreviousMessage(b, &user.Id)
 		editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
 			msg.Chat.Id,
