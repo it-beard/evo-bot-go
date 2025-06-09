@@ -205,23 +205,29 @@ func (s *RandomCoffeeService) GenerateAndSendPairs() error {
 	}
 
 	var messageBuilder strings.Builder
-	messageBuilder.WriteString(fmt.Sprintf("☕️ Пары для рандом кофе (неделя %s):\n\n", latestPoll.WeekStartDate.Format("Mon, Jan 2")))
+	messageBuilder.WriteString(fmt.Sprintf("☕️ Пары для рандом кофе ➪ <b><i>неделя %s</i></b>:\n\n", latestPoll.WeekStartDate.Format("Mon, Jan 2")))
 	for _, pair := range pairsText {
 		messageBuilder.WriteString(fmt.Sprintf("➪ %s\n", pair))
 	}
 	if unpairedUserText != "" {
-		messageBuilder.WriteString(fmt.Sprintf("\n😔 %s ищет кофе-компаньона на эту неделю!\n", unpairedUserText))
+		messageBuilder.WriteString(fmt.Sprintf("\n😔 %s без пары и ищет компанию на эту неделю!\n", unpairedUserText))
 	}
-	messageBuilder.WriteString("\n🗓 День, время и формат встречи вы выбираете сами. Просто напиши партнеру в личку, когда и в каком формате тебе удобно встретиться.")
+	messageBuilder.WriteString("\n🗓 День, время и формат встречи вы выбираете сами. Просто напиши своей паре в личку, когда и в каком формате тебе удобно встретиться.")
 
 	// Send the pairing message
 	opts := &gotgbot.SendMessageOpts{
 		MessageThreadId: int64(s.config.RandomCoffeeTopicID),
 	}
 
-	err = s.messageSender.SendHtml(chatID, messageBuilder.String(), opts)
+	message, err := s.messageSender.SendHtmlWithReturnMessage(chatID, messageBuilder.String(), opts)
 	if err != nil {
 		return fmt.Errorf("%s: error sending pairing message to chat %d: %w", utils.GetCurrentTypeName(), chatID, err)
+	}
+
+	// Pin the message without notification
+	err = s.messageSender.PinMessage(message.Chat.Id, message.MessageId, false)
+	if err != nil {
+		log.Printf("%s: Failed to pin message: %v", utils.GetCurrentTypeName(), err)
 	}
 
 	log.Printf("%s: Successfully sent pairings for poll ID %d to chat %d.", utils.GetCurrentTypeName(), latestPoll.ID, s.config.SuperGroupChatID)
@@ -248,9 +254,6 @@ func (s *RandomCoffeeService) formatUserDisplay(user *repositories.User) string 
 		profileLink := utils.GetIntroMessageLink(s.config, profile.PublishedMessageID.Int64)
 		linkedName := fmt.Sprintf("<a href=\"%s\">%s</a>", profileLink, fullName)
 
-		if user.TgUsername != "" {
-			return fmt.Sprintf("%s (@%s)", linkedName, user.TgUsername)
-		}
 		return linkedName
 	} else {
 		if user.TgUsername != "" {
