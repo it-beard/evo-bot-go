@@ -6,6 +6,7 @@ import (
 
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/services"
+	"evo-bot-go/internal/utils"
 )
 
 // RandomCoffeePairsTask handles scheduling of random coffee pairs generation
@@ -27,10 +28,11 @@ func NewRandomCoffeePairsTask(config *config.Config, randomCoffeeService *servic
 // Start starts the random coffee pairs task
 func (t *RandomCoffeePairsTask) Start() {
 	if !t.config.RandomCoffeePairsTaskEnabled {
-		log.Println("Random Coffee Pairs Task: Random coffee pairs task is disabled")
+		log.Printf("%s: Random coffee pairs task is disabled", utils.GetCurrentTypeName())
 		return
 	}
-	log.Printf("Random Coffee Pairs Task: Starting random coffee pairs task with time %02d:%02d UTC on %s",
+	log.Printf("%s: Starting random coffee pairs task with time %02d:%02d UTC on %s",
+		utils.GetCurrentTypeName(),
 		t.config.RandomCoffeePairsTime.Hour(),
 		t.config.RandomCoffeePairsTime.Minute(),
 		t.config.RandomCoffeePairsDay.String())
@@ -39,14 +41,14 @@ func (t *RandomCoffeePairsTask) Start() {
 
 // Stop stops the random coffee pairs task
 func (t *RandomCoffeePairsTask) Stop() {
-	log.Println("Random Coffee Pairs Task: Stopping random coffee pairs task")
+	log.Printf("%s: Stopping random coffee pairs task", utils.GetCurrentTypeName())
 	close(t.stop)
 }
 
 // run runs the random coffee pairs task
 func (t *RandomCoffeePairsTask) run() {
 	nextRun := t.calculateNextRun()
-	log.Printf("Random Coffee Pairs Task: Next random coffee pairs generation scheduled for: %v", nextRun)
+	log.Printf("%s: Next random coffee pairs generation scheduled for: %v", utils.GetCurrentTypeName(), nextRun)
 
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
@@ -57,16 +59,16 @@ func (t *RandomCoffeePairsTask) run() {
 			return
 		case now := <-ticker.C:
 			if now.After(nextRun) {
-				log.Println("Random Coffee Pairs Task: Running scheduled random coffee pairs generation")
+				log.Printf("%s: Running scheduled random coffee pairs generation", utils.GetCurrentTypeName())
 
 				go func() {
 					if err := t.randomCoffeeService.GenerateAndSendPairs(); err != nil {
-						log.Printf("Random Coffee Pairs Task: Error generating random coffee pairs: %v", err)
+						log.Printf("%s: Error generating random coffee pairs: %v", utils.GetCurrentTypeName(), err)
 					}
 				}()
 
 				nextRun = t.calculateNextRun()
-				log.Printf("Random Coffee Pairs Task: Next random coffee pairs generation scheduled for: %v", nextRun)
+				log.Printf("%s: Next random coffee pairs generation scheduled for: %v", utils.GetCurrentTypeName(), nextRun)
 			}
 		}
 	}

@@ -7,6 +7,7 @@ import (
 
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/services"
+	"evo-bot-go/internal/utils"
 )
 
 // RandomCoffeePollTask handles scheduling of random coffee polls
@@ -28,10 +29,11 @@ func NewRandomCoffeePollTask(config *config.Config, randomCoffeeService *service
 // Start starts the random coffee poll task
 func (t *RandomCoffeePollTask) Start() {
 	if !t.config.RandomCoffeePollTaskEnabled {
-		log.Println("Random Coffee Poll Task: Random coffee poll task is disabled")
+		log.Printf("%s: Random coffee poll task is disabled", utils.GetCurrentTypeName())
 		return
 	}
-	log.Printf("Random Coffee Poll Task: Starting random coffee poll task with time %02d:%02d UTC on %s",
+	log.Printf("%s: Starting random coffee poll task with time %02d:%02d UTC on %s",
+		utils.GetCurrentTypeName(),
 		t.config.RandomCoffeePollTime.Hour(),
 		t.config.RandomCoffeePollTime.Minute(),
 		t.config.RandomCoffeePollDay.String())
@@ -40,14 +42,14 @@ func (t *RandomCoffeePollTask) Start() {
 
 // Stop stops the random coffee poll task
 func (t *RandomCoffeePollTask) Stop() {
-	log.Println("Random Coffee Poll Task: Stopping random coffee poll task")
+	log.Printf("%s: Stopping random coffee poll task", utils.GetCurrentTypeName())
 	close(t.stop)
 }
 
 // run runs the random coffee poll task
 func (t *RandomCoffeePollTask) run() {
 	nextRun := t.calculateNextRun()
-	log.Printf("Random Coffee Poll Task: Next random coffee poll scheduled for: %v", nextRun)
+	log.Printf("%s: Next random coffee poll scheduled for: %v", utils.GetCurrentTypeName(), nextRun)
 
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
@@ -58,19 +60,19 @@ func (t *RandomCoffeePollTask) run() {
 			return
 		case now := <-ticker.C:
 			if now.After(nextRun) {
-				log.Println("Random Coffee Poll Task: Running scheduled random coffee poll")
+				log.Printf("%s: Running scheduled random coffee poll", utils.GetCurrentTypeName())
 
 				go func() {
 					ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 					defer cancel()
 
 					if err := t.randomCoffeeService.SendPoll(ctx); err != nil {
-						log.Printf("Random Coffee Poll Task: Error sending random coffee poll: %v", err)
+						log.Printf("%s: Error sending random coffee poll: %v", utils.GetCurrentTypeName(), err)
 					}
 				}()
 
 				nextRun = t.calculateNextRun()
-				log.Printf("Random Coffee Poll Task: Next random coffee poll scheduled for: %v", nextRun)
+				log.Printf("%s: Next random coffee poll scheduled for: %v", utils.GetCurrentTypeName(), nextRun)
 			}
 		}
 	}

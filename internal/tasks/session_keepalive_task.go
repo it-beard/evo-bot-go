@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"evo-bot-go/internal/clients"
+	"evo-bot-go/internal/utils"
 )
 
 // SessionKeepAliveTask handles scheduling of session keep-alive tasks for tg_user client session.
@@ -23,13 +24,13 @@ func NewSessionKeepAliveTask(interval time.Duration) *SessionKeepAliveTask {
 
 // Start starts the session keep-alive task
 func (s *SessionKeepAliveTask) Start() {
-	log.Printf("Session Keep-Alive Task: Starting session keep-alive task with interval %s", s.interval)
+	log.Printf("%s: Starting session keep-alive task with interval %s", utils.GetCurrentTypeName(), s.interval)
 
 	// First time refresh
 	if err := clients.TgKeepSessionAlive(); err != nil {
-		log.Printf("Session Keep-Alive Task: Failed to keep session alive: %v", err)
+		log.Printf("%s: Failed to keep session alive: %v", utils.GetCurrentTypeName(), err)
 	} else {
-		log.Printf("Session Keep-Alive Task: Session refresh successful")
+		log.Printf("%s: Session refresh successful", utils.GetCurrentTypeName())
 	}
 
 	go s.run()
@@ -37,7 +38,7 @@ func (s *SessionKeepAliveTask) Start() {
 
 // Stop stops the session keep-alive task
 func (s *SessionKeepAliveTask) Stop() {
-	log.Println("Session Keep-Alive Task: Stopping session keep-alive task")
+	log.Printf("%s: Stopping session keep-alive task", utils.GetCurrentTypeName())
 	close(s.stop)
 }
 
@@ -51,14 +52,14 @@ func (s *SessionKeepAliveTask) run() {
 		case <-s.stop:
 			return
 		case <-ticker.C:
-			log.Println("Session Keep-Alive Task: Running scheduled session keep-alive")
+			log.Printf("%s: Running scheduled session keep-alive", utils.GetCurrentTypeName())
 
 			// Run keep-alive in a separate goroutine
 			go func() {
 				if err := clients.TgKeepSessionAlive(); err != nil {
-					log.Printf("Session Keep-Alive Task: Failed to keep session alive: %v", err)
+					log.Printf("%s: Failed to keep session alive: %v", utils.GetCurrentTypeName(), err)
 				} else {
-					log.Printf("Session Keep-Alive Task: Session refresh successful")
+					log.Printf("%s: Session refresh successful", utils.GetCurrentTypeName())
 				}
 			}()
 		}
