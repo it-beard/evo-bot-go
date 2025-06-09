@@ -38,6 +38,7 @@ type HandlerDependencies struct {
 	ProfileRepository                 *repositories.ProfileRepository
 	RandomCoffeePollRepository        *repositories.RandomCoffeePollRepository
 	RandomCoffeeParticipantRepository *repositories.RandomCoffeeParticipantRepository
+	RandomCoffeePairRepository        *repositories.RandomCoffeePairRepository
 }
 
 // TgBotClient represents a Telegram bot client with all required dependencies
@@ -84,6 +85,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	profileRepository := repositories.NewProfileRepository(db.DB)
 	randomCoffeePollRepository := repositories.NewRandomCoffeePollRepository(db.DB)
 	randomCoffeeParticipantRepository := repositories.NewRandomCoffeeParticipantRepository(db.DB)
+	randomCoffeePairRepository := repositories.NewRandomCoffeePairRepository(db.DB)
 
 	// Initialize services
 	messageSenderService := services.NewMessageSenderService(bot)
@@ -100,6 +102,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 		randomCoffeePollRepository,
 		randomCoffeeParticipantRepository,
 		profileRepository,
+		randomCoffeePairRepository,
 	)
 
 	// Initialize scheduled tasks
@@ -135,6 +138,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 		ProfileRepository:                 profileRepository,
 		RandomCoffeePollRepository:        randomCoffeePollRepository,
 		RandomCoffeeParticipantRepository: randomCoffeeParticipantRepository,
+		RandomCoffeePairRepository:        randomCoffeePairRepository,
 	}
 
 	// Register all handlers

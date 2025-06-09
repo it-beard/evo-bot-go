@@ -69,6 +69,7 @@ The bot uses PostgreSQL with automatically initialized tables:
 | **topics** | Stores topics related to events | `id`, `topic`, `user_nickname`, `event_id`, `created_at` |
 | **random_coffee_polls** | Stores random coffee poll information | `id`, `message_id`, `telegram_poll_id`, `week_start_date`, `created_at` |
 | **random_coffee_participants** | Stores poll participants data | `id`, `poll_id`, `user_id`, `participating`, `updated_at` |
+| **random_coffee_pairs** | Stores the history of generated random coffee pairs | `id`, `poll_id`, `user1_id`, `user2_id`, `created_at` |
 | **migrations** | Tracks database migrations | `id`, `name`, `timestamp`, `created_at` |
 
 ## Building the Executable

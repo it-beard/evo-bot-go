@@ -43,6 +43,7 @@ func Registry() []implementations.Migration {
 		implementations.NewAddRandomCoffeePollTables(),
 		implementations.NewRemoveChatIdFromRandomCoffeePolls(),
 		implementations.NewAddIsClubMemberToUsers(),
+		implementations.NewAddRandomCoffeePairsTable(),
 		// Add new migrations here
 	}
 }

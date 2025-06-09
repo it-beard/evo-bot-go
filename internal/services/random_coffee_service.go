@@ -22,6 +22,7 @@ type RandomCoffeeService struct {
 	pollRepo        *repositories.RandomCoffeePollRepository
 	participantRepo *repositories.RandomCoffeeParticipantRepository
 	profileRepo     *repositories.ProfileRepository
+	pairRepo        *repositories.RandomCoffeePairRepository
 }
 
 // NewRandomCoffeeService creates a new random coffee poll service
@@ -32,6 +33,7 @@ func NewRandomCoffeeService(
 	pollRepo *repositories.RandomCoffeePollRepository,
 	participantRepo *repositories.RandomCoffeeParticipantRepository,
 	profileRepo *repositories.ProfileRepository,
+	pairRepo *repositories.RandomCoffeePairRepository,
 ) *RandomCoffeeService {
 	return &RandomCoffeeService{
 		config:          config,
@@ -40,6 +42,7 @@ func NewRandomCoffeeService(
 		pollRepo:        pollRepo,
 		participantRepo: participantRepo,
 		profileRepo:     profileRepo,
+		pairRepo:        pairRepo,
 	}
 }
 
@@ -199,6 +202,18 @@ func (s *RandomCoffeeService) GenerateAndSendPairs() error {
 			user2 := participants[i+1]
 			user2Display := s.formatUserDisplay(&user2)
 			pairsText = append(pairsText, fmt.Sprintf("%s x %s", user1Display, user2Display))
+			if s.pairRepo != nil {
+				// Ensure user1.ID < user2.ID to avoid duplicate pairs in different order
+				u1ID, u2ID := user1.ID, user2.ID
+				if u1ID > u2ID {
+					u1ID, u2ID = u2ID, u1ID
+				}
+				err := s.pairRepo.CreatePair(int(latestPoll.ID), u1ID, u2ID)
+				if err != nil {
+					// Log error but continue
+					log.Printf("%s: failed to save random coffee pair to DB: %v", utils.GetCurrentTypeName(), err)
+				}
+			}
 		} else {
 			unpairedUserText = user1Display
 		}
