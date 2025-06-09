@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"database/sql"
+	"evo-bot-go/internal/utils"
 	"fmt"
 	"log"
 	"time"
@@ -51,7 +52,7 @@ func (r *ProfileRepository) GetByID(id int) (*Profile, error) {
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get profile with ID %d: %w", id, err)
+		return nil, fmt.Errorf("%s: failed to get profile with ID %d: %w", utils.GetCurrentTypeName(), id, err)
 	}
 
 	return &profile, nil
@@ -64,7 +65,7 @@ func (r *ProfileRepository) Create(userID int, bio string) (int, error) {
 			VALUES ($1, $2) RETURNING id`
 	err := r.db.QueryRow(query, userID, bio).Scan(&id)
 	if err != nil {
-		return 0, fmt.Errorf("failed to insert profile: %w", err)
+		return 0, fmt.Errorf("%s: failed to insert profile: %w", utils.GetCurrentTypeName(), err)
 	}
 	return id, nil
 }
@@ -72,7 +73,7 @@ func (r *ProfileRepository) Create(userID int, bio string) (int, error) {
 // Update updates profile fields
 func (r *ProfileRepository) Update(id int, fields map[string]interface{}) error {
 	if len(fields) == 0 {
-		return fmt.Errorf("no fields to update for profile with ID %d", id)
+		return fmt.Errorf("%s: no fields to update for profile with ID %d", utils.GetCurrentTypeName(), id)
 	}
 
 	// Build query dynamically based on provided fields
@@ -91,14 +92,14 @@ func (r *ProfileRepository) Update(id int, fields map[string]interface{}) error 
 
 	result, err := r.db.Exec(query, args...)
 	if err != nil {
-		return fmt.Errorf("failed to update profile with ID %d: %w", id, err)
+		return fmt.Errorf("%s: failed to update profile with ID %d: %w", utils.GetCurrentTypeName(), id, err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		log.Printf("Could not get rows affected after update: %v", err)
+		log.Printf("%s: Could not get rows affected after update: %v", utils.GetCurrentTypeName(), err)
 	} else if rowsAffected == 0 {
-		return fmt.Errorf("no profile found with ID %d to update", id)
+		return fmt.Errorf("%s: no profile found with ID %d to update", utils.GetCurrentTypeName(), id)
 	}
 
 	return nil
@@ -109,14 +110,14 @@ func (r *ProfileRepository) Delete(id int) error {
 	query := `DELETE FROM profiles WHERE id = $1`
 	result, err := r.db.Exec(query, id)
 	if err != nil {
-		return fmt.Errorf("failed to delete profile with ID %d: %w", id, err)
+		return fmt.Errorf("%s: failed to delete profile with ID %d: %w", utils.GetCurrentTypeName(), id, err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		log.Printf("Could not get rows affected after delete: %v", err)
+		log.Printf("%s: Could not get rows affected after delete: %v", utils.GetCurrentTypeName(), err)
 	} else if rowsAffected == 0 {
-		return fmt.Errorf("no profile found with ID %d to delete", id)
+		return fmt.Errorf("%s: no profile found with ID %d to delete", utils.GetCurrentTypeName(), id)
 	}
 
 	return nil
@@ -127,14 +128,14 @@ func (r *ProfileRepository) UpdatePublishedMessageID(profileID int, messageID in
 	query := `UPDATE profiles SET published_message_id = $1, updated_at = NOW() WHERE id = $2`
 	result, err := r.db.Exec(query, messageID, profileID)
 	if err != nil {
-		return fmt.Errorf("failed to update published_message_id for profile with ID %d: %w", profileID, err)
+		return fmt.Errorf("%s: failed to update published_message_id for profile with ID %d: %w", utils.GetCurrentTypeName(), profileID, err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		log.Printf("Could not get rows affected after update: %v", err)
+		log.Printf("%s: Could not get rows affected after update: %v", utils.GetCurrentTypeName(), err)
 	} else if rowsAffected == 0 {
-		return fmt.Errorf("no profile found with ID %d to update published_message_id", profileID)
+		return fmt.Errorf("%s: no profile found with ID %d to update published_message_id", utils.GetCurrentTypeName(), profileID)
 	}
 
 	return nil
@@ -144,7 +145,7 @@ func (r *ProfileRepository) GetOrCreateWithBio(userID int, bio string) (*Profile
 	// Try to get profile
 	profile, err := r.getByUserID(userID)
 	if err != nil && err != sql.ErrNoRows {
-		return nil, fmt.Errorf("ProfileRepository: failed to get profile in GetOrCreateWithBio: %w", err)
+		return nil, fmt.Errorf("%s: failed to get profile in GetOrCreateWithBio: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	// If profile exists, return it
@@ -156,22 +157,22 @@ func (r *ProfileRepository) GetOrCreateWithBio(userID int, bio string) (*Profile
 	userRepo := NewUserRepository(r.db)
 	_, err = userRepo.GetByID(userID)
 	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("ProfileRepository: user with ID %d not found, cannot create profile", userID)
+		return nil, fmt.Errorf("%s: user with ID %d not found, cannot create profile", utils.GetCurrentTypeName(), userID)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("ProfileRepository: failed to verify user exists in GetOrCreateWithBio: %w", err)
+		return nil, fmt.Errorf("%s: failed to verify user exists in GetOrCreateWithBio: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	// User exists, create profile
 	_, err = r.Create(userID, bio)
 	if err != nil {
-		return nil, fmt.Errorf("ProfileRepository: failed to create profile in GetOrCreateWithBio: %w", err)
+		return nil, fmt.Errorf("%s: failed to create profile in GetOrCreateWithBio: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	// Get the newly created profile
 	newProfile, err := r.getByUserID(userID)
 	if err != nil {
-		return nil, fmt.Errorf("ProfileRepository: failed to get created profile in GetOrCreateWithBio: %w", err)
+		return nil, fmt.Errorf("%s: failed to get created profile in GetOrCreateWithBio: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	return newProfile, nil
@@ -185,11 +186,11 @@ func (r *ProfileRepository) GetOrCreate(userID int) (*Profile, error) {
 func (r *ProfileRepository) GetOrFullCreate(user *gotgbot.User) (*Profile, error) {
 	// Get or create user
 	userRepo := NewUserRepository(r.db)
-	dbUser, err := userRepo.GetOrCreate(user)
+	_, profile, err := userRepo.GetOrFullCreate(user)
 	if err != nil {
-		return nil, fmt.Errorf("ProfileRepository: failed to get user in GetOrCreateWithUser: %w", err)
+		return nil, fmt.Errorf("%s: failed to get user in GetOrFullCreate: %w", utils.GetCurrentTypeName(), err)
 	}
-	return r.GetOrCreateWithBio(dbUser.ID, "")
+	return profile, nil
 }
 
 // GetByUserID retrieves a profile by user ID
@@ -214,7 +215,7 @@ func (r *ProfileRepository) getByUserID(userID int) (*Profile, error) {
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get profile for user with ID %d: %w", userID, err)
+		return nil, fmt.Errorf("%s: failed to get profile for user with ID %d: %w", utils.GetCurrentTypeName(), userID, err)
 	}
 
 	return &profile, nil

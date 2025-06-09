@@ -2,6 +2,8 @@ package repositories
 
 import (
 	"database/sql"
+	"evo-bot-go/internal/utils"
+	"fmt"
 	"time"
 )
 
@@ -40,7 +42,7 @@ func (r *RandomCoffeePollRepository) CreatePoll(poll RandomCoffeePoll) (int64, e
 		poll.CreatedAt,
 	).Scan(&id)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("%s: failed to create poll: %w", utils.GetCurrentTypeName(), err)
 	}
 	return id, nil
 }
@@ -63,7 +65,7 @@ func (r *RandomCoffeePollRepository) GetPollByTelegramPollID(telegramPollID stri
 		if err == sql.ErrNoRows {
 			return nil, nil // Or a custom not found error
 		}
-		return nil, err
+		return nil, fmt.Errorf("%s: failed to get poll by telegram poll ID: %w", utils.GetCurrentTypeName(), err)
 	}
 	return poll, nil
 }

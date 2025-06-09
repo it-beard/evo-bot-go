@@ -30,7 +30,7 @@ func (h *JoinLeftHandler) handle(b *gotgbot.Bot, ctx *ext.Context) error {
 	isNowLeftOrBanned := newStatus == "left" || newStatus == "kicked"
 
 	if isNowMember {
-		dbUser, err := h.userRepo.GetOrFullCreate(&user)
+		dbUser, _, err := h.userRepo.GetOrFullCreate(&user)
 		if err != nil {
 			return fmt.Errorf("JoinLeftHandler: failed to get or create user in JoinLeftHandler: %w", err)
 		}
@@ -41,7 +41,7 @@ func (h *JoinLeftHandler) handle(b *gotgbot.Bot, ctx *ext.Context) error {
 		}
 
 	} else if isNowLeftOrBanned {
-		dbUser, err := h.userRepo.GetOrFullCreate(&user)
+		dbUser, _, err := h.userRepo.GetOrFullCreate(&user)
 		if err != nil {
 			log.Printf("JoinLeftHandler: User %d who is now left/banned not found in DB, nothing to update: %v", user.Id, err)
 			return nil // Not an error, user might have never interacted with the bot

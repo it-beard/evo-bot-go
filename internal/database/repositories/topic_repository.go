@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"database/sql"
+	"evo-bot-go/internal/utils"
 	"fmt"
 	"log"
 	"time"
@@ -32,7 +33,7 @@ func (r *TopicRepository) CreateTopic(topic string, userNickname string, eventID
 	query := `INSERT INTO topics (topic, user_nickname, event_id) VALUES ($1, $2, $3) RETURNING id`
 	err := r.db.QueryRow(query, topic, userNickname, eventID).Scan(&id)
 	if err != nil {
-		return 0, fmt.Errorf("failed to insert topic: %w", err)
+		return 0, fmt.Errorf("%s: failed to insert topic: %w", utils.GetCurrentTypeName(), err)
 	}
 	return id, nil
 }
@@ -47,7 +48,7 @@ func (r *TopicRepository) GetTopicsByEventID(eventID int) ([]Topic, error) {
 
 	rows, err := r.db.Query(query, eventID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query topics for event ID %d: %w", eventID, err)
+		return nil, fmt.Errorf("%s: failed to query topics for event ID %d: %w", utils.GetCurrentTypeName(), eventID, err)
 	}
 	defer rows.Close()
 
@@ -55,13 +56,13 @@ func (r *TopicRepository) GetTopicsByEventID(eventID int) ([]Topic, error) {
 	for rows.Next() {
 		var t Topic
 		if err := rows.Scan(&t.ID, &t.Topic, &t.UserNickname, &t.EventID, &t.CreatedAt); err != nil {
-			return nil, fmt.Errorf("failed to scan topic row: %w", err)
+			return nil, fmt.Errorf("%s: failed to scan topic row: %w", utils.GetCurrentTypeName(), err)
 		}
 		topics = append(topics, t)
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error during rows iteration for topics: %w", err)
+		return nil, fmt.Errorf("%s: error during rows iteration for topics: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	return topics, nil
@@ -84,11 +85,11 @@ func (r *TopicRepository) GetTopicByID(id int) (*Topic, error) {
 	)
 
 	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("no topic found with ID %d", id)
+		return nil, fmt.Errorf("%s: no topic found with ID %d", utils.GetCurrentTypeName(), id)
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get topic with ID %d: %w", id, err)
+		return nil, fmt.Errorf("%s: failed to get topic with ID %d: %w", utils.GetCurrentTypeName(), id, err)
 	}
 
 	return &topic, nil
@@ -99,14 +100,14 @@ func (r *TopicRepository) DeleteTopic(id int) error {
 	query := `DELETE FROM topics WHERE id = $1`
 	result, err := r.db.Exec(query, id)
 	if err != nil {
-		return fmt.Errorf("failed to delete topic with ID %d: %w", id, err)
+		return fmt.Errorf("%s: failed to delete topic with ID %d: %w", utils.GetCurrentTypeName(), id, err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		log.Printf("Could not get rows affected after delete: %v", err)
+		log.Printf("%s: Could not get rows affected after delete: %v", utils.GetCurrentTypeName(), err)
 	} else if rowsAffected == 0 {
-		return fmt.Errorf("no topic found with ID %d to delete", id)
+		return fmt.Errorf("%s: no topic found with ID %d to delete", utils.GetCurrentTypeName(), id)
 	}
 
 	return nil

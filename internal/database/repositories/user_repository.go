@@ -65,7 +65,7 @@ func (r *UserRepository) GetByID(id int) (*User, error) {
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user with ID %d: %w", id, err)
+		return nil, fmt.Errorf("%s: failed to get user with ID %d: %w", utils.GetCurrentTypeName(), id, err)
 	}
 
 	return &user, nil
@@ -97,7 +97,7 @@ func (r *UserRepository) GetByTelegramID(tgID int64) (*User, error) {
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user with Telegram ID %d: %w", tgID, err)
+		return nil, fmt.Errorf("%s: failed to get user with Telegram ID %d: %w", utils.GetCurrentTypeName(), tgID, err)
 	}
 
 	return &user, nil
@@ -129,7 +129,7 @@ func (r *UserRepository) GetByTelegramUsername(tgUsername string) (*User, error)
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user with Telegram username %s: %w", tgUsername, err)
+		return nil, fmt.Errorf("%s: failed to get user with Telegram username %s: %w", utils.GetCurrentTypeName(), tgUsername, err)
 	}
 
 	return &user, nil
@@ -142,7 +142,7 @@ func (r *UserRepository) Create(tgID int64, firstname string, lastname string, u
 			VALUES ($1, $2, $3, $4, 0, false, true) RETURNING id`
 	err := r.db.QueryRow(query, tgID, firstname, lastname, username).Scan(&id)
 	if err != nil {
-		return 0, fmt.Errorf("failed to insert user: %w", err)
+		return 0, fmt.Errorf("%s: failed to insert user: %w", utils.GetCurrentTypeName(), err)
 	}
 	return id, nil
 }
@@ -150,7 +150,7 @@ func (r *UserRepository) Create(tgID int64, firstname string, lastname string, u
 // Update updates user fields
 func (r *UserRepository) Update(id int, fields map[string]interface{}) error {
 	if len(fields) == 0 {
-		return fmt.Errorf("no fields to update for user with ID %d", id)
+		return fmt.Errorf("%s: no fields to update for user with ID %d", utils.GetCurrentTypeName(), id)
 	}
 
 	// Build query dynamically based on provided fields
@@ -169,14 +169,14 @@ func (r *UserRepository) Update(id int, fields map[string]interface{}) error {
 
 	result, err := r.db.Exec(query, args...)
 	if err != nil {
-		return fmt.Errorf("failed to update user with ID %d: %w", id, err)
+		return fmt.Errorf("%s: failed to update user with ID %d: %w", utils.GetCurrentTypeName(), id, err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		log.Printf("Could not get rows affected after update: %v", err)
+		log.Printf("%s: Could not get rows affected after update: %v", utils.GetCurrentTypeName(), err)
 	} else if rowsAffected == 0 {
-		return fmt.Errorf("no user found with ID %d to update", id)
+		return fmt.Errorf("%s: no user found with ID %d to update", utils.GetCurrentTypeName(), id)
 	}
 
 	return nil
@@ -187,14 +187,14 @@ func (r *UserRepository) Delete(id int) error {
 	query := `DELETE FROM users WHERE id = $1`
 	result, err := r.db.Exec(query, id)
 	if err != nil {
-		return fmt.Errorf("failed to delete user with ID %d: %w", id, err)
+		return fmt.Errorf("%s: failed to delete user with ID %d: %w", utils.GetCurrentTypeName(), id, err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		log.Printf("Could not get rows affected after delete: %v", err)
+		log.Printf("%s: Could not get rows affected after delete: %v", utils.GetCurrentTypeName(), err)
 	} else if rowsAffected == 0 {
-		return fmt.Errorf("no user found with ID %d to delete", id)
+		return fmt.Errorf("%s: no user found with ID %d to delete", utils.GetCurrentTypeName(), id)
 	}
 
 	return nil
@@ -205,14 +205,14 @@ func (r *UserRepository) UpdateScore(id int, score int) error {
 	query := `UPDATE users SET score = $1, updated_at = NOW() WHERE id = $2`
 	result, err := r.db.Exec(query, score, id)
 	if err != nil {
-		return fmt.Errorf("failed to update score for user with ID %d: %w", id, err)
+		return fmt.Errorf("%s: failed to update score for user with ID %d: %w", utils.GetCurrentTypeName(), id, err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		log.Printf("Could not get rows affected after update: %v", err)
+		log.Printf("%s: Could not get rows affected after update: %v", utils.GetCurrentTypeName(), err)
 	} else if rowsAffected == 0 {
-		return fmt.Errorf("no user found with ID %d to update score", id)
+		return fmt.Errorf("%s: no user found with ID %d to update score", utils.GetCurrentTypeName(), id)
 	}
 
 	return nil
@@ -223,14 +223,14 @@ func (r *UserRepository) SetCoffeeBan(id int, banned bool) error {
 	query := `UPDATE users SET has_coffee_ban = $1, updated_at = NOW() WHERE id = $2`
 	result, err := r.db.Exec(query, banned, id)
 	if err != nil {
-		return fmt.Errorf("failed to update coffee ban status for user with ID %d: %w", id, err)
+		return fmt.Errorf("%s: failed to update coffee ban status for user with ID %d: %w", utils.GetCurrentTypeName(), id, err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		log.Printf("Could not get rows affected after update: %v", err)
+		log.Printf("%s: Could not get rows affected after update: %v", utils.GetCurrentTypeName(), err)
 	} else if rowsAffected == 0 {
-		return fmt.Errorf("no user found with ID %d to update coffee ban status", id)
+		return fmt.Errorf("%s: no user found with ID %d to update coffee ban status", utils.GetCurrentTypeName(), id)
 	}
 
 	return nil
@@ -241,14 +241,14 @@ func (r *UserRepository) SetClubMemberStatus(id int, isMember bool) error {
 	query := `UPDATE users SET is_club_member = $1, updated_at = NOW() WHERE id = $2`
 	result, err := r.db.Exec(query, isMember, id)
 	if err != nil {
-		return fmt.Errorf("failed to update club member status for user with ID %d: %w", id, err)
+		return fmt.Errorf("%s: failed to update club member status for user with ID %d: %w", utils.GetCurrentTypeName(), id, err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		log.Printf("Could not get rows affected after update: %v", err)
+		log.Printf("%s: Could not get rows affected after update: %v", utils.GetCurrentTypeName(), err)
 	} else if rowsAffected == 0 {
-		return fmt.Errorf("no user found with ID %d to update club member status", id)
+		return fmt.Errorf("%s: no user found with ID %d to update club member status", utils.GetCurrentTypeName(), id)
 	}
 
 	return nil
@@ -288,20 +288,20 @@ func (h *UserRepository) GetOrCreate(tgUser *gotgbot.User) (*User, error) {
 }
 
 // GetOrFullCreate gets or creates a user with default profile
-func (h *UserRepository) GetOrFullCreate(user *gotgbot.User) (*User, error) {
+func (h *UserRepository) GetOrFullCreate(user *gotgbot.User) (*User, *Profile, error) {
 	dbUser, err := h.GetOrCreate(user)
 	if err != nil {
-		return nil, fmt.Errorf("%s: failed to get user in getOrCreateWithProfile: %w", utils.GetCurrentTypeName(), err)
+		return nil, nil, fmt.Errorf("%s: failed to get user in getOrCreateWithProfile: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	// Get or create profile
 	profileRepo := NewProfileRepository(h.db)
-	_, err = profileRepo.GetOrCreate(dbUser.ID)
+	profile, err := profileRepo.GetOrCreate(dbUser.ID)
 	if err != nil {
-		return nil, fmt.Errorf("%s: failed to get profile in getOrCreateWithProfile: %w", utils.GetCurrentTypeName(), err)
+		return nil, nil, fmt.Errorf("%s: failed to get profile in getOrCreateWithProfile: %w", utils.GetCurrentTypeName(), err)
 	}
 
-	return dbUser, nil
+	return dbUser, profile, nil
 }
 
 // SearchByName searches for users with matching first and last name
