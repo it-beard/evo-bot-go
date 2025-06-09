@@ -241,7 +241,8 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 
 	// Register group chat handlers
 	groupHandlers := []ext.Handler{
-		grouphandlers.NewDeleteJoinLeftMessagesHandler(deps.UserRepository),
+		grouphandlers.NewJoinLeftHandler(deps.UserRepository),
+		grouphandlers.NewDeleteJoinLeftMessagesHandler(),
 		grouphandlers.NewRepliesFromClosedThreadsHandler(deps.AppConfig, deps.MessageSenderService),
 		grouphandlers.NewCleanClosedThreadsHandler(deps.AppConfig, deps.MessageSenderService),
 		grouphandlers.NewRandomCoffeePollAnswerHandler(deps.AppConfig, deps.UserRepository, deps.RandomCoffeePollRepository, deps.RandomCoffeeParticipantRepository, deps.MessageSenderService),
@@ -268,6 +269,13 @@ func (b *TgBotClient) Start() {
 			Timeout: 9,
 			RequestOpts: &gotgbot.RequestOpts{
 				Timeout: time.Second * 10,
+			},
+			AllowedUpdates: []string{
+				"message",
+				"chat_member",
+				"callback_query",
+				"poll_answer",
+				"my_chat_member",
 			},
 		},
 	}

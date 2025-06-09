@@ -2,7 +2,6 @@ package grouphandlers
 
 import (
 	"evo-bot-go/internal/constants"
-	"evo-bot-go/internal/database/repositories"
 	"fmt"
 	"log"
 
@@ -11,16 +10,10 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 )
 
-type deleteJoinLeftMessagesHandler struct {
-	userRepo *repositories.UserRepository
-}
+type deleteJoinLeftMessagesHandler struct{}
 
-func NewDeleteJoinLeftMessagesHandler(
-	userRepo *repositories.UserRepository,
-) ext.Handler {
-	h := &deleteJoinLeftMessagesHandler{
-		userRepo: userRepo,
-	}
+func NewDeleteJoinLeftMessagesHandler() ext.Handler {
+	h := &deleteJoinLeftMessagesHandler{}
 
 	return handlers.NewMessage(h.check, h.handle)
 }
@@ -36,14 +29,8 @@ func (h *deleteJoinLeftMessagesHandler) check(msg *gotgbot.Message) bool {
 func (h *deleteJoinLeftMessagesHandler) handle(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
-	// Get or create user with profile
-	_, err := h.userRepo.GetOrFullCreate(&msg.NewChatMembers[0])
-	if err != nil {
-		log.Printf("DeleteJoinLeftMessagesHandler: failed to get user in handle: %v", err)
-	}
-
 	// Delete message
-	_, err = msg.Delete(b, nil)
+	_, err := msg.Delete(b, nil)
 	if err != nil {
 		return fmt.Errorf("%s: Error deleting message: %v", constants.DeleteJoinLeftMessagesHandlerName, err)
 	}

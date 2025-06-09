@@ -18,6 +18,7 @@ type User struct {
 	TgUsername   string
 	Score        int
 	HasCoffeeBan bool
+	IsClubMember bool
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }
@@ -40,7 +41,7 @@ func (r *UserRepository) GetDB() *sql.DB {
 // GetByID retrieves a user by ID
 func (r *UserRepository) GetByID(id int) (*User, error) {
 	query := `
-		SELECT id, tg_id, firstname, lastname, tg_username, score, has_coffee_ban, created_at, updated_at
+		SELECT id, tg_id, firstname, lastname, tg_username, score, has_coffee_ban, is_club_member, created_at, updated_at
 		FROM users
 		WHERE id = $1`
 
@@ -53,6 +54,7 @@ func (r *UserRepository) GetByID(id int) (*User, error) {
 		&user.TgUsername,
 		&user.Score,
 		&user.HasCoffeeBan,
+		&user.IsClubMember,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -71,7 +73,7 @@ func (r *UserRepository) GetByID(id int) (*User, error) {
 // GetByTelegramID retrieves a user by Telegram ID
 func (r *UserRepository) GetByTelegramID(tgID int64) (*User, error) {
 	query := `
-		SELECT id, tg_id, firstname, lastname, tg_username, score, has_coffee_ban, created_at, updated_at
+		SELECT id, tg_id, firstname, lastname, tg_username, score, has_coffee_ban, is_club_member, created_at, updated_at
 		FROM users
 		WHERE tg_id = $1`
 
@@ -84,6 +86,7 @@ func (r *UserRepository) GetByTelegramID(tgID int64) (*User, error) {
 		&user.TgUsername,
 		&user.Score,
 		&user.HasCoffeeBan,
+		&user.IsClubMember,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -102,7 +105,7 @@ func (r *UserRepository) GetByTelegramID(tgID int64) (*User, error) {
 // GetByTelegramUsername retrieves a user by Telegram username
 func (r *UserRepository) GetByTelegramUsername(tgUsername string) (*User, error) {
 	query := `
-		SELECT id, tg_id, firstname, lastname, tg_username, score, has_coffee_ban, created_at, updated_at
+		SELECT id, tg_id, firstname, lastname, tg_username, score, has_coffee_ban, is_club_member, created_at, updated_at
 		FROM users
 		WHERE tg_username = $1`
 
@@ -115,6 +118,7 @@ func (r *UserRepository) GetByTelegramUsername(tgUsername string) (*User, error)
 		&user.TgUsername,
 		&user.Score,
 		&user.HasCoffeeBan,
+		&user.IsClubMember,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -133,8 +137,8 @@ func (r *UserRepository) GetByTelegramUsername(tgUsername string) (*User, error)
 // Create inserts a new user record into the database
 func (r *UserRepository) Create(tgID int64, firstname string, lastname string, username string) (int, error) {
 	var id int
-	query := `INSERT INTO users (tg_id, firstname, lastname, tg_username, score, has_coffee_ban) 
-			VALUES ($1, $2, $3, $4, 0, false) RETURNING id`
+	query := `INSERT INTO users (tg_id, firstname, lastname, tg_username, score, has_coffee_ban, is_club_member) 
+			VALUES ($1, $2, $3, $4, 0, false, true) RETURNING id`
 	err := r.db.QueryRow(query, tgID, firstname, lastname, username).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert user: %w", err)
@@ -231,6 +235,24 @@ func (r *UserRepository) SetCoffeeBan(id int, banned bool) error {
 	return nil
 }
 
+// SetClubMemberStatus sets a user's club member status
+func (r *UserRepository) SetClubMemberStatus(id int, isMember bool) error {
+	query := `UPDATE users SET is_club_member = $1, updated_at = NOW() WHERE id = $2`
+	result, err := r.db.Exec(query, isMember, id)
+	if err != nil {
+		return fmt.Errorf("failed to update club member status for user with ID %d: %w", id, err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		log.Printf("Could not get rows affected after update: %v", err)
+	} else if rowsAffected == 0 {
+		return fmt.Errorf("no user found with ID %d to update club member status", id)
+	}
+
+	return nil
+}
+
 func (h *UserRepository) GetOrCreate(tgUser *gotgbot.User) (*User, error) {
 	// Try to get user by Telegram ID
 	dbUser, err := h.GetByTelegramID(int64(tgUser.Id))
@@ -284,7 +306,7 @@ func (h *UserRepository) GetOrFullCreate(user *gotgbot.User) (*User, error) {
 // SearchByName searches for users with matching first and last name
 func (r *UserRepository) SearchByName(firstname, lastname string) (*User, error) {
 	query := `
-		SELECT id, tg_id, firstname, lastname, tg_username, score, has_coffee_ban, created_at, updated_at
+		SELECT id, tg_id, firstname, lastname, tg_username, score, has_coffee_ban, is_club_member, created_at, updated_at
 		FROM users
 		WHERE LOWER(firstname) = LOWER($1) AND LOWER(lastname) = LOWER($2)
 		LIMIT 1`
@@ -298,6 +320,7 @@ func (r *UserRepository) SearchByName(firstname, lastname string) (*User, error)
 		&user.TgUsername,
 		&user.Score,
 		&user.HasCoffeeBan,
+		&user.IsClubMember,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
