@@ -175,25 +175,11 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 
 	// Register admin chat handlers
 	adminHandlers := []ext.Handler{
-		adminhandlers.NewCodeHandler(
+		eventhandlers.NewEventDeleteHandler(
 			deps.AppConfig,
-			deps.MessageSenderService,
-			deps.PermissionsService,
-		),
-		adminhandlers.NewShowTopicsHandler(
-			deps.AppConfig,
-			deps.TopicRepository,
 			deps.EventRepository,
 			deps.MessageSenderService,
 			deps.PermissionsService,
-		),
-		adminhandlers.NewAdminProfilesHandler(
-			deps.AppConfig,
-			deps.MessageSenderService,
-			deps.PermissionsService,
-			deps.ProfileService,
-			deps.UserRepository,
-			deps.ProfileRepository,
 		),
 		eventhandlers.NewEventEditHandler(
 			deps.AppConfig,
@@ -207,23 +193,18 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 			deps.MessageSenderService,
 			deps.PermissionsService,
 		),
-		eventhandlers.NewEventDeleteHandler(
-			deps.AppConfig,
-			deps.EventRepository,
-			deps.MessageSenderService,
-			deps.PermissionsService,
-		),
 		eventhandlers.NewEventStartHandler(
 			deps.AppConfig,
 			deps.EventRepository,
 			deps.MessageSenderService,
 			deps.PermissionsService,
 		),
-		testhandlers.NewTrySummarizeHandler(
+
+		testhandlers.NewTryCreateCoffeePoolHandler(
 			deps.AppConfig,
-			deps.SummarizationService,
 			deps.MessageSenderService,
 			deps.PermissionsService,
+			deps.RandomCoffeeService,
 		),
 		testhandlers.NewTryGenerateCoffeePairsHandler(
 			deps.AppConfig,
@@ -234,22 +215,73 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 			deps.ProfileRepository,
 			deps.RandomCoffeeService,
 		),
-		testhandlers.NewTryCreateCoffeePoolHandler(
+		testhandlers.NewTrySummarizeHandler(
+			deps.AppConfig,
+			deps.SummarizationService,
+			deps.MessageSenderService,
+			deps.PermissionsService,
+		),
+
+		adminhandlers.NewCodeHandler(
 			deps.AppConfig,
 			deps.MessageSenderService,
 			deps.PermissionsService,
-			deps.RandomCoffeeService,
+		),
+		adminhandlers.NewAdminProfilesHandler(
+			deps.AppConfig,
+			deps.MessageSenderService,
+			deps.PermissionsService,
+			deps.ProfileService,
+			deps.UserRepository,
+			deps.ProfileRepository,
+		),
+		adminhandlers.NewShowTopicsHandler(
+			deps.AppConfig,
+			deps.TopicRepository,
+			deps.EventRepository,
+			deps.MessageSenderService,
+			deps.PermissionsService,
+		),
+	}
+
+	// Register group chat handlers
+	groupHandlers := []ext.Handler{
+		grouphandlers.NewCleanClosedThreadsHandler(
+			deps.AppConfig,
+			deps.MessageSenderService,
+		),
+		grouphandlers.NewDeleteJoinLeftMessagesHandler(),
+		grouphandlers.NewJoinLeftHandler(deps.UserRepository),
+		grouphandlers.NewRandomCoffeePollAnswerHandler(
+			deps.AppConfig,
+			deps.UserRepository,
+			deps.RandomCoffeePollRepository,
+			deps.RandomCoffeeParticipantRepository,
+			deps.MessageSenderService,
+		),
+		grouphandlers.NewRepliesFromClosedThreadsHandler(
+			deps.AppConfig,
+			deps.MessageSenderService,
 		),
 	}
 
 	// Register private chat handlers
 	privateHandlers := []ext.Handler{
-		privatehandlers.NewHelpHandler(
+		topicshandlers.NewTopicAddHandler(
 			deps.AppConfig,
+			deps.TopicRepository,
+			deps.EventRepository,
 			deps.MessageSenderService,
 			deps.PermissionsService,
 		),
-		privatehandlers.NewToolsHandler(
+		topicshandlers.NewTopicsHandler(
+			deps.AppConfig,
+			deps.TopicRepository,
+			deps.EventRepository,
+			deps.MessageSenderService,
+			deps.PermissionsService,
+		),
+		privatehandlers.NewContentHandler(
 			deps.AppConfig,
 			deps.OpenAiClient,
 			deps.MessageSenderService,
@@ -262,6 +294,18 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 			deps.MessageSenderService,
 			deps.PermissionsService,
 		),
+		privatehandlers.NewHelpHandler(
+			deps.AppConfig,
+			deps.MessageSenderService,
+			deps.PermissionsService,
+		),
+		privatehandlers.NewIntroHandler(
+			deps.AppConfig,
+			deps.OpenAiClient,
+			deps.MessageSenderService,
+			deps.PromptingTemplateRepository,
+			deps.PermissionsService,
+		),
 		privatehandlers.NewProfileHandler(
 			deps.AppConfig,
 			deps.MessageSenderService,
@@ -270,38 +314,17 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 			deps.UserRepository,
 			deps.ProfileRepository,
 		),
-		topicshandlers.NewTopicsHandler(
+		privatehandlers.NewToolsHandler(
 			deps.AppConfig,
-			deps.TopicRepository,
-			deps.EventRepository,
+			deps.OpenAiClient,
 			deps.MessageSenderService,
+			deps.PromptingTemplateRepository,
 			deps.PermissionsService,
 		),
 	}
 
-	// Register group chat handlers
-	groupHandlers := []ext.Handler{
-		grouphandlers.NewJoinLeftHandler(deps.UserRepository),
-		grouphandlers.NewDeleteJoinLeftMessagesHandler(),
-		grouphandlers.NewRepliesFromClosedThreadsHandler(
-			deps.AppConfig,
-			deps.MessageSenderService,
-		),
-		grouphandlers.NewCleanClosedThreadsHandler(
-			deps.AppConfig,
-			deps.MessageSenderService,
-		),
-		grouphandlers.NewRandomCoffeePollAnswerHandler(
-			deps.AppConfig,
-			deps.UserRepository,
-			deps.RandomCoffeePollRepository,
-			deps.RandomCoffeeParticipantRepository,
-			deps.MessageSenderService,
-		),
-	}
-
 	// Combine all handlers
-	allHandlers := append(append(adminHandlers, privateHandlers...), groupHandlers...)
+	allHandlers := append(append(adminHandlers, groupHandlers...), privateHandlers...)
 	for _, handler := range allHandlers {
 		b.dispatcher.AddHandler(handler)
 	}
