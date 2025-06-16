@@ -92,7 +92,7 @@ func (r *EventRepository) GetLastEvents(limit int) ([]Event, error) {
 	query := `
 		SELECT id, name, type, status, started_at, created_at, updated_at
 		FROM events
-		ORDER BY started_at ASC NULLS LAST
+		ORDER BY started_at DESC NULLS LAST
 		LIMIT $1`
 
 	rows, err := r.db.Query(query, limit)
