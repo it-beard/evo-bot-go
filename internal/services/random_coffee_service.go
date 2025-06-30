@@ -250,30 +250,25 @@ func (s *RandomCoffeeService) GenerateAndSendPairs() error {
 }
 
 func (s *RandomCoffeeService) formatUserDisplay(user *repositories.User) string {
+	userDisplay := user.Firstname
+
+	if user.TgUsername != "" {
+		userDisplay = fmt.Sprintf("@%s", user.TgUsername)
+	}
+
 	profile, err := s.profileRepo.GetOrCreate(user.ID)
 	if err != nil {
 		log.Printf("%s: Error getting profile for user %d: %v", utils.GetCurrentTypeName(), user.ID, err)
-		if user.TgUsername != "" {
-			return fmt.Sprintf("@%s", user.TgUsername)
-		}
-		return user.Firstname
+		return userDisplay
 	}
 
-	hasPublishedProfile := profile.PublishedMessageID.Valid && profile.PublishedMessageID.Int64 > 0
-	if hasPublishedProfile {
-		fullName := user.Firstname
-		if user.Lastname != "" {
-			fullName += " " + user.Lastname
-		}
-
+	if profile.PublishedMessageID.Valid &&
+		profile.PublishedMessageID.Int64 > 0 {
 		profileLink := utils.GetIntroMessageLink(s.config, profile.PublishedMessageID.Int64)
-		linkedName := fmt.Sprintf("<a href=\"%s\">%s</a>", profileLink, fullName)
+		linkedName := fmt.Sprintf(" <i>(<a href=\"%s\">профиль</a>)</i>", profileLink)
 
-		return linkedName
-	} else {
-		if user.TgUsername != "" {
-			return fmt.Sprintf("@%s", user.TgUsername)
-		}
-		return user.Firstname
+		userDisplay += linkedName
 	}
+
+	return userDisplay
 }
