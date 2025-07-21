@@ -312,7 +312,38 @@ func (h *UserRepository) GetOrCreate(tgUser *gotgbot.User) (*User, error) {
 	// Try to get user by Telegram ID
 	dbUser, err := h.GetByTelegramID(int64(tgUser.Id))
 	if err == nil {
-		// User exists, return it
+		// User exists, check if we need to update any fields
+		fieldsToUpdate := make(map[string]interface{})
+
+		if dbUser.Firstname != tgUser.FirstName && tgUser.FirstName != "" {
+			fieldsToUpdate["firstname"] = tgUser.FirstName
+		}
+		if dbUser.Lastname != tgUser.LastName && tgUser.LastName != "" {
+			fieldsToUpdate["lastname"] = tgUser.LastName
+		}
+		if dbUser.TgUsername != tgUser.Username && tgUser.Username != "" {
+			fieldsToUpdate["tg_username"] = tgUser.Username
+		}
+
+		// Update fields if any changed
+		if len(fieldsToUpdate) > 0 {
+			err = h.Update(dbUser.ID, fieldsToUpdate)
+			if err != nil {
+				return nil, fmt.Errorf("%s: failed to update user fields: %w", utils.GetCurrentTypeName(), err)
+			}
+
+			// Update the dbUser struct with new values
+			if firstname, ok := fieldsToUpdate["firstname"]; ok {
+				dbUser.Firstname = firstname.(string)
+			}
+			if lastname, ok := fieldsToUpdate["lastname"]; ok {
+				dbUser.Lastname = lastname.(string)
+			}
+			if username, ok := fieldsToUpdate["tg_username"]; ok {
+				dbUser.TgUsername = username.(string)
+			}
+		}
+
 		return dbUser, nil
 	}
 
