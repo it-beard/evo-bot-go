@@ -103,6 +103,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 		promptingTemplateRepository,
 	)
 	randomCoffeeService := services.NewRandomCoffeeService(
+		bot,
 		appConfig,
 		pollSenderService,
 		messageSenderService,
@@ -110,6 +111,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 		randomCoffeeParticipantRepository,
 		profileRepository,
 		randomCoffeePairRepository,
+		userRepository,
 	)
 
 	// Initialize scheduled tasks

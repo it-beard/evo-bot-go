@@ -16,6 +16,7 @@ import (
 )
 
 type RandomCoffeeService struct {
+	bot             *gotgbot.Bot
 	config          *config.Config
 	pollSender      *PollSenderService
 	messageSender   *MessageSenderService
@@ -23,10 +24,12 @@ type RandomCoffeeService struct {
 	participantRepo *repositories.RandomCoffeeParticipantRepository
 	profileRepo     *repositories.ProfileRepository
 	pairRepo        *repositories.RandomCoffeePairRepository
+	userRepo        *repositories.UserRepository
 }
 
 // NewRandomCoffeeService creates a new random coffee poll service
 func NewRandomCoffeeService(
+	bot *gotgbot.Bot,
 	config *config.Config,
 	pollSender *PollSenderService,
 	messageSender *MessageSenderService,
@@ -34,8 +37,10 @@ func NewRandomCoffeeService(
 	participantRepo *repositories.RandomCoffeeParticipantRepository,
 	profileRepo *repositories.ProfileRepository,
 	pairRepo *repositories.RandomCoffeePairRepository,
+	userRepo *repositories.UserRepository,
 ) *RandomCoffeeService {
 	return &RandomCoffeeService{
+		bot:             bot,
 		config:          config,
 		pollSender:      pollSender,
 		messageSender:   messageSender,
@@ -43,6 +48,7 @@ func NewRandomCoffeeService(
 		participantRepo: participantRepo,
 		profileRepo:     profileRepo,
 		pairRepo:        pairRepo,
+		userRepo:        userRepo,
 	}
 }
 
@@ -183,6 +189,37 @@ func (s *RandomCoffeeService) GenerateAndSendPairs() error {
 
 	if len(participants) < 2 {
 		return fmt.Errorf("недостаточно участников для создания пар (нужно минимум 2, зарегистрировалось %d)", len(participants))
+	}
+
+	// Update participant telegram usernames using Telegram Bot API if they've changed
+	for i := range participants {
+		participant := &participants[i]
+		user, err := s.userRepo.GetByTelegramID(participant.TgID)
+		if err != nil {
+			log.Printf("%s: error getting user by telegram ID %d: %v", utils.GetCurrentTypeName(), participant.TgID, err)
+			continue
+		}
+
+		// Get current user info from Telegram
+		chatMember, err := s.bot.GetChatMember(chatID, participant.TgID, nil)
+		if err != nil {
+			log.Printf("%s: error getting chat member for user ID %d: %v", utils.GetCurrentTypeName(), participant.TgID, err)
+			continue
+		}
+
+		currentUser := chatMember.GetUser()
+		currentUsername := currentUser.Username
+
+		// Update username if it has changed
+		if user.TgUsername != currentUsername {
+			err = s.userRepo.UpdateTelegramUsername(user.ID, currentUsername)
+			if err != nil {
+				log.Printf("%s: error updating username for user ID %d: %v", utils.GetCurrentTypeName(), user.ID, err)
+			} else {
+				log.Printf("%s: Updated username for user ID %d from '%s' to '%s'", utils.GetCurrentTypeName(), user.ID, user.TgUsername, currentUsername)
+				participant.TgUsername = currentUsername
+			}
+		}
 	}
 
 	// Random Pairing Logic

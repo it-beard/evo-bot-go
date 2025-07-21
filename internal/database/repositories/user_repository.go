@@ -254,6 +254,24 @@ func (r *UserRepository) SetClubMemberStatus(id int, isMember bool) error {
 	return nil
 }
 
+// UpdateTelegramUsername updates a user's telegram username
+func (r *UserRepository) UpdateTelegramUsername(id int, username string) error {
+	query := `UPDATE users SET tg_username = $1, updated_at = NOW() WHERE id = $2`
+	result, err := r.db.Exec(query, username, id)
+	if err != nil {
+		return fmt.Errorf("%s: failed to update telegram username for user with ID %d: %w", utils.GetCurrentTypeName(), id, err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		log.Printf("%s: Could not get rows affected after update: %v", utils.GetCurrentTypeName(), err)
+	} else if rowsAffected == 0 {
+		return fmt.Errorf("%s: no user found with ID %d to update telegram username", utils.GetCurrentTypeName(), id)
+	}
+
+	return nil
+}
+
 func (h *UserRepository) GetOrCreate(tgUser *gotgbot.User) (*User, error) {
 	// Try to get user by Telegram ID
 	dbUser, err := h.GetByTelegramID(int64(tgUser.Id))
