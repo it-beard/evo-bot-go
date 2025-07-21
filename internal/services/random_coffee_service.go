@@ -191,7 +191,7 @@ func (s *RandomCoffeeService) GenerateAndSendPairs() error {
 		return fmt.Errorf("недостаточно участников для создания пар (нужно минимум 2, зарегистрировалось %d)", len(participants))
 	}
 
-	// Update participant telegram usernames using Telegram Bot API if they've changed
+	// Update participant info using Telegram Bot API if any field has changed
 	for i := range participants {
 		participant := &participants[i]
 		user, err := s.userRepo.GetByTelegramID(participant.TgID)
@@ -208,16 +208,37 @@ func (s *RandomCoffeeService) GenerateAndSendPairs() error {
 		}
 
 		currentUser := chatMember.GetUser()
-		currentUsername := currentUser.Username
 
-		// Update username if it has changed
-		if user.TgUsername != currentUsername {
-			err = s.userRepo.UpdateTelegramUsername(user.ID, currentUsername)
+		// Check and update username
+		if user.TgUsername != currentUser.Username {
+			err = s.userRepo.UpdateTelegramUsername(user.ID, currentUser.Username)
 			if err != nil {
 				log.Printf("%s: error updating username for user ID %d: %v", utils.GetCurrentTypeName(), user.ID, err)
 			} else {
-				log.Printf("%s: Updated username for user ID %d from '%s' to '%s'", utils.GetCurrentTypeName(), user.ID, user.TgUsername, currentUsername)
-				participant.TgUsername = currentUsername
+				log.Printf("%s: Updated username for user ID %d from '%s' to '%s'", utils.GetCurrentTypeName(), user.ID, user.TgUsername, currentUser.Username)
+				participant.TgUsername = currentUser.Username
+			}
+		}
+
+		// Check and update firstname
+		if user.Firstname != currentUser.FirstName {
+			err = s.userRepo.UpdateFirstname(user.ID, currentUser.FirstName)
+			if err != nil {
+				log.Printf("%s: error updating firstname for user ID %d: %v", utils.GetCurrentTypeName(), user.ID, err)
+			} else {
+				log.Printf("%s: Updated firstname for user ID %d from '%s' to '%s'", utils.GetCurrentTypeName(), user.ID, user.Firstname, currentUser.FirstName)
+				participant.Firstname = currentUser.FirstName
+			}
+		}
+
+		// Check and update lastname
+		if user.Lastname != currentUser.LastName {
+			err = s.userRepo.UpdateLastname(user.ID, currentUser.LastName)
+			if err != nil {
+				log.Printf("%s: error updating lastname for user ID %d: %v", utils.GetCurrentTypeName(), user.ID, err)
+			} else {
+				log.Printf("%s: Updated lastname for user ID %d from '%s' to '%s'", utils.GetCurrentTypeName(), user.ID, user.Lastname, currentUser.LastName)
+				participant.Lastname = currentUser.LastName
 			}
 		}
 	}

@@ -272,6 +272,42 @@ func (r *UserRepository) UpdateTelegramUsername(id int, username string) error {
 	return nil
 }
 
+// UpdateFirstname updates a user's first name
+func (r *UserRepository) UpdateFirstname(id int, firstname string) error {
+	query := `UPDATE users SET firstname = $1, updated_at = NOW() WHERE id = $2`
+	result, err := r.db.Exec(query, firstname, id)
+	if err != nil {
+		return fmt.Errorf("%s: failed to update firstname for user with ID %d: %w", utils.GetCurrentTypeName(), id, err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		log.Printf("%s: Could not get rows affected after update: %v", utils.GetCurrentTypeName(), err)
+	} else if rowsAffected == 0 {
+		return fmt.Errorf("%s: no user found with ID %d to update firstname", utils.GetCurrentTypeName(), id)
+	}
+
+	return nil
+}
+
+// UpdateLastname updates a user's last name
+func (r *UserRepository) UpdateLastname(id int, lastname string) error {
+	query := `UPDATE users SET lastname = $1, updated_at = NOW() WHERE id = $2`
+	result, err := r.db.Exec(query, lastname, id)
+	if err != nil {
+		return fmt.Errorf("%s: failed to update lastname for user with ID %d: %w", utils.GetCurrentTypeName(), id, err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		log.Printf("%s: Could not get rows affected after update: %v", utils.GetCurrentTypeName(), err)
+	} else if rowsAffected == 0 {
+		return fmt.Errorf("%s: no user found with ID %d to update lastname", utils.GetCurrentTypeName(), id)
+	}
+
+	return nil
+}
+
 func (h *UserRepository) GetOrCreate(tgUser *gotgbot.User) (*User, error) {
 	// Try to get user by Telegram ID
 	dbUser, err := h.GetByTelegramID(int64(tgUser.Id))
