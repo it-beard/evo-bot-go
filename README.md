@@ -12,18 +12,18 @@ A Telegram bot for Evocoders Club management implemented in Go. Helps moderate d
 - ✅ **Join/Leave Cleanup**: Removes join/leave messages for cleaner conversations
 
 ### AI-Powered Functionality
-- 🔍 **Tool Search** (`/tool`): Finds relevant AI tools based on user queries
+- 🔍 **Tool Search** (`/tools`): Finds relevant AI tools based on user queries
 - 📚 **Content Search** (`/content`): Searches through designated topics for information
 - 👋 **Club Members Introduction Search** (`/intro`): Provides information about clubs members
 - 📋 **Chat Summarization**: Creates daily summaries of conversations
   - Auto-posts at configured times
-  - Manual trigger with `/summarize` (admin-only)
+  - Manual trigger with `/trySummarize` (admin-only)
 
 ### 🎲 Weekly Random Coffee Meetings
 - **Automated Participation Poll**: Every week (configurable day and time in UTC, defaults to Friday at 2 PM UTC), the bot posts a poll asking members if they want to participate in random coffee meetings for the following week.
 - **Opt-in/Opt-out**: Members can easily indicate their availability by responding to the poll. Votes can be changed or retracted before pairs are made.
 - **Automated Pairing**: The bot automatically generates and announces pairs on a scheduled basis (configurable day and time in UTC, defaults to Monday at 12 PM UTC).
-- **Manual Pairing**: An administrator can also manually trigger the pairing process using the `/pair_meetings` command.
+- **Manual Pairing**: An administrator can also manually trigger the pairing process using the `/tryGenerateCoffeePairs` command.
 - **Random Pair Announcement**: The bot randomly pairs participating members and announces the pairs in the main chat.
 - **Self-Managed Meetings**: Paired members are encouraged to contact each other to arrange the day, time, and format of their meeting.
 
@@ -35,12 +35,33 @@ A Telegram bot for Evocoders Club management implemented in Go. Helps moderate d
 
 ### Event Management
 - 📅 **Event Management**: Track and organize community events
+  - View upcoming events with `/events` command
+  - Browse event topics and questions with `/topics` command
+  - Suggest topics or questions with `/topicAdd` command
+  - Admin commands for full event lifecycle management
   - Support for different event types and statuses
   - Event publishing with start times
   - Topic organization within events
 
+### Administrative Commands
+- 🔐 **Event Management** (Admin-only):
+  - `/eventSetup` - Create new events
+  - `/eventStart` - Start an event
+  - `/eventEdit` - Edit existing events  
+  - `/eventDelete` - Delete events
+  - `/showTopics` - View and manage event topics
+- 👥 **User Management** (Admin-only):
+  - `/profilesManager` - Manage user profiles
+  - `/code` - Enter verification code for Telegram User Client (reversed)
+- ⚙️ **Testing Commands** (Admin-only):
+  - `/trySummarize` - Manually generate chat summary
+  - `/tryCreateCoffeePool` - Manually create Random Coffee poll
+  - `/tryGenerateCoffeePairs` - Manually generate Random Coffee pairs
+
 ### Utility
 - ℹ️ **Help** (`/help`): Provides usage information
+- 🚀 **Start** (`/start`): Shows welcome message
+- ❌ **Cancel** (`/cancel`): Cancels any active dialog
 - 🧩 **Dynamic Templates**: Customizable AI prompts stored in database
 
 For more details on bot usage, use the `/help` command in the bot chat.
@@ -60,15 +81,14 @@ The bot uses PostgreSQL with automatically initialized tables:
 
 | Table | Purpose | Key Fields |
 |-------|---------|------------|
-| **messages** | Stores chat data for summarization | `id`, `topic_id`, `message_text`, `created_at` |
 | **tg_sessions** | Manages Telegram User Client sessions | `id`, `data`, `updated_at` |
 | **prompting_templates** | Stores AI prompting templates | `template_key`, `template_text` |
-| **users** | Stores user information | `id`, `tg_id`, `firstname`, `lastname`, `tg_username`, `score`, `has_coffee_ban` |
+| **users** | Stores user information | `id`, `tg_id`, `firstname`, `lastname`, `tg_username`, `score`, `has_coffee_ban`, `is_club_member` |
 | **profiles** | Stores user profile data | `id`, `user_id`, `bio`, `published_message_id`, `created_at`, `updated_at` |
 | **events** | Stores event information | `id`, `name`, `type`, `status`, `started_at`, `created_at`, `updated_at` |
 | **topics** | Stores topics related to events | `id`, `topic`, `user_nickname`, `event_id`, `created_at` |
 | **random_coffee_polls** | Stores random coffee poll information | `id`, `message_id`, `telegram_poll_id`, `week_start_date`, `created_at` |
-| **random_coffee_participants** | Stores poll participants data | `id`, `poll_id`, `user_id`, `participating`, `updated_at` |
+| **random_coffee_participants** | Stores poll participants data | `id`, `poll_id`, `user_id`, `is_participating`, `updated_at` |
 | **random_coffee_pairs** | Stores the history of generated random coffee pairs | `id`, `poll_id`, `user1_id`, `user2_id`, `created_at` |
 | **migrations** | Tracks database migrations | `id`, `name`, `timestamp`, `created_at` |
 

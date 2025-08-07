@@ -11,9 +11,11 @@ This is a Telegram bot for Evocoders Club management implemented in Go. The bot 
 - **Thread Management**: Deletes non-admin messages in read-only threads
 - **Message Forwarding**: Forwards replies from closed threads to the general topic
 - **Join/Leave Cleanup**: Removes join/leave messages for cleaner conversations
-- **AI-Powered Search**: Tool search, content search, and club member introduction search
-- **Chat Summarization**: Creates daily summaries automatically or on-demand
+- **AI-Powered Search**: Tool search (`/tools`), content search (`/content`), and club member introduction search (`/intro`)
+- **Chat Summarization**: Creates daily summaries automatically or on-demand with `/trySummarize`
 - **Event Management**: Create and manage club events like meetups and club calls
+- **User Profiles**: Personal profile management with `/profile` command
+- **Random Coffee**: Weekly automated polls and pairing for random coffee meetings
 
 ## Development Commands
 
@@ -54,9 +56,9 @@ go run gotest.tools/gotestsum@latest --format pkgname --format-icons hivis
    - Contains settings for bot token, chat IDs, OpenAI API key, and more
 
 3. **Handlers**: 
-   - **Admin Handlers**: Commands only available to admins like event management
-   - **Group Handlers**: Handle group chat functionality like thread moderation
-   - **Private Handlers**: User commands like help, content search, and tool search
+   - **Admin Handlers**: Commands only available to admins like event management (`/eventSetup`, `/eventStart`, `/eventEdit`, `/eventDelete`), profile management (`/profilesManager`), and testing commands (`/trySummarize`, `/tryCreateCoffeePool`, `/tryGenerateCoffeePairs`)
+   - **Group Handlers**: Handle group chat functionality like thread moderation, join/leave message cleanup, and Random Coffee poll responses
+   - **Private Handlers**: User commands like help (`/help`), search commands (`/tools`, `/content`, `/intro`), event viewing (`/events`, `/topics`), topic suggestions (`/topicAdd`), and profile management (`/profile`)
 
 4. **Database**:
    - PostgreSQL database with migration system
@@ -67,18 +69,29 @@ go run gotest.tools/gotestsum@latest --format pkgname --format-icons hivis
    - **SummarizationService**: Generates daily chat summaries 
    - **MessageSenderService**: Centralized message sending with formatting
    - **PermissionsService**: Handles user permission checks
+   - **ProfileService**: Manages user profile operations
+   - **RandomCoffeeService**: Handles Random Coffee polls and pairing
+   - **PollSenderService**: Sends and manages Telegram polls
 
 6. **Tasks**:
    - **DailySummarizationTask**: Runs chat summarization at configured time
    - **SessionKeepAliveTask**: Keeps Telegram User Client session alive
+   - **RandomCoffeePollTask**: Creates weekly Random Coffee participation polls
+   - **RandomCoffeePairsTask**: Generates and announces Random Coffee pairs
 
 ### Database Schema
 
 The database has several key tables:
 - **events**: Stores club events like meetups and club calls
 - **topics**: Stores discussion topics linked to events
+- **users**: Stores user information including club membership status
+- **profiles**: Stores user profile data with bio and published message references
 - **tg_sessions**: Manages Telegram User Client sessions
 - **prompting_templates**: Stores AI prompting templates
+- **random_coffee_polls**: Stores weekly Random Coffee polls
+- **random_coffee_participants**: Tracks poll participation
+- **random_coffee_pairs**: Stores generated coffee meeting pairs
+- **migrations**: Database migration tracking
 
 ### Handler Workflow
 
