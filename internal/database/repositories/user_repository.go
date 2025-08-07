@@ -218,6 +218,24 @@ func (r *UserRepository) UpdateScore(id int, score int) error {
 	return nil
 }
 
+// AddPoints adds points to a user's score
+func (r *UserRepository) AddPoints(id int, points int) error {
+	query := `UPDATE users SET score = score + $1, updated_at = NOW() WHERE id = $2`
+	result, err := r.db.Exec(query, points, id)
+	if err != nil {
+		return fmt.Errorf("%s: failed to add points to user with ID %d: %w", utils.GetCurrentTypeName(), id, err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		log.Printf("%s: Could not get rows affected after update: %v", utils.GetCurrentTypeName(), err)
+	} else if rowsAffected == 0 {
+		return fmt.Errorf("%s: no user found with ID %d to add points", utils.GetCurrentTypeName(), id)
+	}
+
+	return nil
+}
+
 // SetCoffeeBan sets a user's coffee ban status
 func (r *UserRepository) SetCoffeeBan(id int, banned bool) error {
 	query := `UPDATE users SET has_coffee_ban = $1, updated_at = NOW() WHERE id = $2`

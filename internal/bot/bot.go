@@ -86,6 +86,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	randomCoffeePollRepository := repositories.NewRandomCoffeePollRepository(db.DB)
 	randomCoffeeParticipantRepository := repositories.NewRandomCoffeeParticipantRepository(db.DB)
 	randomCoffeePairRepository := repositories.NewRandomCoffeePairRepository(db.DB)
+	userPointsLogRepository := repositories.NewUserPointsLogRepository(db.DB)
 
 	// Initialize services
 	messageSenderService := services.NewMessageSenderService(bot)
@@ -112,6 +113,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 		profileRepository,
 		randomCoffeePairRepository,
 		userRepository,
+		userPointsLogRepository,
 	)
 
 	// Initialize scheduled tasks

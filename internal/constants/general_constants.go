@@ -7,3 +7,9 @@ const CancelCommand = "cancel"
 const (
 	ProfileBioLengthLimit = 3900 //max Telegram message length
 )
+
+// Points system
+const (
+	PointsPerRandomCoffeeParticipation = 100
+	RandomCoffeeParticipationReason    = "Участие в Random Coffee"
+)

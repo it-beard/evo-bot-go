@@ -100,3 +100,65 @@ The bot uses environment variables for configuration. These must be set before r
 - `TG_EVO_BOT_DB_CONNECTION`: PostgreSQL connection string
 
 See the README.md for the complete list of environment variables.
+
+# Документация изменений Claude AI
+
+## Добавлен функционал подсчета очков за участие в Random Coffee
+
+### Описание
+Реализован полный функционал начисления очков пользователям за участие в Random Coffee. За каждое участие пользователь получает 100 очков.
+
+### Что было сделано:
+
+#### 1. База данных
+- **Миграция 20250701**: Создана таблица `user_points_log` для логирования всех начислений очков
+  - `user_id` - ссылка на пользователя
+  - `points` - количество начисленных очков
+  - `reason` - причина начисления
+  - `poll_id` - ссылка на опрос (для Random Coffee)
+  - `created_at` - время начисления
+
+- **Поле `score`** в таблице `users` уже существовало и используется для хранения общего количества очков пользователя
+
+#### 2. Репозиторий для работы с очками
+- **UserPointsLogRepository** (`/internal/database/repositories/user_points_log_repository.go`):
+  - `AddPoints()` - добавляет очки пользователю и записывает в лог (транзакционно)
+  - `GetUserPointsHistory()` - получает историю начислений для пользователя
+  - `GetPointsForPoll()` - проверяет, получил ли пользователь уже очки за конкретный опрос
+
+#### 3. Обновлен Random Coffee Service
+- Добавлен `UserPointsLogRepository` в зависимости сервиса
+- Создан метод `awardPointsToParticipants()` который начисляет очки всем участникам
+- Очки начисляются в момент генерации пар (метод `GenerateAndSendPairs()`)
+- Предотвращено двойное начисление очков за один опрос
+
+#### 4. Константы
+- `PointsPerRandomCoffeeParticipation = 100` - количество очков за участие
+- `RandomCoffeeParticipationReason = "Участие в Random Coffee"` - причина начисления
+
+#### 5. Логика начисления
+- Очки начисляются всем участникам после успешной генерации пар
+- Включая пользователей в парах и непарного пользователя (если есть)
+- Проверяется, что пользователь еще не получил очки за данный опрос
+- Все операции логируются в консоль
+
+### Как тестировать:
+1. Создать опрос Random Coffee
+2. Добавить участников в опрос
+3. Использовать админ-команду для генерации пар (есть тестовый хендлер `try_generate_coffee_pairs_handler.go`)
+4. Проверить, что участники получили очки в базе данных
+
+### Файлы, которые были изменены:
+- `/internal/database/migrations/implementations/20250701_add_user_points_log_table.go` - новая миграция
+- `/internal/database/repositories/user_points_log_repository.go` - новый репозиторий
+- `/internal/database/repositories/user_repository.go` - добавлен метод `AddPoints()`
+- `/internal/services/random_coffee_service.go` - обновлен для начисления очков
+- `/internal/bot/bot.go` - добавлен `UserPointsLogRepository` в зависимости
+- `/internal/database/migrations/migrator.go` - добавлена новая миграция в Registry
+- `/internal/constants/general_constants.go` - добавлены константы для очков
+
+### Особенности реализации:
+- Транзакционность: начисление очков и запись в лог происходят в одной транзакции
+- Защита от дублирования: проверяется, что пользователь еще не получил очки за данный опрос
+- Логирование: все операции логируются для отладки
+- Гибкость: система легко расширяется для других типов начислений очков

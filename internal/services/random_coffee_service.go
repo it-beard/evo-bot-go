@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"evo-bot-go/internal/config"
+	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/repositories"
 	"evo-bot-go/internal/utils"
 
@@ -25,6 +26,7 @@ type RandomCoffeeService struct {
 	profileRepo     *repositories.ProfileRepository
 	pairRepo        *repositories.RandomCoffeePairRepository
 	userRepo        *repositories.UserRepository
+	pointsLogRepo   *repositories.UserPointsLogRepository
 }
 
 // NewRandomCoffeeService creates a new random coffee poll service
@@ -38,6 +40,7 @@ func NewRandomCoffeeService(
 	profileRepo *repositories.ProfileRepository,
 	pairRepo *repositories.RandomCoffeePairRepository,
 	userRepo *repositories.UserRepository,
+	pointsLogRepo *repositories.UserPointsLogRepository,
 ) *RandomCoffeeService {
 	return &RandomCoffeeService{
 		bot:             bot,
@@ -49,6 +52,7 @@ func NewRandomCoffeeService(
 		profileRepo:     profileRepo,
 		pairRepo:        pairRepo,
 		userRepo:        userRepo,
+		pointsLogRepo:   pointsLogRepo,
 	}
 }
 
@@ -295,6 +299,14 @@ func (s *RandomCoffeeService) GenerateAndSendPairs() error {
 		log.Printf("%s: Failed to pin message: %v", utils.GetCurrentTypeName(), err)
 	}
 
+	// Award points to participants
+	if s.pointsLogRepo != nil {
+		err = s.awardPointsToParticipants(pairs, unpaired, latestPoll.ID)
+		if err != nil {
+			log.Printf("%s: Error awarding points to participants: %v", utils.GetCurrentTypeName(), err)
+		}
+	}
+
 	log.Printf("%s: Successfully sent pairings for poll ID %d to chat %d.", utils.GetCurrentTypeName(), latestPoll.ID, s.config.SuperGroupChatID)
 	return nil
 }
@@ -476,4 +488,59 @@ func (s *RandomCoffeeService) createPairsFromShuffled(participants []repositorie
 	}
 
 	return pairs, unpaired
+}
+
+// awardPointsToParticipants awards points to all participants who actually participated in coffee pairing
+func (s *RandomCoffeeService) awardPointsToParticipants(pairs []CoffeePair, unpaired *repositories.User, pollID int64) error {
+	pointsPerParticipation := constants.PointsPerRandomCoffeeParticipation
+	participationReason := constants.RandomCoffeeParticipationReason
+	
+	// Award points to paired users
+	for _, pair := range pairs {
+		// Check if user1 already received points for this poll
+		existingLog, err := s.pointsLogRepo.GetPointsForPoll(pair.User1.ID, pollID)
+		if err != nil {
+			log.Printf("%s: Error checking existing points for user %d poll %d: %v", utils.GetCurrentTypeName(), pair.User1.ID, pollID, err)
+		} else if existingLog == nil {
+			err = s.pointsLogRepo.AddPoints(pair.User1.ID, pointsPerParticipation, participationReason, &pollID)
+			if err != nil {
+				log.Printf("%s: Error awarding points to user %d: %v", utils.GetCurrentTypeName(), pair.User1.ID, err)
+			} else {
+				log.Printf("%s: Awarded %d points to user %s (ID: %d) for Random Coffee participation", 
+					utils.GetCurrentTypeName(), pointsPerParticipation, pair.User1.Firstname, pair.User1.ID)
+			}
+		}
+
+		// Check if user2 already received points for this poll
+		existingLog, err = s.pointsLogRepo.GetPointsForPoll(pair.User2.ID, pollID)
+		if err != nil {
+			log.Printf("%s: Error checking existing points for user %d poll %d: %v", utils.GetCurrentTypeName(), pair.User2.ID, pollID, err)
+		} else if existingLog == nil {
+			err = s.pointsLogRepo.AddPoints(pair.User2.ID, pointsPerParticipation, participationReason, &pollID)
+			if err != nil {
+				log.Printf("%s: Error awarding points to user %d: %v", utils.GetCurrentTypeName(), pair.User2.ID, err)
+			} else {
+				log.Printf("%s: Awarded %d points to user %s (ID: %d) for Random Coffee participation", 
+					utils.GetCurrentTypeName(), pointsPerParticipation, pair.User2.Firstname, pair.User2.ID)
+			}
+		}
+	}
+
+	// Award points to unpaired user if exists
+	if unpaired != nil {
+		existingLog, err := s.pointsLogRepo.GetPointsForPoll(unpaired.ID, pollID)
+		if err != nil {
+			log.Printf("%s: Error checking existing points for unpaired user %d poll %d: %v", utils.GetCurrentTypeName(), unpaired.ID, pollID, err)
+		} else if existingLog == nil {
+			err = s.pointsLogRepo.AddPoints(unpaired.ID, pointsPerParticipation, participationReason, &pollID)
+			if err != nil {
+				log.Printf("%s: Error awarding points to unpaired user %d: %v", utils.GetCurrentTypeName(), unpaired.ID, err)
+			} else {
+				log.Printf("%s: Awarded %d points to unpaired user %s (ID: %d) for Random Coffee participation", 
+					utils.GetCurrentTypeName(), pointsPerParticipation, unpaired.Firstname, unpaired.ID)
+			}
+		}
+	}
+
+	return nil
 }
