@@ -39,6 +39,15 @@ go test ./...
 
 # Run tests with colored output (if gotestsum is installed)
 go run gotest.tools/gotestsum@latest --format pkgname --format-icons hivis
+
+# Run tests with coverage
+go test -cover ./...
+
+# Run specific test
+go test -run TestFunctionName ./path/to/package
+
+# Run tests with race detection
+go test -race ./...
 ```
 
 ## Project Architecture
@@ -79,6 +88,12 @@ The database has several key tables:
 - **topics**: Stores discussion topics linked to events
 - **tg_sessions**: Manages Telegram User Client sessions
 - **prompting_templates**: Stores AI prompting templates
+- **users**: Stores user information with Telegram details
+- **profiles**: User profile data and publishing information
+- **random_coffee_polls**: Weekly random coffee participation polls
+- **random_coffee_participants**: Poll participant responses
+- **random_coffee_pairs**: Historical pairing data
+- **migrations**: Database migration tracking (automatically managed)
 
 ### Handler Workflow
 
@@ -86,6 +101,61 @@ The database has several key tables:
 2. Bot routes the command to the appropriate handler
 3. Handler validates permissions and input
 4. Handler processes the command and sends a response
+
+### Important Architectural Patterns
+
+#### Dependency Injection Pattern
+The bot uses a centralized `HandlerDependencies` struct (`internal/bot/bot.go:26`) that contains all services, repositories, and clients needed by handlers. This promotes clean separation of concerns and makes testing easier.
+
+#### Repository Pattern
+All database interactions go through repository interfaces located in `internal/database/repositories/`. Each entity (User, Profile, Event, etc.) has its own repository with standardized CRUD operations.
+
+#### Service Layer Architecture
+Business logic is separated into service layers (`internal/services/`):
+- **MessageSenderService**: Centralized message sending with formatting
+- **PermissionsService**: User permission validation
+- **ProfileService**: User profile management
+- **SummarizationService**: Chat summarization logic
+- **RandomCoffeeService**: Random coffee pairing logic
+
+#### Migration System
+Database migrations are automatically managed in `internal/database/migrations/`. New migrations go in `implementations/` directory and must be added to the registry in `migrator.go`. Migrations run automatically on app startup.
+
+#### Handler Registration
+All handlers are registered in `internal/bot/bot.go:174` in the `registerHandlers` method, organized by type:
+- **Admin handlers**: Commands only for administrators
+- **Group handlers**: Handle group chat events and moderation
+- **Private handlers**: User commands in private chats
+
+### Application Startup Sequence
+
+1. **Configuration Loading** (`config.LoadConfig()`): Loads all environment variables and validates required settings
+2. **Client Initialization** (`clients.NewOpenAiClient()`): Creates OpenAI client for AI features
+3. **Bot Creation** (`bot.NewTgBotClient()`): Initializes bot with all dependencies:
+   - Database connection and migration execution
+   - Repository and service initialization
+   - Handler registration
+   - Scheduled task setup
+4. **Graceful Shutdown Setup**: Configures signal handling for clean termination
+5. **Bot Start** (`botClient.Start()`): Begins polling and starts scheduled tasks
+
+### Development Guidelines
+
+#### Adding New Commands
+1. Create handler in appropriate subdirectory (`adminhandlers/`, `grouphandlers/`, `privatehandlers/`)
+2. Implement the `Handler` interface with `Name()` and `CheckUpdate()` methods
+3. Add dependencies to `HandlerDependencies` struct if needed
+4. Register handler in `registerHandlers()` method
+5. Test with both unit tests and integration testing
+
+#### Adding New Database Tables
+1. Create migration in `internal/database/migrations/implementations/`
+2. Add migration to registry in `migrator.go`
+3. Create repository in `internal/database/repositories/`
+4. Add repository to dependency injection in `bot.go`
+
+#### Testing Patterns
+The codebase uses table-driven tests. See `internal/utils/*_test.go` for examples of the testing patterns used.
 
 ## Configuration
 
