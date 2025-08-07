@@ -299,7 +299,7 @@ func (h *eventStartHandler) handleCallbackYes(b *gotgbot.Bot, ctx *ext.Context) 
 		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
 			{
 				{
-					Text: "🔗 Ссылка на подключение",
+					Text: "🔗 Ссылка на Zoom",
 					Url:  eventLink,
 				},
 			},
