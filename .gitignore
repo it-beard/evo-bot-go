@@ -18,3 +18,4 @@ session.json
 last-prompt-log.txt
 main
 /last-intro-prompt-log.txt
+/last-profile-prompt-log.txt

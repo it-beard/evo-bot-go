@@ -1,16 +1,23 @@
 package privatehandlers
 
 import (
+	"context"
 	"database/sql"
+	"encoding/json"
 	"evo-bot-go/internal/buttons"
+	"evo-bot-go/internal/clients"
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
+	"evo-bot-go/internal/database/prompts"
 	"evo-bot-go/internal/database/repositories"
 	"evo-bot-go/internal/formatters"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 	"fmt"
+	"log"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -21,38 +28,47 @@ import (
 
 const (
 	// Conversation states
-	profileStateViewOptions         = "profile_state_view_options"
-	profileStateEditMyProfile       = "profile_state_edit_my_profile"
-	profileStateAwaitQueryForSearch = "profile_state_await_query_for_search"
-	profileStateAwaitBio            = "profile_state_await_bio"
-	profileStateAwaitFirstname      = "profile_state_await_firstname"
-	profileStateAwaitLastname       = "profile_state_await_lastname"
+	profileStateViewOptions               = "profile_state_view_options"
+	profileStateEditMyProfile             = "profile_state_edit_my_profile"
+	profileStateAwaitQueryForSearch       = "profile_state_await_query_for_search"
+	profileStateAwaitQueryForBioSearch    = "profile_state_await_query_for_bio_search"
+	profileStateAwaitBio                  = "profile_state_await_bio"
+	profileStateAwaitFirstname            = "profile_state_await_firstname"
+	profileStateAwaitLastname             = "profile_state_await_lastname"
 
 	// UserStore keys
 	profileCtxDataKeyField                   = "profile_ctx_data_field"
 	profileCtxDataKeyPreviousMessageID       = "profile_ctx_data_previous_message_id"
 	profileCtxDataKeyPreviousChatID          = "profile_ctx_data_previous_chat_id"
 	profileCtxDataKeyLastMessageTimeFromUser = "profile_ctx_data_last_message_time_from_user"
+	profileCtxDataKeyProcessing              = "profile_ctx_data_key_processing"
+	profileCtxDataKeyCancelFunc              = "profile_ctx_data_key_cancel_func"
 
 	// Menu headers
-	profileMenuHeader              = "Меню \"Профиль\""
-	profileMenuMyProfileHeader     = "Профиль → Мой профиль"
-	profileMenuEditHeader          = "Профиль → Редактирование"
-	profileMenuEditFirstnameHeader = "Профиль → Редактирование → Имя"
-	profileMenuEditLastnameHeader  = "Профиль → Редактирование → Фамилия"
-	profileMenuEditBioHeader       = "Профиль → Редактирование → О себе"
-	profileMenuPublishHeader       = "Профиль → Публикация"
-	profileMenuSearchHeader        = "Профиль → Поиск"
+	profileMenuHeader               = "Меню \"Профиль\""
+	profileMenuMyProfileHeader      = "Профиль → Мой профиль"
+	profileMenuEditHeader           = "Профиль → Редактирование"
+	profileMenuEditFirstnameHeader  = "Профиль → Редактирование → Имя"
+	profileMenuEditLastnameHeader   = "Профиль → Редактирование → Фамилия"
+	profileMenuEditBioHeader        = "Профиль → Редактирование → О себе"
+	profileMenuPublishHeader        = "Профиль → Публикация"
+	profileMenuSearchHeader         = "Профиль → Поиск"
+	profileMenuBioSearchHeader      = "Профиль → Поиск по биографиям"
+
+	// Callback data
+	profileCallbackConfirmCancel = "profile_callback_confirm_cancel"
 )
 
 type profileHandler struct {
-	config               *config.Config
-	messageSenderService *services.MessageSenderService
-	permissionsService   *services.PermissionsService
-	profileService       *services.ProfileService
-	userRepository       *repositories.UserRepository
-	profileRepository    *repositories.ProfileRepository
-	userStore            *utils.UserDataStore
+	config                      *config.Config
+	messageSenderService        *services.MessageSenderService
+	permissionsService          *services.PermissionsService
+	profileService              *services.ProfileService
+	userRepository              *repositories.UserRepository
+	profileRepository           *repositories.ProfileRepository
+	promptingTemplateRepository *repositories.PromptingTemplateRepository
+	openaiClient                *clients.OpenAiClient
+	userStore                   *utils.UserDataStore
 }
 
 func NewProfileHandler(
@@ -62,15 +78,19 @@ func NewProfileHandler(
 	profileService *services.ProfileService,
 	userRepository *repositories.UserRepository,
 	profileRepository *repositories.ProfileRepository,
+	promptingTemplateRepository *repositories.PromptingTemplateRepository,
+	openaiClient *clients.OpenAiClient,
 ) ext.Handler {
 	h := &profileHandler{
-		config:               config,
-		messageSenderService: messageSenderService,
-		permissionsService:   permissionsService,
-		profileService:       profileService,
-		userRepository:       userRepository,
-		profileRepository:    profileRepository,
-		userStore:            utils.NewUserDataStore(),
+		config:                      config,
+		messageSenderService:        messageSenderService,
+		permissionsService:          permissionsService,
+		profileService:              profileService,
+		userRepository:              userRepository,
+		profileRepository:           profileRepository,
+		promptingTemplateRepository: promptingTemplateRepository,
+		openaiClient:                openaiClient,
+		userStore:                   utils.NewUserDataStore(),
 	}
 
 	return handlers.NewConversation(
@@ -90,6 +110,11 @@ func NewProfileHandler(
 				handlers.NewMessage(message.Text, h.handleSearchInput),
 				handlers.NewCallback(callbackquery.Equal(constants.ProfileStartCallback), h.handleCallback),
 				handlers.NewCallback(callbackquery.Equal(constants.ProfileFullCancel), h.handleCallbackCancel),
+			},
+			profileStateAwaitQueryForBioSearch: {
+				handlers.NewMessage(message.Text, h.handleBioSearchInput),
+				handlers.NewCallback(callbackquery.Equal(constants.ProfileStartCallback), h.handleCallback),
+				handlers.NewCallback(callbackquery.Equal(profileCallbackConfirmCancel), h.handleCallbackCancel),
 			},
 			profileStateAwaitBio: {
 				handlers.NewMessage(message.Text, h.handleBioInput),
@@ -186,6 +211,8 @@ func (h *profileHandler) handleCallback(b *gotgbot.Bot, ctx *ext.Context) error 
 		return h.handleEditMyProfile(b, ctx, effectiveMsg)
 	case constants.ProfileViewOtherProfileCallback:
 		return h.handleViewOtherProfile(b, ctx, effectiveMsg)
+	case constants.ProfileBioSearchCallback:
+		return h.handleBioSearch(b, ctx, effectiveMsg)
 	case constants.ProfileEditBioCallback:
 		return h.handleEditField(b, ctx, effectiveMsg, fmt.Sprintf("обновлённую биографию (до %d символов)", constants.ProfileBioLengthLimit), profileStateAwaitBio)
 	case constants.ProfileEditFirstnameCallback:
@@ -684,13 +711,18 @@ func (h *profileHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	userId := ctx.EffectiveUser.Id
 
-	h.RemovePreviousMessage(b, &userId)
+	// Check if there's an ongoing operation to cancel
+	if cancelFunc, ok := h.userStore.Get(ctx.EffectiveUser.Id, profileCtxDataKeyCancelFunc); ok {
+		// Call the cancel function to stop any ongoing API calls
+		if cf, ok := cancelFunc.(context.CancelFunc); ok {
+			cf()
+			h.messageSenderService.Reply(msg, "Операция поиска профилей отменена.", nil)
+		}
+	} else {
+		h.messageSenderService.Reply(msg, "Сессия работы с профилями завершена.", nil)
+	}
 
-	_ = h.messageSenderService.Send(
-		msg.Chat.Id,
-		"Сессия работы с профилями завершена.",
-		nil,
-	)
+	h.RemovePreviousMessage(b, &userId)
 	h.userStore.Clear(ctx.EffectiveUser.Id)
 
 	return handlers.EndConversation()
@@ -779,6 +811,189 @@ func (h *profileHandler) RemovePreviousMessage(b *gotgbot.Bot, userID *int64) {
 	}
 
 	b.DeleteMessage(chatID, messageID, nil)
+}
+
+func (h *profileHandler) handleBioSearch(b *gotgbot.Bot, ctx *ext.Context, msg *gotgbot.Message) error {
+	user := ctx.Update.CallbackQuery.From
+
+	h.RemovePreviousMessage(b, &user.Id)
+	editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
+		msg.Chat.Id,
+		fmt.Sprintf("<b>%s</b>", profileMenuBioSearchHeader)+
+			"\n\nВведи поисковый запрос для поиска участников по их биографиям:",
+		&gotgbot.SendMessageOpts{
+			ReplyMarkup: buttons.CancelButton(profileCallbackConfirmCancel),
+		})
+
+	if err != nil {
+		return fmt.Errorf("%s: failed to send message in handleBioSearch: %w", utils.GetCurrentTypeName(), err)
+	}
+	h.SavePreviousMessageInfo(user.Id, editedMsg)
+	return handlers.NextConversationState(profileStateAwaitQueryForBioSearch)
+}
+
+func (h *profileHandler) handleBioSearchInput(b *gotgbot.Bot, ctx *ext.Context) error {
+	msg := ctx.EffectiveMessage
+
+	// Check if we're already processing a request for this user
+	if isProcessing, ok := h.userStore.Get(ctx.EffectiveUser.Id, profileCtxDataKeyProcessing); ok && isProcessing.(bool) {
+		h.messageSenderService.Reply(
+			msg,
+			fmt.Sprintf("Пожалуйста, дождитесь окончания обработки предыдущего запроса, или используйте /%s для отмены.", constants.CancelCommand),
+			nil,
+		)
+		return nil // Stay in the same state
+	}
+
+	// Get query from user message
+	query := strings.TrimSpace(msg.Text)
+	if query == "" {
+		h.messageSenderService.Reply(
+			msg,
+			fmt.Sprintf("Поисковый запрос не может быть пустым. Пожалуйста, введите запрос или используйте /%s для отмены.", constants.CancelCommand),
+			nil,
+		)
+		return nil // Stay in the same state
+	}
+
+	// Mark as processing
+	h.userStore.Set(ctx.EffectiveUser.Id, profileCtxDataKeyProcessing, true)
+
+	// Create a cancellable context for this operation
+	typingCtx, cancelTyping := context.WithCancel(context.Background())
+
+	// Store cancel function in user store so it can be called from handleCancel
+	h.userStore.Set(ctx.EffectiveUser.Id, profileCtxDataKeyCancelFunc, cancelTyping)
+
+	// Make sure we clean up the processing flag in all exit paths
+	defer func() {
+		h.userStore.Set(ctx.EffectiveUser.Id, profileCtxDataKeyProcessing, false)
+		h.userStore.Set(ctx.EffectiveUser.Id, profileCtxDataKeyCancelFunc, nil)
+	}()
+
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
+	// Inform user that search has started
+	sentMsg, _ := h.messageSenderService.ReplyWithReturnMessage(msg, fmt.Sprintf("Ищу участников по запросу: \"%s\"...", query), &gotgbot.SendMessageOpts{
+		ReplyMarkup: buttons.CancelButton(profileCallbackConfirmCancel),
+	})
+	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
+
+	// Send typing action using MessageSender
+	h.messageSenderService.SendTypingAction(msg.Chat.Id)
+
+	// Get profiles from database
+	profiles, err := h.profileRepository.GetAllWithUsers()
+	if err != nil {
+		h.messageSenderService.Reply(msg, "Произошла ошибка при получении профилей из базы данных.", nil)
+		log.Printf("%s: Error during profiles retrieval: %v", utils.GetCurrentTypeName(), err)
+		return handlers.EndConversation()
+	}
+
+	dataProfiles, err := h.prepareProfilesData(profiles)
+	if err != nil {
+		h.messageSenderService.Reply(msg, "Произошла ошибка при подготовке профилей для поиска.", nil)
+		log.Printf("%s: Error during profiles preparation: %v", utils.GetCurrentTypeName(), err)
+		return handlers.EndConversation()
+	}
+
+	templateText, err := h.promptingTemplateRepository.Get(prompts.GetProfilePromptTemplateDbKey)
+	if err != nil {
+		h.messageSenderService.Reply(msg, "Произошла ошибка при получении шаблона для поиска профилей.", nil)
+		log.Printf("%s: Error during template retrieval: %v", utils.GetCurrentTypeName(), err)
+		return handlers.EndConversation()
+	}
+
+	prompt := fmt.Sprintf(
+		templateText,
+		utils.EscapeMarkdown(string(dataProfiles)),
+		utils.EscapeMarkdown(query),
+	)
+
+	// Save the prompt into a temporary file for logging purposes
+	err = os.WriteFile("last-profile-prompt-log.txt", []byte(prompt), 0644)
+	if err != nil {
+		log.Printf("%s: Error writing prompt to file: %v", utils.GetCurrentTypeName(), err)
+	}
+
+	// Start periodic typing action every 5 seconds while waiting for the OpenAI response
+	defer cancelTyping() // ensure cancellation if function exits early
+
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				h.messageSenderService.SendTypingAction(msg.Chat.Id)
+			case <-typingCtx.Done():
+				return
+			}
+		}
+	}()
+
+	// Get completion from OpenAI using the new context
+	responseOpenAi, err := h.openaiClient.GetCompletion(typingCtx, prompt)
+	// Check if context was cancelled
+	if typingCtx.Err() != nil {
+		log.Printf("%s: Request was cancelled", utils.GetCurrentTypeName())
+		return handlers.EndConversation()
+	}
+
+	// Continue only if no errors
+	if err != nil {
+		h.messageSenderService.Reply(msg, "Произошла ошибка при получении ответа от OpenAI.", nil)
+		log.Printf("%s: Error during OpenAI response retrieval: %v", utils.GetCurrentTypeName(), err)
+		return handlers.EndConversation()
+	}
+
+	err = h.messageSenderService.ReplyMarkdown(msg, responseOpenAi, nil)
+	if err != nil {
+		h.messageSenderService.Reply(msg, "Произошла ошибка при отправке ответа.", nil)
+		log.Printf("%s: Error during message sending: %v", utils.GetCurrentTypeName(), err)
+		return handlers.EndConversation()
+	}
+
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
+	// Clean up user data
+	h.userStore.Clear(ctx.EffectiveUser.Id)
+
+	return handlers.EndConversation()
+}
+
+func (h *profileHandler) prepareProfilesData(profiles []repositories.ProfileWithUser) ([]byte, error) {
+	type ProfileData struct {
+		ID          int    `json:"id"`
+		FirstName   string `json:"first_name"`
+		LastName    string `json:"last_name"`
+		Username    string `json:"username,omitempty"`
+		Bio         string `json:"bio"`
+	}
+
+	profileObjects := make([]ProfileData, 0, len(profiles))
+	for _, profileWithUser := range profiles {
+		profileObjects = append(profileObjects, ProfileData{
+			ID:        profileWithUser.Profile.ID,
+			FirstName: profileWithUser.User.Firstname,
+			LastName:  profileWithUser.User.Lastname,
+			Username:  profileWithUser.User.TgUsername,
+			Bio:       profileWithUser.Profile.Bio,
+		})
+	}
+
+	if len(profileObjects) == 0 {
+		return nil, fmt.Errorf("%s: no profiles found in database", utils.GetCurrentTypeName())
+	}
+
+	dataProfiles, err := json.Marshal(profileObjects)
+	if err != nil {
+		return nil, fmt.Errorf("%s: failed to marshal profiles to JSON: %w", utils.GetCurrentTypeName(), err)
+	}
+
+	if string(dataProfiles) == "" {
+		return nil, fmt.Errorf("%s: no profiles found in database", utils.GetCurrentTypeName())
+	}
+
+	return dataProfiles, nil
 }
 
 func (h *profileHandler) SavePreviousMessageInfo(userID int64, sentMsg *gotgbot.Message) {

@@ -16,6 +16,7 @@ const (
 	ProfileViewMyProfileCallback    = ProfilePrefix + "view_my"
 	ProfileEditMyProfileCallback    = ProfilePrefix + "edit_my"
 	ProfileViewOtherProfileCallback = ProfilePrefix + "view_other"
+	ProfileBioSearchCallback        = ProfilePrefix + "bio_search"
 
 	ProfileEditBioCallback               = ProfilePrefix + "edit_bio"
 	ProfileEditFirstnameCallback         = ProfilePrefix + "edit_firstname"
