@@ -15,7 +15,7 @@ func NewAddProfileSearchPromptMigration() *AddProfileSearchPromptMigration {
 	return &AddProfileSearchPromptMigration{
 		BaseMigration: BaseMigration{
 			name:      "add_profile_search_prompt",
-			timestamp: "20250107",
+			timestamp: "20250807",
 		},
 	}
 }
@@ -24,7 +24,7 @@ func (m *AddProfileSearchPromptMigration) Apply(db *sql.DB) error {
 	if err := m.insertPromptIfNotExists(db, prompts.GetProfilePromptTemplateDbKey, prompts.GetProfilePromptDefaultTemplate); err != nil {
 		return fmt.Errorf("failed to insert profile search prompt: %w", err)
 	}
-	
+
 	log.Printf("Migration %s applied successfully", m.name)
 	return nil
 }
@@ -34,7 +34,7 @@ func (m *AddProfileSearchPromptMigration) Rollback(db *sql.DB) error {
 	if err != nil {
 		return fmt.Errorf("failed to remove profile search prompt: %w", err)
 	}
-	
+
 	log.Printf("Migration %s rolled back successfully", m.name)
 	return nil
 }
