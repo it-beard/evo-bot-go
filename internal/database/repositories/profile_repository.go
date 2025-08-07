@@ -220,3 +220,66 @@ func (r *ProfileRepository) getByUserID(userID int) (*Profile, error) {
 
 	return &profile, nil
 }
+
+// ProfileWithUser represents a profile with associated user information
+type ProfileWithUser struct {
+	Profile *Profile
+	User    *User
+}
+
+// GetAllWithUsers retrieves all profiles with their associated user information
+func (r *ProfileRepository) GetAllWithUsers() ([]ProfileWithUser, error) {
+	query := `
+		SELECT 
+			p.id, p.user_id, p.bio, p.published_message_id, p.created_at, p.updated_at,
+			u.id, u.tg_id, u.firstname, u.lastname, u.tg_username, u.score, u.has_coffee_ban, u.is_club_member, u.created_at, u.updated_at
+		FROM profiles p
+		INNER JOIN users u ON p.user_id = u.id
+		WHERE p.bio != '' AND p.bio IS NOT NULL
+		ORDER BY p.updated_at DESC`
+
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("%s: failed to query profiles with users: %w", utils.GetCurrentTypeName(), err)
+	}
+	defer rows.Close()
+
+	var profiles []ProfileWithUser
+	for rows.Next() {
+		var profile Profile
+		var user User
+
+		err := rows.Scan(
+			&profile.ID,
+			&profile.UserID,
+			&profile.Bio,
+			&profile.PublishedMessageID,
+			&profile.CreatedAt,
+			&profile.UpdatedAt,
+			&user.ID,
+			&user.TgID,
+			&user.Firstname,
+			&user.Lastname,
+			&user.TgUsername,
+			&user.Score,
+			&user.HasCoffeeBan,
+			&user.IsClubMember,
+			&user.CreatedAt,
+			&user.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("%s: failed to scan profile with user: %w", utils.GetCurrentTypeName(), err)
+		}
+
+		profiles = append(profiles, ProfileWithUser{
+			Profile: &profile,
+			User:    &user,
+		})
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("%s: error iterating over profiles with users: %w", utils.GetCurrentTypeName(), err)
+	}
+
+	return profiles, nil
+}

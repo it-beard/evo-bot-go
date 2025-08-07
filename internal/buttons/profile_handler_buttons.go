@@ -34,6 +34,10 @@ func ProfileMainButtons() gotgbot.InlineKeyboardMarkup {
 					Text:         "🔎 Поиск профиля",
 					CallbackData: constants.ProfileViewOtherProfileCallback,
 				},
+				{
+					Text:         "🧠 ИИ-поиск по био",
+					CallbackData: constants.ProfileBioSearchCallback,
+				},
 			},
 			{
 				{
@@ -136,3 +140,4 @@ func ProfileEditButtons(backCallbackData string) gotgbot.InlineKeyboardMarkup {
 		InlineKeyboard: buttons,
 	}
 }
+
