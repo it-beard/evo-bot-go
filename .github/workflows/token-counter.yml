@@ -1,0 +1,24 @@
+name: Token Count
+on:
+  workflow_dispatch:
+
+jobs:
+  count:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Count tokens
+        id: token_counter
+        uses: gamezovladislav/token-counter@v1
+        with:
+          path: .
+          model: o3
+          pretty_output: 'false'
+
+      - name: Upload summary artifact (optional)
+        uses: actions/upload-artifact@v4
+        with:
+          name: token-summary
+          path: ${{ steps.token_counter.outputs.summary_file }}
