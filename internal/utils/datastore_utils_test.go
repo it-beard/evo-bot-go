@@ -174,3 +174,73 @@ func TestUserDataStore_DifferentValueTypes(t *testing.T) {
 	assert.True(t, exists)
 	assert.Equal(t, mapValue, val5)
 }
+
+func TestUserDataStore_SetPreviousMessageInfo(t *testing.T) {
+	store := NewUserDataStore()
+	var userID int64 = 12345
+	var messageID int64 = 98765
+	var chatID int64 = 54321
+	messageIDKey := "prev_msg_id"
+	chatIDKey := "prev_chat_id"
+
+	store.SetPreviousMessageInfo(userID, messageID, chatID, messageIDKey, chatIDKey)
+
+	// Verify that both values were stored correctly
+	value, exists := store.Get(userID, messageIDKey)
+	assert.True(t, exists, "Message ID should be stored")
+	assert.Equal(t, messageID, value, "Stored message ID should match")
+
+	value, exists = store.Get(userID, chatIDKey)
+	assert.True(t, exists, "Chat ID should be stored")
+	assert.Equal(t, chatID, value, "Stored chat ID should match")
+}
+
+func TestUserDataStore_GetPreviousMessageInfo(t *testing.T) {
+	store := NewUserDataStore()
+	var userID int64 = 12345
+	var expectedMessageID int64 = 98765
+	var expectedChatID int64 = 54321
+	messageIDKey := "prev_msg_id"
+	chatIDKey := "prev_chat_id"
+
+	// Store the values first
+	store.Set(userID, messageIDKey, expectedMessageID)
+	store.Set(userID, chatIDKey, expectedChatID)
+
+	// Retrieve using GetPreviousMessageInfo
+	messageID, chatID := store.GetPreviousMessageInfo(userID, messageIDKey, chatIDKey)
+
+	assert.Equal(t, expectedMessageID, messageID, "Retrieved message ID should match")
+	assert.Equal(t, expectedChatID, chatID, "Retrieved chat ID should match")
+}
+
+func TestUserDataStore_GetPreviousMessageInfo_NonExistentKeys(t *testing.T) {
+	store := NewUserDataStore()
+	var userID int64 = 12345
+	messageIDKey := "non_existent_msg_id"
+	chatIDKey := "non_existent_chat_id"
+
+	// Try to retrieve non-existent keys
+	messageID, chatID := store.GetPreviousMessageInfo(userID, messageIDKey, chatIDKey)
+
+	// Should return zero values for int64
+	assert.Equal(t, int64(0), messageID, "Non-existent message ID should return zero")
+	assert.Equal(t, int64(0), chatID, "Non-existent chat ID should return zero")
+}
+
+func TestUserDataStore_GetPreviousMessageInfo_PartialData(t *testing.T) {
+	store := NewUserDataStore()
+	var userID int64 = 12345
+	var expectedMessageID int64 = 98765
+	messageIDKey := "existing_msg_id"
+	chatIDKey := "non_existing_chat_id"
+
+	// Store only message ID
+	store.Set(userID, messageIDKey, expectedMessageID)
+
+	// Retrieve using GetPreviousMessageInfo
+	messageID, chatID := store.GetPreviousMessageInfo(userID, messageIDKey, chatIDKey)
+
+	assert.Equal(t, expectedMessageID, messageID, "Existing message ID should be retrieved")
+	assert.Equal(t, int64(0), chatID, "Non-existent chat ID should return zero")
+}
