@@ -22,7 +22,9 @@ type SummarizationService struct {
 	config                      *config.Config
 	openaiClient                *clients.OpenAiClient
 	messageSenderService        *MessageSenderService
+	groupTopicRepository        *repositories.GroupTopicRepository
 	promptingTemplateRepository *repositories.PromptingTemplateRepository
+	groupMessageRepository      *repositories.GroupMessageRepository
 }
 
 // NewSummarizationService creates a new summarization service
@@ -30,13 +32,17 @@ func NewSummarizationService(
 	config *config.Config,
 	openaiClient *clients.OpenAiClient,
 	messageSenderService *MessageSenderService,
+	groupTopicRepository *repositories.GroupTopicRepository,
 	promptingTemplateRepository *repositories.PromptingTemplateRepository,
+	groupMessageRepository *repositories.GroupMessageRepository,
 ) *SummarizationService {
 	return &SummarizationService{
 		config:                      config,
 		openaiClient:                openaiClient,
 		messageSenderService:        messageSenderService,
+		groupTopicRepository:        groupTopicRepository,
 		promptingTemplateRepository: promptingTemplateRepository,
+		groupMessageRepository:      groupMessageRepository,
 	}
 }
 
@@ -74,8 +80,11 @@ func (s *SummarizationService) RunDailySummarization(ctx context.Context, sendTo
 // summarizeTopicMessages summarizes a single topic
 func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topicID int, since time.Time, sendToDM bool) error {
 	// Get topic name
-	// [todo] get correct topic name
-	topicName := "Topic"
+	groupTopic, err := s.groupTopicRepository.GetGroupTopicByTopicID(int64(topicID))
+	if err != nil {
+		return fmt.Errorf("%s: failed to get topic name: %w", utils.GetCurrentTypeName(), err)
+	}
+	topicName := groupTopic.Name
 
 	// Calculate hours since the given time
 	// hoursSince := int(time.Since(since).Hours()) + 1 // Add 1 to ensure we get all messages since 'since' time
@@ -83,7 +92,10 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 	// Get messages directly from Telegram with retry logic for rate limiting
 	// [todo] get correct messages
 	var messages []*repositories.GroupMessage
-	messages = []*repositories.GroupMessage{}
+	messages, err = s.groupMessageRepository.GetByGroupTopicIDForLastDay(int64(topicID))
+	if err != nil {
+		return fmt.Errorf("%s: failed to get messages: %w", utils.GetCurrentTypeName(), err)
+	}
 
 	if len(messages) == 0 {
 		log.Printf("%s: No messages found for topic %d since %v", utils.GetCurrentTypeName(), topicID, since)

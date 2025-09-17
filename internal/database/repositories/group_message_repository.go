@@ -202,6 +202,46 @@ func (r *GroupMessageRepository) GetByGroupTopicID(groupTopicID int64, limit int
 	return messages, nil
 }
 
+// GetByGroupTopicIDForLastDay retrieves group messages by group topic ID for the last 24 hours
+func (r *GroupMessageRepository) GetByGroupTopicIDForLastDay(groupTopicID int64) ([]*GroupMessage, error) {
+	query := `
+		SELECT id, message_id, message_text, reply_to_message_id, user_tg_id, group_topic_id, created_at, updated_at
+		FROM group_messages
+		WHERE group_topic_id = $1 AND created_at >= NOW() - INTERVAL '24 hours'
+		ORDER BY created_at ASC`
+
+	rows, err := r.db.Query(query, groupTopicID)
+	if err != nil {
+		return nil, fmt.Errorf("%s: failed to get group messages by group topic ID %d for last day: %w", utils.GetCurrentTypeName(), groupTopicID, err)
+	}
+	defer rows.Close()
+
+	var messages []*GroupMessage
+	for rows.Next() {
+		var message GroupMessage
+		err := rows.Scan(
+			&message.ID,
+			&message.MessageID,
+			&message.MessageText,
+			&message.ReplyToMessageID,
+			&message.UserTgID,
+			&message.GroupTopicID,
+			&message.CreatedAt,
+			&message.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("%s: failed to scan group message: %w", utils.GetCurrentTypeName(), err)
+		}
+		messages = append(messages, &message)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("%s: error iterating group message rows: %w", utils.GetCurrentTypeName(), err)
+	}
+
+	return messages, nil
+}
+
 // Update updates a group message record
 func (r *GroupMessageRepository) Update(id int, messageText string) error {
 	query := `UPDATE group_messages SET message_text = $1, updated_at = NOW() WHERE id = $2`

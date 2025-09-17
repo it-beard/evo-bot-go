@@ -95,7 +95,6 @@ func (h *RepliesFromClosedThreadsHandler) forwardReplyMessage(ctx *ext.Context, 
 		msg.ReplyToMessage.MessageId)
 
 	// Get the topic name
-	// [todo] get topic name from database
 	groupTopic, err := h.groupTopicRepository.GetGroupTopicByTopicID(msg.MessageThreadId)
 	if err != nil {
 		log.Printf(

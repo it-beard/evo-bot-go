@@ -104,7 +104,9 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 		appConfig,
 		openaiClient,
 		messageSenderService,
+		groupTopicRepository,
 		promptingTemplateRepository,
+		groupMessageRepository,
 	)
 	randomCoffeeService := services.NewRandomCoffeeService(
 		bot,
