@@ -23,7 +23,6 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/callbackquery"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/message"
-	"github.com/gotd/td/tg"
 )
 
 const (
@@ -160,7 +159,7 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 
 	// Get messages from chat
 	//[todo] get messages from chat
-	messages := []tg.Message{}
+	messages := []*repositories.GroupMessage{}
 
 	dataMessages, err := h.prepareTelegramMessages(messages)
 	if err != nil {
@@ -270,7 +269,7 @@ func (h *contentHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	return handlers.EndConversation()
 }
 
-func (h *contentHandler) prepareTelegramMessages(messages []tg.Message) ([]byte, error) {
+func (h *contentHandler) prepareTelegramMessages(messages []*repositories.GroupMessage) ([]byte, error) {
 	// Modified MessageObject to have Date as string
 	type MessageObject struct {
 		ID      int    `json:"id"`
@@ -287,13 +286,13 @@ func (h *contentHandler) prepareTelegramMessages(messages []tg.Message) ([]byte,
 	messageObjects := make([]MessageObject, 0, len(messages))
 	for _, message := range messages {
 		// Convert Unix timestamp to UTC time
-		t := time.Unix(int64(message.Date), 0).In(loc)
+		t := time.Unix(int64(message.CreatedAt.Unix()), 0).In(loc)
 		// Format date as "day month year" and convert to lowercase
 		dateFormatted := strings.ToLower(t.Format("2 January 2006"))
 
 		messageObjects = append(messageObjects, MessageObject{
 			ID:      message.ID,
-			Message: message.Message,
+			Message: message.MessageText,
 			Date:    dateFormatted,
 		})
 	}

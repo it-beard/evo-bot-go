@@ -2,6 +2,7 @@ package grouphandlers
 
 import (
 	"evo-bot-go/internal/config"
+	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/repositories"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
@@ -45,6 +46,11 @@ func NewRepliesFromClosedThreadsHandler(
 
 func (h *RepliesFromClosedThreadsHandler) check(msg *gotgbot.Message) bool {
 	if msg == nil || msg.ReplyToMessage == nil {
+		return false
+	}
+
+	// Skip private chats
+	if msg.Chat.Type == constants.PrivateChatType {
 		return false
 	}
 

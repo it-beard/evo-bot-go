@@ -39,6 +39,11 @@ A Telegram bot for Evocoders Club management implemented in Go. Helps moderate d
   - Event publishing with start times
   - Topic organization within events
 
+### Events Topic Management
+- 📝 **Topic Viewing** (`/topics`): Browse topics and questions from events
+- ➕ **Topic Addition** (`/topic_add`): Add new topics and questions to events (for all club members)
+- 🔧 **Admin Topic Management** (`/show_topics`): View and delete topics (admin-only)
+
 ### Utility
 - ℹ️ **Help** (`/help`): Provides usage information
 - 🧩 **Dynamic Templates**: Customizable AI prompts stored in database
@@ -60,8 +65,8 @@ The bot uses PostgreSQL with automatically initialized tables:
 
 | Table | Purpose | Key Fields |
 |-------|---------|------------|
-| **messages** | Stores chat data for summarization | `id`, `topic_id`, `message_text`, `created_at` |
-| **tg_sessions** | Manages Telegram User Client sessions | `id`, `data`, `updated_at` |
+| **group_messages** | Stores group messages | `id`, `message_id`, `message_text`, `user_tg_id`, `group_topic_id`, `created_at`, `updated_at` |
+| **group_topics** | Stores forum topic names | `id`, `topic_id`, `name`, `created_at`, `updated_at` |
 | **prompting_templates** | Stores AI prompting templates | `template_key`, `template_text` |
 | **users** | Stores user information | `id`, `tg_id`, `firstname`, `lastname`, `tg_username`, `score`, `has_coffee_ban` |
 | **profiles** | Stores user profile data | `id`, `user_id`, `bio`, `published_message_id`, `created_at`, `updated_at` |
@@ -120,16 +125,6 @@ The bot uses environment variables for configuration, make sure to set them all:
 - `TG_EVO_BOT_INTRO_TOPIC_ID`: Topic ID for the club introductions and member information
 - `TG_EVO_BOT_ANNOUNCEMENT_TOPIC_ID`: Topic ID for announcements
 
-### Telegram User Client
-- `TG_EVO_BOT_TGUSERCLIENT_APPID`: Telegram API App ID
-- `TG_EVO_BOT_TGUSERCLIENT_APPHASH`: Telegram API App Hash
-- `TG_EVO_BOT_TGUSERCLIENT_PHONENUMBER`: Phone number for Telegram user client
-- `TG_EVO_BOT_TGUSERCLIENT_2FAPASS`: Two-factor authentication password for Telegram user client (if using 2FA)
-- `TG_EVO_BOT_TGUSERCLIENT_SESSION_TYPE`: Session type for Telegram User Client. Available options:
-  - `file`: Enables file storage (using `session.json`)
-  - `database`: Uses database storage (requires valid `TG_EVO_BOT_DB_CONNECTION`)
-  - `memory` or empty: Uses in-memory session storage (session will be lost after restart)
-
 ### Daily Summarization Feature
 - `TG_EVO_BOT_DB_CONNECTION`: PostgreSQL connection string (e.g., `postgresql://user:password@localhost:5432/dbname`) - the database will be automatically initialized with required tables
 - `TG_EVO_BOT_MONITORED_TOPICS_IDS`: Comma-separated list of topic IDs to monitor for summarization
@@ -163,13 +158,6 @@ set TG_EVO_BOT_CONTENT_TOPIC_ID=content_topic_id
 set TG_EVO_BOT_INTRO_TOPIC_ID=intro_topic_id
 set TG_EVO_BOT_ANNOUNCEMENT_TOPIC_ID=announcement_topic_id
 
-# Telegram User Client
-set TG_EVO_BOT_TGUSERCLIENT_APPID=your_app_id
-set TG_EVO_BOT_TGUSERCLIENT_APPHASH=your_app_hash
-set TG_EVO_BOT_TGUSERCLIENT_PHONENUMBER=your_phone_number
-set TG_EVO_BOT_TGUSERCLIENT_2FAPASS=your_2fa_password
-set TG_EVO_BOT_TGUSERCLIENT_SESSION_TYPE=file
-
 # Daily Summarization Feature
 set TG_EVO_BOT_DB_CONNECTION=postgresql://user:password@localhost:5432/dbname
 set TG_EVO_BOT_MONITORED_TOPICS_IDS=0,2
@@ -188,15 +176,6 @@ set TG_EVO_BOT_RANDOM_COFFEE_PAIRS_DAY=monday
 ```
 
 Then run the executable.
-
-## Obtain Verification Code
-
-To obtain the verification code, you need to run the Telegram User Client. 
-After first run you will get this **code in your telegram app**. 
-
-Send this code **REVERTED** by /code command to your bot.
-
-After that your bot will be able to use Telegram User Client and will update session automaticaly once per _30 minutes_.
 
 ## Running Tests
 

@@ -23,7 +23,6 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/callbackquery"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/message"
-	"github.com/gotd/td/tg"
 )
 
 const (
@@ -160,7 +159,7 @@ func (h *toolsHandler) processToolSearch(b *gotgbot.Bot, ctx *ext.Context) error
 
 	// Get messages from chat
 	//[todo] get messages from chat
-	messages := []tg.Message{}
+	messages := []*repositories.GroupMessage{}
 
 	dataMessages, err := h.prepareTelegramMessages(messages)
 	if err != nil {
@@ -269,7 +268,7 @@ func (h *toolsHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	return handlers.EndConversation()
 }
 
-func (h *toolsHandler) prepareTelegramMessages(messages []tg.Message) ([]byte, error) {
+func (h *toolsHandler) prepareTelegramMessages(messages []*repositories.GroupMessage) ([]byte, error) {
 	type MessageObject struct {
 		ID      int    `json:"id"`
 		Message string `json:"message"`
@@ -279,7 +278,7 @@ func (h *toolsHandler) prepareTelegramMessages(messages []tg.Message) ([]byte, e
 	for _, message := range messages {
 		messageObjects = append(messageObjects, MessageObject{
 			ID:      message.ID,
-			Message: message.Message,
+			Message: message.MessageText,
 		})
 	}
 

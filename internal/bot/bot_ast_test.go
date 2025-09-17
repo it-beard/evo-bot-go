@@ -52,11 +52,12 @@ var expectedConstructors = []string{
 	"NewTryCreateCoffeePoolHandler",
 	"NewTryGenerateCoffeePairsHandler",
 	"NewTrySummarizeHandler",
-	"NewCodeHandler",
 	"NewAdminProfilesHandler",
 	"NewShowTopicsHandler",
 
 	// Group
+	"NewSaveTopicsHandler",
+	"NewSaveMessagesHandler",
 	"NewCleanClosedThreadsHandler",
 	"NewDeleteJoinLeftMessagesHandler",
 	"NewJoinLeftHandler",
