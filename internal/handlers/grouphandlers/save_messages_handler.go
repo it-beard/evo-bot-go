@@ -3,6 +3,7 @@ package grouphandlers
 import (
 	"database/sql"
 	"evo-bot-go/internal/config"
+	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/repositories"
 	"evo-bot-go/internal/utils"
 	"fmt"
@@ -37,6 +38,11 @@ func NewSaveMessagesHandler(
 
 func (h *SaveMessagesHandler) check(msg *gotgbot.Message) bool {
 	if msg == nil {
+		return false
+	}
+
+	// Skip private chats
+	if msg.Chat.Type == constants.PrivateChatType {
 		return false
 	}
 

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"evo-bot-go/internal/config"
+	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
@@ -42,6 +43,11 @@ func NewCleanClosedThreadsHandler(
 
 func (h *CleanClosedThreadsHandler) check(msg *gotgbot.Message) bool {
 	if msg == nil {
+		return false
+	}
+
+	// Skip private chats
+	if msg.Chat.Type == constants.PrivateChatType {
 		return false
 	}
 

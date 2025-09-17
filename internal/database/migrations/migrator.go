@@ -47,6 +47,7 @@ func Registry() []implementations.Migration {
 		implementations.NewAddProfileSearchPromptMigration(),
 		implementations.NewAddGroupTopicsTable(),
 		implementations.NewAddGroupMessagesTable(),
+		implementations.NewRemoveTgSessionsTable(),
 		// Add new migrations here
 	}
 }

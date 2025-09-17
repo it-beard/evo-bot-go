@@ -1,6 +1,7 @@
 package grouphandlers
 
 import (
+	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/utils"
 	"fmt"
 	"log"
@@ -20,6 +21,11 @@ func NewDeleteJoinLeftMessagesHandler() ext.Handler {
 
 func (h *deleteJoinLeftMessagesHandler) check(msg *gotgbot.Message) bool {
 	if msg == nil {
+		return false
+	}
+
+	// Skip private chats
+	if msg.Chat.Type == constants.PrivateChatType {
 		return false
 	}
 

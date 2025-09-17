@@ -24,13 +24,6 @@ type Config struct {
 	AnnouncementTopicID int
 	IntroTopicID        int
 
-	// Telegram User Client
-	TGUserClientAppID       int
-	TGUserClientAppHash     string
-	TGUserClientPhoneNumber string
-	TGUserClient2FAPass     string
-	TGUserClientSessionType string
-
 	// Daily Summarization Feature
 	DBConnection             string
 	MonitoredTopicsIDs       []int
@@ -142,21 +135,6 @@ func LoadConfig() (*Config, error) {
 		}
 		config.IntroTopicID = introTopicID
 	}
-
-	// Telegram User Client
-	tgUserClientAppIDStr := os.Getenv("TG_EVO_BOT_TGUSERCLIENT_APPID")
-	if tgUserClientAppIDStr != "" {
-		tgUserClientAppID, err := strconv.Atoi(tgUserClientAppIDStr)
-		if err != nil {
-			return nil, fmt.Errorf("invalid Telegram User Client App ID: %s", tgUserClientAppIDStr)
-		}
-		config.TGUserClientAppID = tgUserClientAppID
-	}
-
-	config.TGUserClientAppHash = os.Getenv("TG_EVO_BOT_TGUSERCLIENT_APPHASH")
-	config.TGUserClientPhoneNumber = os.Getenv("TG_EVO_BOT_TGUSERCLIENT_PHONENUMBER")
-	config.TGUserClient2FAPass = os.Getenv("TG_EVO_BOT_TGUSERCLIENT_2FAPASS")
-	config.TGUserClientSessionType = os.Getenv("TG_EVO_BOT_TGUSERCLIENT_SESSION_TYPE")
 
 	// Daily Summarization Feature
 	config.DBConnection = os.Getenv("TG_EVO_BOT_DB_CONNECTION")

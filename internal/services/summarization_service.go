@@ -15,7 +15,6 @@ import (
 	"evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/gotd/td/tg"
 )
 
 // SummarizationService handles the daily summarization of messages
@@ -83,54 +82,30 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 
 	// Get messages directly from Telegram with retry logic for rate limiting
 	// [todo] get correct messages
-	var tgMessages []tg.Message
-	tgMessages = []tg.Message{}
+	var messages []*repositories.GroupMessage
+	messages = []*repositories.GroupMessage{}
 
-	if len(tgMessages) == 0 {
+	if len(messages) == 0 {
 		log.Printf("%s: No messages found for topic %d since %v", utils.GetCurrentTypeName(), topicID, since)
 		return nil
 	}
 
-	log.Printf("%s: Found %d messages for topic %d", utils.GetCurrentTypeName(), len(tgMessages), topicID)
+	log.Printf("%s: Found %d messages for topic %d", utils.GetCurrentTypeName(), len(messages), topicID)
 
 	// Build context directly from all messages without using RAG
 	context := ""
-	for _, msg := range tgMessages {
+	for _, msg := range messages {
 		// Convert Unix timestamp to time.Time
-		msgTime := time.Unix(int64(msg.Date), 0)
-
-		// Extract username/first name from the message
-		userID := int64(0)
-		if msg.FromID != nil {
-			if user, ok := msg.FromID.(*tg.PeerUser); ok && user != nil {
-				// Just use the user ID as a placeholder since we don't have easy access to username
-				userID = user.UserID
-			}
-		}
-
-		replyToMessageId := 0
-		if msg.ReplyTo != nil {
-			reply, ok := msg.ReplyTo.(*tg.MessageReplyHeader)
-			if ok {
-				if reply.ReplyToTopID == 0 && topicID != 0 { // Hack for non main topic messages (id = 0)
-					replyToMessageId = 0
-				} else {
-					replyToMessageId = reply.ReplyToMsgID
-				}
-			}
-		}
+		msgTime := time.Unix(int64(msg.CreatedAt.Unix()), 0)
 
 		replyToMessage := ""
 
-		if replyToMessageId != 0 {
-			replyToMessage = fmt.Sprintf("ReplyID: %d\n", replyToMessageId)
-		}
 		context += fmt.Sprintf("\n---\nMessageID: %d\n%sUserID: user_%d\nTimestamp: %s\nText: %s",
 			msg.ID,
 			replyToMessage,
-			userID,
+			msg.UserTgID,
 			msgTime.Format("2006-01-02 15:04:05"),
-			msg.Message)
+			msg.MessageText)
 
 	}
 
