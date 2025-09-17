@@ -12,12 +12,17 @@ import (
 )
 
 type SaveMessagesHandler struct {
-	groupTopicRepository *repositories.GroupTopicRepository
+	groupMessageRepository *repositories.GroupMessageRepository
+	userRepository         *repositories.UserRepository
 }
 
-func NewSaveMessagesHandler(groupTopicRepository *repositories.GroupTopicRepository) ext.Handler {
+func NewSaveMessagesHandler(
+	groupMessageRepository *repositories.GroupMessageRepository,
+	userRepository *repositories.UserRepository,
+) ext.Handler {
 	h := &SaveMessagesHandler{
-		groupTopicRepository: groupTopicRepository,
+		groupMessageRepository: groupMessageRepository,
+		userRepository:         userRepository,
 	}
 	return handlers.NewMessage(h.check, h.handle)
 }
@@ -27,82 +32,110 @@ func (h *SaveMessagesHandler) check(msg *gotgbot.Message) bool {
 		return false
 	}
 
-	// Check if this is a forum topic created or edited message
-	return msg.ForumTopicCreated != nil || msg.ForumTopicEdited != nil
+	// Handle regular user messages (text, voice, photo, etc.)
+	// Skip bot messages and system messages
+	if msg.From == nil || msg.From.IsBot {
+		return false
+	}
+
+	// Skip forum topic created or edited messages (handled by SaveTopicsHandler)
+	if msg.ForumTopicCreated != nil || msg.ForumTopicEdited != nil {
+		return false
+	}
+
+	// Check if this is a regular message with content
+	return msg.Text != "" || msg.Caption != "" || msg.Voice != nil || msg.Audio != nil ||
+		msg.Document != nil || msg.Photo != nil || msg.Video != nil || msg.VideoNote != nil ||
+		msg.Sticker != nil || msg.Animation != nil
 }
 
 func (h *SaveMessagesHandler) handle(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
-	if msg.ForumTopicCreated != nil {
-		// Handle forum topic creation
-		return h.handleForumTopicCreated(msg)
-	}
-
-	if msg.ForumTopicEdited != nil {
-		// Handle forum topic edit
-		return h.handleForumTopicEdited(msg)
-	}
-
-	return nil
+	// Handle regular user messages
+	return h.handleUserMessage(msg)
 }
 
-func (h *SaveMessagesHandler) handleForumTopicCreated(msg *gotgbot.Message) error {
-	topicCreated := msg.ForumTopicCreated
-	topicID := msg.MessageThreadId
-	topicName := topicCreated.Name
+// handleUserMessage processes regular user messages and saves them to database
+func (h *SaveMessagesHandler) handleUserMessage(msg *gotgbot.Message) error {
+	// Get message content
+	messageText := ""
+	entities := []gotgbot.MessageEntity{}
 
-	log.Printf("%s: Forum topic created - ID: %d, Name: %s", utils.GetCurrentTypeName(), topicID, topicName)
-
-	// Save the new topic to database
-	groupTopic, err := h.groupTopicRepository.AddGroupTopic(topicID, topicName)
-	if err != nil {
-		return fmt.Errorf("%s: failed to save forum topic created: %w", utils.GetCurrentTypeName(), err)
-	}
-
-	log.Printf("%s: Successfully saved forum topic created - DB ID: %d, Topic ID: %d, Name: %s",
-		utils.GetCurrentTypeName(), groupTopic.ID, groupTopic.TopicID, groupTopic.Name)
-
-	return nil
-}
-
-func (h *SaveMessagesHandler) handleForumTopicEdited(msg *gotgbot.Message) error {
-	topicEdited := msg.ForumTopicEdited
-	topicID := msg.MessageThreadId
-
-	// The topic name might not change in edit, but we'll handle the case where it does
-	var topicName string
-	if topicEdited.Name != "" {
-		topicName = topicEdited.Name
+	if msg.Text != "" {
+		messageText = msg.Text
+		entities = msg.Entities
+	} else if msg.Caption != "" {
+		messageText = msg.Caption
+		entities = msg.CaptionEntities
 	} else {
-		// If no name change, try to get existing topic
-		existingTopic, err := h.groupTopicRepository.GetGroupTopicByTopicID(topicID)
-		if err != nil {
-			return fmt.Errorf("%s: failed to get existing topic for edit: %w", utils.GetCurrentTypeName(), err)
-		}
-		topicName = existingTopic.Name
-	}
-
-	log.Printf("%s: Forum topic edited - ID: %d, Name: %s", utils.GetCurrentTypeName(), topicID, topicName)
-
-	// Update the topic in database
-	groupTopic, err := h.groupTopicRepository.UpdateGroupTopic(topicID, topicName)
-	if err != nil {
-		// If topic doesn't exist, create it (edge case handling)
-		if utils.IndexAny(err.Error(), "no group topic found") != -1 {
-			log.Printf("%s: Topic not found during edit, creating new one - ID: %d, Name: %s",
-				utils.GetCurrentTypeName(), topicID, topicName)
-			groupTopic, err = h.groupTopicRepository.AddGroupTopic(topicID, topicName)
-			if err != nil {
-				return fmt.Errorf("%s: failed to create forum topic during edit: %w", utils.GetCurrentTypeName(), err)
-			}
+		// For media messages without caption, create a descriptive text
+		if msg.Photo != nil {
+			messageText = "[Photo]"
+		} else if msg.Video != nil {
+			messageText = "[Video]"
+		} else if msg.Voice != nil {
+			messageText = "[Voice message]"
+		} else if msg.Audio != nil {
+			messageText = "[Audio]"
+		} else if msg.Document != nil {
+			messageText = "[Document]"
+		} else if msg.VideoNote != nil {
+			messageText = "[Video note]"
+		} else if msg.Sticker != nil {
+			messageText = "[Sticker]"
+		} else if msg.Animation != nil {
+			messageText = "[GIF]"
 		} else {
-			return fmt.Errorf("%s: failed to update forum topic edited: %w", utils.GetCurrentTypeName(), err)
+			messageText = "[Media]"
 		}
 	}
 
-	log.Printf("%s: Successfully updated forum topic edited - DB ID: %d, Topic ID: %d, Name: %s",
-		utils.GetCurrentTypeName(), groupTopic.ID, groupTopic.TopicID, groupTopic.Name)
+	// Convert to markdown
+	markdownText := utils.ConvertToMarkdown(messageText, entities)
+
+	// Get replied message ID if exists
+	var replyToMessageID *int64
+	if msg.ReplyToMessage != nil {
+		repliedID := int64(msg.ReplyToMessage.MessageId)
+		replyToMessageID = &repliedID
+	}
+
+	// Get thread ID
+	var groupTopicID int64
+	if msg.MessageThreadId != 0 {
+		groupTopicID = msg.MessageThreadId
+		if !msg.IsTopicMessage {
+			groupTopicID = 0 // If message is not a topic message, set thread ID to 0
+		}
+	}
+
+	// If replied message ID is the same as thread ID, set replied message ID to nil
+	if replyToMessageID != nil && *replyToMessageID == groupTopicID {
+		replyToMessageID = nil
+	}
+
+	// Check if user exists and create/update if needed
+	_, err := h.userRepository.GetOrCreate(msg.From)
+	if err != nil {
+		log.Printf("%s: failed to get or create user %d: %v", utils.GetCurrentTypeName(), msg.From.Id, err)
+		// Continue even if user operations fail, but log the error
+	}
+
+	// Save the message
+	_, err = h.groupMessageRepository.Create(
+		msg.MessageId,
+		markdownText,
+		replyToMessageID,
+		msg.From.Id,
+		groupTopicID,
+	)
+	if err != nil {
+		return fmt.Errorf("%s: failed to save group message: %w", utils.GetCurrentTypeName(), err)
+	}
+
+	log.Printf("%s: Successfully saved group message - ID: %d, User: %d, Thread: %v",
+		utils.GetCurrentTypeName(), msg.MessageId, msg.From.Id, groupTopicID)
 
 	return nil
 }

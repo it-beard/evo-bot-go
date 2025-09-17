@@ -40,6 +40,7 @@ type HandlerDependencies struct {
 	RandomCoffeePollRepository        *repositories.RandomCoffeePollRepository
 	RandomCoffeeParticipantRepository *repositories.RandomCoffeeParticipantRepository
 	RandomCoffeePairRepository        *repositories.RandomCoffeePairRepository
+	GroupMessageRepository            *repositories.GroupMessageRepository
 }
 
 // TgBotClient represents a Telegram bot client with all required dependencies
@@ -88,6 +89,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	randomCoffeePollRepository := repositories.NewRandomCoffeePollRepository(db.DB)
 	randomCoffeeParticipantRepository := repositories.NewRandomCoffeeParticipantRepository(db.DB)
 	randomCoffeePairRepository := repositories.NewRandomCoffeePairRepository(db.DB)
+	groupMessageRepository := repositories.NewGroupMessageRepository(db.DB)
 
 	// Initialize services
 	messageSenderService := services.NewMessageSenderService(bot)
@@ -150,6 +152,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 		RandomCoffeePollRepository:        randomCoffeePollRepository,
 		RandomCoffeeParticipantRepository: randomCoffeeParticipantRepository,
 		RandomCoffeePairRepository:        randomCoffeePairRepository,
+		GroupMessageRepository:            groupMessageRepository,
 	}
 
 	// Register all handlers
@@ -244,7 +247,8 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 
 	// Register group chat handlers
 	groupHandlers := []ext.Handler{
-		grouphandlers.NewSaveMessagesHandler(deps.GroupTopicRepository), //always goes first!
+		grouphandlers.NewSaveTopicsHandler(deps.GroupTopicRepository), //always goes first!
+		grouphandlers.NewSaveMessagesHandler(deps.GroupMessageRepository, deps.UserRepository),
 		grouphandlers.NewCleanClosedThreadsHandler(
 			deps.AppConfig,
 			deps.MessageSenderService,
