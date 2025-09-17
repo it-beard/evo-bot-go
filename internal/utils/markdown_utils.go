@@ -46,9 +46,17 @@ func ConvertToMarkdown(text string, entities []gotgbot.MessageEntity) string {
 		// Get the entity text
 		entityText := text[byteOffset:byteEnd]
 
-		// Convert entity to markdown
-		markdownText := convertEntityToMarkdown(entityText, entity)
-		result.WriteString(markdownText)
+		// Special handling for blockquote to keep nested entities (e.g., links)
+		if entity.Type == "blockquote" {
+			// Collect entities fully inside this blockquote and shift offsets
+			nested := extractNestedEntities(entities, entity)
+			inner := ConvertToMarkdown(entityText, nested)
+			result.WriteString(applyBlockquote(inner))
+		} else {
+			// Convert entity to markdown
+			markdownText := convertEntityToMarkdown(entityText, entity)
+			result.WriteString(markdownText)
+		}
 
 		lastOffset = byteEnd
 	}
@@ -145,14 +153,42 @@ func convertEntityToMarkdown(text string, entity gotgbot.MessageEntity) string {
 	case "spoiler":
 		return fmt.Sprintf("||%s||", text)
 	case "blockquote":
-		// Convert blockquote to markdown blockquote
-		lines := strings.Split(text, "\n")
-		for i, line := range lines {
-			lines[i] = "> " + line
-		}
-		return strings.Join(lines, "\n")
+		return applyBlockquote(text)
 	default:
 		// Unknown entity type, return text as-is
 		return text
 	}
+}
+
+// extractNestedEntities returns entities fully contained in container, with offsets shifted
+func extractNestedEntities(all []gotgbot.MessageEntity, container gotgbot.MessageEntity) []gotgbot.MessageEntity {
+	if len(all) == 0 {
+		return nil
+	}
+
+	var nested []gotgbot.MessageEntity
+	cStart := container.Offset
+	cEnd := container.Offset + container.Length
+	for _, e := range all {
+		if e == container {
+			continue
+		}
+		eStart := e.Offset
+		eEnd := e.Offset + e.Length
+		if eStart >= cStart && eEnd <= cEnd {
+			shifted := e
+			shifted.Offset = e.Offset - cStart
+			nested = append(nested, shifted)
+		}
+	}
+	return nested
+}
+
+// applyBlockquote prefixes every line with "> "
+func applyBlockquote(text string) string {
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		lines[i] = "> " + line
+	}
+	return strings.Join(lines, "\n")
 }
