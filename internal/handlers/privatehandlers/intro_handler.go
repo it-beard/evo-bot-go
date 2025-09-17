@@ -103,7 +103,7 @@ func (h *introHandler) startIntroSearch(b *gotgbot.Bot, ctx *ext.Context) error 
 	// Ask user to enter search query
 	sentMsg, _ := h.messageSenderService.ReplyWithReturnMessage(
 		msg,
-		fmt.Sprintf("Введите поисковый запрос по участникам клуба или нажмите /%s для получения общей информации:", constants.CancelCommand),
+		fmt.Sprintf("Введи поисковый запрос по участникам клуба или нажми /%s для получения общей информации:", constants.CancelCommand),
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: buttons.CancelButton(introCallbackConfirmCancel),
 		},
@@ -121,7 +121,7 @@ func (h *introHandler) processIntroSearch(b *gotgbot.Bot, ctx *ext.Context) erro
 	if isProcessing, ok := h.userStore.Get(ctx.EffectiveUser.Id, introCtxDataKeyProcessing); ok && isProcessing.(bool) {
 		h.messageSenderService.Reply(
 			msg,
-			fmt.Sprintf("Пожалуйста, дождитесь окончания обработки предыдущего запроса, или используйте /%s для отмены.", constants.CancelCommand),
+			fmt.Sprintf("Пожалуйста, дождись окончания обработки предыдущего запроса, или используй /%s для отмены.", constants.CancelCommand),
 			nil,
 		)
 		return nil // Stay in the same state

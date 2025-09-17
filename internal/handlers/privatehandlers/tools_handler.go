@@ -97,7 +97,7 @@ func (h *toolsHandler) startToolSearch(b *gotgbot.Bot, ctx *ext.Context) error {
 	// Ask user to enter search query
 	sentMsg, _ := h.messageSenderService.ReplyWithReturnMessage(
 		msg,
-		fmt.Sprintf("Введите поисковый запрос по инструментам:"),
+		"Введи поисковый запрос по инструментам:",
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: buttons.CancelButton(toolsCallbackConfirmCancel),
 		},
@@ -115,7 +115,7 @@ func (h *toolsHandler) processToolSearch(b *gotgbot.Bot, ctx *ext.Context) error
 	if isProcessing, ok := h.userStore.Get(ctx.EffectiveUser.Id, toolsUserCtxDataKeyProcessing); ok && isProcessing.(bool) {
 		h.messageSenderService.Reply(
 			msg,
-			fmt.Sprintf("Пожалуйста, дождитесь окончания обработки предыдущего запроса, или используйте /%s для отмены.", constants.CancelCommand),
+			fmt.Sprintf("Пожалуйста, дождись окончания обработки предыдущего запроса, или используй /%s для отмены.", constants.CancelCommand),
 			nil,
 		)
 		return nil // Stay in the same state
@@ -126,7 +126,7 @@ func (h *toolsHandler) processToolSearch(b *gotgbot.Bot, ctx *ext.Context) error
 	if query == "" {
 		h.messageSenderService.Reply(
 			msg,
-			fmt.Sprintf("Поисковый запрос не может быть пустым. Пожалуйста, введите запрос или используйте /%s для отмены.", constants.CancelCommand),
+			fmt.Sprintf("Поисковый запрос не может быть пустым. Пожалуйста, введи запрос или используй /%s для отмены.", constants.CancelCommand),
 			nil,
 		)
 		return nil // Stay in the same state

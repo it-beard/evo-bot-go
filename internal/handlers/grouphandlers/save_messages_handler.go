@@ -104,7 +104,7 @@ func (h *SaveMessagesHandler) handleUserMessage(msg *gotgbot.Message) error {
 	}
 
 	// Convert to markdown
-	markdownText := utils.ConvertToMarkdown(messageText, entities)
+	markdownText := utils.ConvertToHTML(messageText, entities)
 
 	// Get replied message ID if exists
 	var replyToMessageID *int64
@@ -213,7 +213,7 @@ func (h *SaveMessagesHandler) handleMessageUpdate(msg *gotgbot.Message) error {
 	}
 
 	// Convert to markdown
-	markdownText := utils.ConvertToMarkdown(messageText, entities)
+	markdownText := utils.ConvertToHTML(messageText, entities)
 
 	// Only update if content actually changed
 	if markdownText != existingMessage.MessageText {
