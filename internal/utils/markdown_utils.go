@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"unicode/utf16"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 )
@@ -18,40 +19,88 @@ func ConvertToMarkdown(text string, entities []gotgbot.MessageEntity) string {
 	sortedEntities := make([]gotgbot.MessageEntity, len(entities))
 	copy(sortedEntities, entities)
 	sort.Slice(sortedEntities, func(i, j int) bool {
+		if sortedEntities[i].Offset == sortedEntities[j].Offset {
+			// For same offset, process longer entities first
+			return sortedEntities[i].Length > sortedEntities[j].Length
+		}
 		return sortedEntities[i].Offset < sortedEntities[j].Offset
 	})
 
-	// Convert text to runes for proper unicode handling
-	runes := []rune(text)
-	result := strings.Builder{}
-	lastOffset := int64(0)
+	// Remove overlapping entities to prevent duplication
+	nonOverlappingEntities := filterOverlappingEntities(sortedEntities)
 
-	for _, entity := range sortedEntities {
+	// Build result by processing entities in order
+	result := strings.Builder{}
+	lastOffset := 0
+
+	for _, entity := range nonOverlappingEntities {
+		// Convert offsets to byte positions in UTF-8 string
+		byteOffset := utf16OffsetToByteOffset(text, int(entity.Offset))
+		byteEnd := utf16OffsetToByteOffset(text, int(entity.Offset+entity.Length))
+
 		// Add text before this entity
-		if entity.Offset > lastOffset {
-			result.WriteString(string(runes[lastOffset:entity.Offset]))
+		if byteOffset > lastOffset {
+			result.WriteString(text[lastOffset:byteOffset])
 		}
 
 		// Get the entity text
-		entityEnd := entity.Offset + entity.Length
-		if entityEnd > int64(len(runes)) {
-			entityEnd = int64(len(runes))
-		}
-		entityText := string(runes[entity.Offset:entityEnd])
+		entityText := text[byteOffset:byteEnd]
 
 		// Convert entity to markdown
 		markdownText := convertEntityToMarkdown(entityText, entity)
 		result.WriteString(markdownText)
 
-		lastOffset = entityEnd
+		lastOffset = byteEnd
 	}
 
 	// Add remaining text
-	if lastOffset < int64(len(runes)) {
-		result.WriteString(string(runes[lastOffset:]))
+	if lastOffset < len(text) {
+		result.WriteString(text[lastOffset:])
 	}
 
 	return result.String()
+}
+
+// filterOverlappingEntities removes overlapping entities to prevent content duplication
+func filterOverlappingEntities(entities []gotgbot.MessageEntity) []gotgbot.MessageEntity {
+	if len(entities) <= 1 {
+		return entities
+	}
+
+	var result []gotgbot.MessageEntity
+	lastEnd := int64(-1)
+
+	for _, entity := range entities {
+		// Skip entities that overlap with the previous one
+		if entity.Offset >= lastEnd {
+			result = append(result, entity)
+			lastEnd = entity.Offset + entity.Length
+		}
+	}
+
+	return result
+}
+
+// utf16OffsetToByteOffset converts UTF-16 offset to byte offset in UTF-8 string
+func utf16OffsetToByteOffset(text string, utf16Offset int) int {
+	if utf16Offset <= 0 {
+		return 0
+	}
+
+	runes := []rune(text)
+	utf16Text := utf16.Encode(runes)
+
+	if utf16Offset >= len(utf16Text) {
+		return len(text)
+	}
+
+	// Convert the portion up to the offset to runes
+	partialUtf16 := utf16Text[:utf16Offset]
+	partialRunes := utf16.Decode(partialUtf16)
+
+	// Convert runes back to UTF-8 bytes
+	partialText := string(partialRunes)
+	return len(partialText)
 }
 
 // convertEntityToMarkdown converts a single entity to its markdown representation
