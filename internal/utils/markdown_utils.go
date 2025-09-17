@@ -66,7 +66,8 @@ func ConvertToMarkdown(text string, entities []gotgbot.MessageEntity) string {
 		result.WriteString(text[lastOffset:])
 	}
 
-	return result.String()
+	// Ensure single newlines are preserved as hard line breaks in Markdown
+	return ensureHardLineBreaks(result.String())
 }
 
 // filterOverlappingEntities removes overlapping entities to prevent content duplication
@@ -191,4 +192,49 @@ func applyBlockquote(text string) string {
 		lines[i] = "> " + line
 	}
 	return strings.Join(lines, "\n")
+}
+
+// ensureHardLineBreaks converts single newlines to Markdown hard line breaks (two spaces + \n)
+// while keeping code blocks (``` ... ```) intact.
+func ensureHardLineBreaks(s string) string {
+	if s == "" {
+		return s
+	}
+
+	var b strings.Builder
+	inCode := false
+
+	// Process text line-by-line while preserving whether a newline was present
+	segments := strings.SplitAfter(s, "\n")
+	for _, seg := range segments {
+		if seg == "" {
+			continue
+		}
+
+		hasNL := strings.HasSuffix(seg, "\n")
+		line := strings.TrimSuffix(seg, "\n")
+
+		// Toggle code block state on fence lines and keep them unmodified
+		if strings.HasPrefix(line, "```") {
+			b.WriteString(seg)
+			inCode = !inCode
+			continue
+		}
+
+		if inCode || !hasNL {
+			b.WriteString(seg)
+			continue
+		}
+
+		if line == "" { // blank line -> paragraph break
+			b.WriteString(seg)
+			continue
+		}
+
+		// Add two spaces before newline to force a hard line break
+		b.WriteString(line)
+		b.WriteString("  \n")
+	}
+
+	return b.String()
 }
