@@ -152,19 +152,19 @@ func (m *InitialMigration) Rollback(db *sql.DB) error {
 }
 
 func insertDefaultPrompts(db *sql.DB) error {
-	if err := insertDefaultPromptIfNotExists(db, prompts.GetContentPromptTemplateDbKey, prompts.GetContentPromptDefaultTemplate); err != nil {
+	if err := insertDefaultPromptIfNotExists(db, prompts.GetContentPromptKey, prompts.GetContentPromptDefaultValue); err != nil {
 		return fmt.Errorf("failed to insert content prompt: %w", err)
 	}
 
-	if err := insertDefaultPromptIfNotExists(db, prompts.DailySummarizationPromptTemplateDbKey, prompts.DailySummarizationPromptDefaultTemplate); err != nil {
+	if err := insertDefaultPromptIfNotExists(db, prompts.DailySummarizationPromptKey, prompts.DailySummarizationPromptDefaultValue); err != nil {
 		return fmt.Errorf("failed to insert summarization prompt: %w", err)
 	}
 
-	if err := insertDefaultPromptIfNotExists(db, prompts.GetToolPromptTemplateDbKey, prompts.GetToolPromptDefaultTemplate); err != nil {
+	if err := insertDefaultPromptIfNotExists(db, prompts.GetToolPromptKey, prompts.GetToolPromptDefaultValue); err != nil {
 		return fmt.Errorf("failed to insert tool prompt: %w", err)
 	}
 
-	if err := insertDefaultPromptIfNotExists(db, prompts.GetIntroPromptTemplateDbKey, prompts.GetIntroPromptDefaultTemplate); err != nil {
+	if err := insertDefaultPromptIfNotExists(db, prompts.GetIntroPromptKey, prompts.GetIntroPromptDefaultValue); err != nil {
 		return fmt.Errorf("failed to insert intro prompt: %w", err)
 	}
 	return nil

@@ -203,7 +203,7 @@ func (r *GroupMessageRepository) GetByGroupTopicID(groupTopicID int64, limit int
 }
 
 // GetByGroupTopicIDForLastDay retrieves group messages by group topic ID for the last 24 hours
-func (r *GroupMessageRepository) GetByGroupTopicIDForLastDay(groupTopicID int64) ([]*GroupMessage, error) {
+func (r *GroupMessageRepository) GetByGroupTopicIdForpreviousTwentyFourHours(groupTopicID int64) ([]*GroupMessage, error) {
 	query := `
 		SELECT id, message_id, message_text, reply_to_message_id, user_tg_id, group_topic_id, created_at, updated_at
 		FROM group_messages

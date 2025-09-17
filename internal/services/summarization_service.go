@@ -50,26 +50,12 @@ func NewSummarizationService(
 func (s *SummarizationService) RunDailySummarization(ctx context.Context, sendToDM bool) error {
 	log.Printf("%s: Starting daily summarization process", utils.GetCurrentTypeName())
 
-	// Get the time 24 hours ago
-	since := time.Now().Add(-24 * time.Hour)
-
 	// Process each monitored topic
-	for i, topicID := range s.config.MonitoredTopicsIDs {
-		if err := s.summarizeTopicMessages(ctx, topicID, since, sendToDM); err != nil {
+	for _, topicID := range s.config.MonitoredTopicsIDs {
+		if err := s.summarizeTopicMessages(ctx, topicID, sendToDM); err != nil {
 			log.Printf("%s: Error summarizing topic %d: %v", utils.GetCurrentTypeName(), topicID, err)
 			// Continue with other chats even if one fails
 			continue
-		}
-
-		// Add delay between topics to avoid rate limiting (except after the last topic)
-		if i < len(s.config.MonitoredTopicsIDs)-1 {
-			log.Printf("%s: Waiting 20 seconds before processing next topic to avoid rate limiting", utils.GetCurrentTypeName())
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(20 * time.Second):
-				// Continue after delay
-			}
 		}
 	}
 
@@ -78,7 +64,7 @@ func (s *SummarizationService) RunDailySummarization(ctx context.Context, sendTo
 }
 
 // summarizeTopicMessages summarizes a single topic
-func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topicID int, since time.Time, sendToDM bool) error {
+func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topicID int, sendToDM bool) error {
 	// Get topic name
 	groupTopic, err := s.groupTopicRepository.GetGroupTopicByTopicID(int64(topicID))
 	if err != nil {
@@ -86,19 +72,15 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 	}
 	topicName := groupTopic.Name
 
-	// Calculate hours since the given time
-	// hoursSince := int(time.Since(since).Hours()) + 1 // Add 1 to ensure we get all messages since 'since' time
-
 	// Get messages directly from Telegram with retry logic for rate limiting
-	// [todo] get correct messages
 	var messages []*repositories.GroupMessage
-	messages, err = s.groupMessageRepository.GetByGroupTopicIDForLastDay(int64(topicID))
+	messages, err = s.groupMessageRepository.GetByGroupTopicIdForpreviousTwentyFourHours(int64(topicID))
 	if err != nil {
 		return fmt.Errorf("%s: failed to get messages: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	if len(messages) == 0 {
-		log.Printf("%s: No messages found for topic %d since %v", utils.GetCurrentTypeName(), topicID, since)
+		log.Printf("%s: No messages found for topic %d", utils.GetCurrentTypeName(), topicID)
 		return nil
 	}
 
@@ -113,7 +95,7 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 		replyToMessage := ""
 
 		context += fmt.Sprintf("\n---\nMessageID: %d\n%sUserID: user_%d\nTimestamp: %s\nText: %s",
-			msg.ID,
+			msg.MessageID,
 			replyToMessage,
 			msg.UserTgID,
 			msgTime.Format("2006-01-02 15:04:05"),
@@ -122,12 +104,11 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 	}
 
 	// Get the prompt template from the database with fallback to default
-	templateText, err := s.promptingTemplateRepository.Get(prompts.DailySummarizationPromptTemplateDbKey)
+	templateText, err := s.promptingTemplateRepository.Get(prompts.DailySummarizationPromptKey, prompts.DailySummarizationPromptDefaultValue)
 	if err != nil {
 		return fmt.Errorf("%s: failed to get prompt template: %w", utils.GetCurrentTypeName(), err)
 	}
 
-	dateNow := time.Now().Format("02.01.2006")
 	superGroupChatIDStr := strconv.Itoa(int(s.config.SuperGroupChatID))
 	topicIDStr := strconv.Itoa(topicID)
 	if topicID == 0 {
@@ -136,7 +117,6 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 	// Generate summary using OpenAI with the prompt from the database
 	prompt := fmt.Sprintf(
 		templateText,
-		dateNow,
 		superGroupChatIDStr,
 		topicIDStr,
 		superGroupChatIDStr,
@@ -145,7 +125,6 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 		topicIDStr,
 		superGroupChatIDStr,
 		topicIDStr,
-		dateNow,
 		context,
 	)
 

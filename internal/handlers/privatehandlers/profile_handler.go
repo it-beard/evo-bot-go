@@ -28,13 +28,13 @@ import (
 
 const (
 	// Conversation states
-	profileStateViewOptions               = "profile_state_view_options"
-	profileStateEditMyProfile             = "profile_state_edit_my_profile"
-	profileStateAwaitQueryForSearch       = "profile_state_await_query_for_search"
-	profileStateAwaitQueryForBioSearch    = "profile_state_await_query_for_bio_search"
-	profileStateAwaitBio                  = "profile_state_await_bio"
-	profileStateAwaitFirstname            = "profile_state_await_firstname"
-	profileStateAwaitLastname             = "profile_state_await_lastname"
+	profileStateViewOptions            = "profile_state_view_options"
+	profileStateEditMyProfile          = "profile_state_edit_my_profile"
+	profileStateAwaitQueryForSearch    = "profile_state_await_query_for_search"
+	profileStateAwaitQueryForBioSearch = "profile_state_await_query_for_bio_search"
+	profileStateAwaitBio               = "profile_state_await_bio"
+	profileStateAwaitFirstname         = "profile_state_await_firstname"
+	profileStateAwaitLastname          = "profile_state_await_lastname"
 
 	// UserStore keys
 	profileCtxDataKeyField                   = "profile_ctx_data_field"
@@ -45,15 +45,15 @@ const (
 	profileCtxDataKeyCancelFunc              = "profile_ctx_data_key_cancel_func"
 
 	// Menu headers
-	profileMenuHeader               = "Меню \"Профиль\""
-	profileMenuMyProfileHeader      = "Профиль → Мой профиль"
-	profileMenuEditHeader           = "Профиль → Редактирование"
-	profileMenuEditFirstnameHeader  = "Профиль → Редактирование → Имя"
-	profileMenuEditLastnameHeader   = "Профиль → Редактирование → Фамилия"
-	profileMenuEditBioHeader        = "Профиль → Редактирование → О себе"
-	profileMenuPublishHeader        = "Профиль → Публикация"
-	profileMenuSearchHeader         = "Профиль → Поиск"
-	profileMenuBioSearchHeader      = "Профиль → Поиск по биографиям"
+	profileMenuHeader              = "Меню \"Профиль\""
+	profileMenuMyProfileHeader     = "Профиль → Мой профиль"
+	profileMenuEditHeader          = "Профиль → Редактирование"
+	profileMenuEditFirstnameHeader = "Профиль → Редактирование → Имя"
+	profileMenuEditLastnameHeader  = "Профиль → Редактирование → Фамилия"
+	profileMenuEditBioHeader       = "Профиль → Редактирование → О себе"
+	profileMenuPublishHeader       = "Профиль → Публикация"
+	profileMenuSearchHeader        = "Профиль → Поиск"
+	profileMenuBioSearchHeader     = "Профиль → Поиск по биографиям"
 
 	// Callback data
 	profileCallbackConfirmCancel = "profile_callback_confirm_cancel"
@@ -896,7 +896,7 @@ func (h *profileHandler) handleBioSearchInput(b *gotgbot.Bot, ctx *ext.Context) 
 		return handlers.EndConversation()
 	}
 
-	templateText, err := h.promptingTemplateRepository.Get(prompts.GetProfilePromptTemplateDbKey)
+	templateText, err := h.promptingTemplateRepository.Get(prompts.GetProfilePromptKey, prompts.GetProfilePromptDefaultValue)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Произошла ошибка при получении шаблона для поиска профилей.", nil)
 		log.Printf("%s: Error during template retrieval: %v", utils.GetCurrentTypeName(), err)
@@ -962,11 +962,11 @@ func (h *profileHandler) handleBioSearchInput(b *gotgbot.Bot, ctx *ext.Context) 
 
 func (h *profileHandler) prepareProfilesData(profiles []repositories.ProfileWithUser) ([]byte, error) {
 	type ProfileData struct {
-		ID          int    `json:"id"`
-		FirstName   string `json:"first_name"`
-		LastName    string `json:"last_name"`
-		Username    string `json:"username,omitempty"`
-		Bio         string `json:"bio"`
+		ID        int    `json:"id"`
+		FirstName string `json:"first_name"`
+		LastName  string `json:"last_name"`
+		Username  string `json:"username,omitempty"`
+		Bio       string `json:"bio"`
 	}
 
 	profileObjects := make([]ProfileData, 0, len(profiles))

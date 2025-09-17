@@ -170,7 +170,7 @@ func (h *toolsHandler) processToolSearch(b *gotgbot.Bot, ctx *ext.Context) error
 
 	topicLink := fmt.Sprintf("https://t.me/c/%d/%d", h.config.SuperGroupChatID, h.config.ToolTopicID)
 
-	templateText, err := h.promptingTemplateRepository.Get(prompts.GetToolPromptTemplateDbKey)
+	templateText, err := h.promptingTemplateRepository.Get(prompts.GetToolPromptKey, prompts.GetToolPromptDefaultValue)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Произошла ошибка при получении шаблона для поиска инструментов.", nil)
 		log.Printf("%s: Error during template retrieval: %v", utils.GetCurrentTypeName(), err)
