@@ -304,6 +304,7 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 			deps.OpenAiClient,
 			deps.MessageSenderService,
 			deps.PromptingTemplateRepository,
+			deps.ProfileRepository,
 			deps.PermissionsService,
 		),
 		privatehandlers.NewProfileHandler(

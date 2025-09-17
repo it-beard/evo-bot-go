@@ -23,7 +23,6 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/callbackquery"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/message"
-	"github.com/gotd/td/tg"
 )
 
 const (
@@ -44,6 +43,7 @@ type introHandler struct {
 	config                      *config.Config
 	openaiClient                *clients.OpenAiClient
 	promptingTemplateRepository *repositories.PromptingTemplateRepository
+	profileRepository           *repositories.ProfileRepository
 	messageSenderService        *services.MessageSenderService
 	userStore                   *utils.UserDataStore
 	permissionsService          *services.PermissionsService
@@ -54,12 +54,14 @@ func NewIntroHandler(
 	openaiClient *clients.OpenAiClient,
 	messageSenderService *services.MessageSenderService,
 	promptingTemplateRepository *repositories.PromptingTemplateRepository,
+	profileRepository *repositories.ProfileRepository,
 	permissionsService *services.PermissionsService,
 ) ext.Handler {
 	h := &introHandler{
 		config:                      config,
 		openaiClient:                openaiClient,
 		promptingTemplateRepository: promptingTemplateRepository,
+		profileRepository:           profileRepository,
 		messageSenderService:        messageSenderService,
 		userStore:                   utils.NewUserDataStore(),
 		permissionsService:          permissionsService,
@@ -161,14 +163,11 @@ func (h *introHandler) processIntroSearch(b *gotgbot.Bot, ctx *ext.Context) erro
 	// Send typing action using MessageSender.
 	h.messageSenderService.SendTypingAction(msg.Chat.Id)
 
-	// Get messages from Intro topic
-	//[todo] get messages from chat
-	messages := []tg.Message{}
-
-	dataMessages, err := h.prepareTelegramMessages(messages)
+	// Get profile data from repository
+	profiles, err := h.prepareProfileData()
 	if err != nil {
-		h.messageSenderService.Reply(msg, "Произошла ошибка при подготовке сообщений для обработки.", nil)
-		log.Printf("%s: Error during messages preparation: %v", utils.GetCurrentTypeName(), err)
+		h.messageSenderService.Reply(msg, "Произошла ошибка при получении данных профилей для обработки.", nil)
+		log.Printf("%s: Error during profile data preparation: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 
@@ -185,7 +184,7 @@ func (h *introHandler) processIntroSearch(b *gotgbot.Bot, ctx *ext.Context) erro
 	prompt := fmt.Sprintf(
 		templateText,
 		topicLink,
-		utils.EscapeMarkdown(string(dataMessages)),
+		utils.EscapeMarkdown(string(profiles)),
 		utils.EscapeMarkdown(query),
 	)
 
@@ -272,36 +271,47 @@ func (h *introHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	return handlers.EndConversation()
 }
 
-func (h *introHandler) prepareTelegramMessages(messages []tg.Message) ([]byte, error) {
-
-	type MessageObject struct {
-		ID      int    `json:"id"`
-		Message string `json:"message"`
+func (h *introHandler) prepareProfileData() ([]byte, error) {
+	type ProfileData struct {
+		ID        int    `json:"id"`
+		Firstname string `json:"firstname"`
+		Lastname  string `json:"lastname"`
+		Username  string `json:"username"`
+		Bio       string `json:"bio"`
+		MessageId *int64 `json:"message_id"`
 	}
 
-	messageObjects := make([]MessageObject, 0, len(messages))
-	for _, message := range messages {
-
-		messageObjects = append(messageObjects, MessageObject{
-			ID:      message.ID,
-			Message: message.Message,
-		})
-	}
-
-	if len(messageObjects) == 0 {
-		return nil, fmt.Errorf("no messages found in chat")
-	}
-
-	dataMessages, err := json.Marshal(messageObjects)
+	// Get all profiles with users from the repository
+	profilesWithUsers, err := h.profileRepository.GetAllWithUsers()
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal messages to JSON: %w", err)
+		return nil, fmt.Errorf("failed to get profiles from repository: %w", err)
 	}
 
-	if string(dataMessages) == "" {
-		return nil, fmt.Errorf("no messages found in chat")
+	profileData := make([]ProfileData, 0, len(profilesWithUsers))
+	for _, pwu := range profilesWithUsers {
+		// Only include profiles with non-empty bios
+		if pwu.Profile.Bio != "" {
+			profileData = append(profileData, ProfileData{
+				ID:        pwu.Profile.ID,
+				Firstname: pwu.User.Firstname,
+				Lastname:  pwu.User.Lastname,
+				Username:  pwu.User.TgUsername,
+				Bio:       pwu.Profile.Bio,
+				MessageId: &pwu.Profile.PublishedMessageID.Int64,
+			})
+		}
 	}
 
-	return dataMessages, nil
+	if len(profileData) == 0 {
+		return nil, fmt.Errorf("no profiles with bios found")
+	}
+
+	dataJSON, err := json.Marshal(profileData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal profile data to JSON: %w", err)
+	}
+
+	return dataJSON, nil
 }
 
 func (h *introHandler) MessageRemoveInlineKeyboard(b *gotgbot.Bot, userID *int64) {
