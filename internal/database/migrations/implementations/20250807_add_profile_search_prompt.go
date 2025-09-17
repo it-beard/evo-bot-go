@@ -21,7 +21,7 @@ func NewAddProfileSearchPromptMigration() *AddProfileSearchPromptMigration {
 }
 
 func (m *AddProfileSearchPromptMigration) Apply(db *sql.DB) error {
-	if err := m.insertPromptIfNotExists(db, prompts.GetProfilePromptTemplateDbKey, prompts.GetProfilePromptDefaultTemplate); err != nil {
+	if err := m.insertPromptIfNotExists(db, prompts.GetProfilePromptKey, prompts.GetProfilePromptDefaultValue); err != nil {
 		return fmt.Errorf("failed to insert profile search prompt: %w", err)
 	}
 
@@ -30,7 +30,7 @@ func (m *AddProfileSearchPromptMigration) Apply(db *sql.DB) error {
 }
 
 func (m *AddProfileSearchPromptMigration) Rollback(db *sql.DB) error {
-	_, err := db.Exec("DELETE FROM prompting_templates WHERE template_key = $1", prompts.GetProfilePromptTemplateDbKey)
+	_, err := db.Exec("DELETE FROM prompting_templates WHERE template_key = $1", prompts.GetProfilePromptKey)
 	if err != nil {
 		return fmt.Errorf("failed to remove profile search prompt: %w", err)
 	}

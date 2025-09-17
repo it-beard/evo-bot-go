@@ -171,7 +171,7 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 	topicLink := fmt.Sprintf("https://t.me/c/%d/%d", h.config.SuperGroupChatID, h.config.ContentTopicID)
 
 	// Get the prompt template from the database
-	templateText, err := h.promptingTemplateRepository.Get(prompts.GetContentPromptTemplateDbKey)
+	templateText, err := h.promptingTemplateRepository.Get(prompts.GetContentPromptKey, prompts.GetContentPromptDefaultValue)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Произошла ошибка при получении шаблона для поиска контента.", nil)
 		log.Printf("%s: Error during template retrieval: %v", utils.GetCurrentTypeName(), err)

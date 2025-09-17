@@ -172,7 +172,7 @@ func (h *introHandler) processIntroSearch(b *gotgbot.Bot, ctx *ext.Context) erro
 	}
 
 	// Get the prompt template from the database
-	templateText, err := h.promptingTemplateRepository.Get(prompts.GetIntroPromptTemplateDbKey)
+	templateText, err := h.promptingTemplateRepository.Get(prompts.GetIntroPromptKey, prompts.GetIntroPromptDefaultValue)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Произошла ошибка при получении шаблона для вводной информации.", nil)
 		log.Printf("%s: Error during template retrieval: %v", utils.GetCurrentTypeName(), err)
@@ -225,7 +225,7 @@ func (h *introHandler) processIntroSearch(b *gotgbot.Bot, ctx *ext.Context) erro
 		return handlers.EndConversation()
 	}
 
-	err = h.messageSenderService.ReplyMarkdown(msg, responseOpenAi, nil)
+	err = h.messageSenderService.ReplyHtml(msg, responseOpenAi, nil)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Произошла ошибка при отправке ответа.", nil)
 		log.Printf("%s: Error during message sending: %v", utils.GetCurrentTypeName(), err)
