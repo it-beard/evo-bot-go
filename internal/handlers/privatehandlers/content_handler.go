@@ -159,12 +159,8 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 	h.messageSenderService.SendTypingAction(msg.Chat.Id)
 
 	// Get messages from chat
-	messages, err := clients.GetChatMessages(h.config.SuperGroupChatID, h.config.ContentTopicID)
-	if err != nil {
-		h.messageSenderService.Reply(msg, "Произошла ошибка при получении сообщений из чата.", nil)
-		log.Printf("%s: Error during messages retrieval: %v", utils.GetCurrentTypeName(), err)
-		return handlers.EndConversation()
-	}
+	//[todo] get messages from chat
+	messages := []tg.Message{}
 
 	dataMessages, err := h.prepareTelegramMessages(messages)
 	if err != nil {

@@ -162,12 +162,8 @@ func (h *introHandler) processIntroSearch(b *gotgbot.Bot, ctx *ext.Context) erro
 	h.messageSenderService.SendTypingAction(msg.Chat.Id)
 
 	// Get messages from Intro topic
-	messages, err := clients.GetChatMessages(h.config.SuperGroupChatID, h.config.IntroTopicID)
-	if err != nil {
-		h.messageSenderService.Reply(msg, "Произошла ошибка при получении сообщений из чата.", nil)
-		log.Printf("%s: Error during messages retrieval: %v", utils.GetCurrentTypeName(), err)
-		return handlers.EndConversation()
-	}
+	//[todo] get messages from chat
+	messages := []tg.Message{}
 
 	dataMessages, err := h.prepareTelegramMessages(messages)
 	if err != nil {

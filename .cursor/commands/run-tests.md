@@ -1,0 +1,1 @@
+run "go run gotest.tools/gotestsum@latest --format pkgname --format-icons hivis"

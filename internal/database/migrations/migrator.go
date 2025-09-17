@@ -45,6 +45,7 @@ func Registry() []implementations.Migration {
 		implementations.NewAddIsClubMemberToUsers(),
 		implementations.NewAddRandomCoffeePairsTable(),
 		implementations.NewAddProfileSearchPromptMigration(),
+		implementations.NewAddGroupTopicsTable(),
 		// Add new migrations here
 	}
 }

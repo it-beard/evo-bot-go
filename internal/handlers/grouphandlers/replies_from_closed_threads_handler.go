@@ -1,15 +1,14 @@
 package grouphandlers
 
 import (
+	"evo-bot-go/internal/config"
+	"evo-bot-go/internal/database/repositories"
+	"evo-bot-go/internal/services"
+	"evo-bot-go/internal/utils"
 	"fmt"
 	"log"
 	"strconv"
 	"unicode/utf8"
-
-	"evo-bot-go/internal/clients"
-	"evo-bot-go/internal/config"
-	"evo-bot-go/internal/services"
-	"evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -20,11 +19,13 @@ type RepliesFromClosedThreadsHandler struct {
 	config               *config.Config
 	closedTopics         map[int]bool
 	messageSenderService *services.MessageSenderService
+	groupTopicRepository *repositories.GroupTopicRepository
 }
 
 func NewRepliesFromClosedThreadsHandler(
 	config *config.Config,
 	messageSenderService *services.MessageSenderService,
+	groupTopicRepository *repositories.GroupTopicRepository,
 ) ext.Handler {
 	// Create map of closed topics
 	closedTopics := make(map[int]bool)
@@ -36,6 +37,7 @@ func NewRepliesFromClosedThreadsHandler(
 		closedTopics:         closedTopics,
 		messageSenderService: messageSenderService,
 		config:               config,
+		groupTopicRepository: groupTopicRepository,
 	}
 
 	return handlers.NewMessage(h.check, h.handle)
@@ -61,7 +63,7 @@ func (h *RepliesFromClosedThreadsHandler) handle(b *gotgbot.Bot, ctx *ext.Contex
 	if msg.ReplyToMessage != nil &&
 		h.closedTopics[int(msg.MessageThreadId)] &&
 		msg.ReplyToMessage.MessageId != msg.MessageThreadId {
-		if err := h.forwardReplyMessage(ctx); err != nil {
+		if err := h.forwardReplyMessage(ctx, b); err != nil {
 			log.Printf(
 				"%s: error >> failed to forward reply message: %v",
 				utils.GetCurrentTypeName(),
@@ -79,7 +81,7 @@ func (h *RepliesFromClosedThreadsHandler) handle(b *gotgbot.Bot, ctx *ext.Contex
 	return nil
 }
 
-func (h *RepliesFromClosedThreadsHandler) forwardReplyMessage(ctx *ext.Context) error {
+func (h *RepliesFromClosedThreadsHandler) forwardReplyMessage(ctx *ext.Context, b *gotgbot.Bot) error {
 	msg := ctx.EffectiveMessage
 	replyToMessageUrl := fmt.Sprintf(
 		"https://t.me/c/%s/%d",
@@ -87,28 +89,36 @@ func (h *RepliesFromClosedThreadsHandler) forwardReplyMessage(ctx *ext.Context) 
 		msg.ReplyToMessage.MessageId)
 
 	// Get the topic name
-	topicName, topicErr := clients.TgGetTopicName(int(msg.MessageThreadId))
-	if topicErr != nil {
+	// [todo] get topic name from database
+	groupTopic, err := h.groupTopicRepository.GetGroupTopicByTopicID(msg.MessageThreadId)
+	if err != nil {
 		log.Printf(
-			"%s: warning >> failed to get topic name: %v",
+			"%s: error >> failed to get topic name: %v",
 			utils.GetCurrentTypeName(),
-			topicErr)
-		// Continue with a default topic name
-		topicName = "Topic"
+			err)
 	}
 
 	// Prepare the text with the topic name and user mention
-	username := msg.From.Username
-	prefixText := fmt.Sprintf(
-		"↩️ oтвет @%s на сообщение в канале ",
-		username)
+	prefixText, postfixText := "", ""
+	if groupTopic != nil && groupTopic.Name != "" {
+		prefixText = fmt.Sprintf(
+			"↩️ oтвет @%s на сообщение в канале",
+			msg.From.Username)
+		postfixText = fmt.Sprintf("\"%s\"", groupTopic.Name)
+	} else {
+		prefixText = fmt.Sprintf(
+			"↩️ oтвет @%s на",
+			msg.From.Username)
+		postfixText = "сообщение"
+	}
+
 	prefixLength := utf8.RuneCountInString(prefixText)
-	topicNameLength := utf8.RuneCountInString(topicName)
+	postfixLength := utf8.RuneCountInString(postfixText)
 
 	firstLine := fmt.Sprintf(
-		"%s\"%s\"",
+		"%s %s",
 		prefixText,
-		topicName)
+		postfixText)
 	firstLineLength := utf8.RuneCountInString(firstLine)
 	firstLineEntities := []gotgbot.MessageEntity{
 		{
@@ -124,7 +134,7 @@ func (h *RepliesFromClosedThreadsHandler) forwardReplyMessage(ctx *ext.Context) 
 		{
 			Type:   "text_link",
 			Offset: int64(prefixLength) + 1,
-			Length: int64(topicNameLength),
+			Length: int64(postfixLength),
 			Url:    replyToMessageUrl,
 		},
 	}
@@ -162,7 +172,7 @@ func (h *RepliesFromClosedThreadsHandler) forwardReplyMessage(ctx *ext.Context) 
 	}
 
 	// Forward the message
-	_, err := h.messageSenderService.SendCopy(msg.Chat.Id, &h.config.ForwardingTopicID, finalMessage, updatedEntities, msg)
+	_, err = h.messageSenderService.SendCopy(msg.Chat.Id, &h.config.ForwardingTopicID, finalMessage, updatedEntities, msg)
 	if err != nil {
 		return fmt.Errorf("%s: error >> failed to forward reply message: %w", utils.GetCurrentTypeName(), err)
 	}
