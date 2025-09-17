@@ -33,6 +33,7 @@ type HandlerDependencies struct {
 	PermissionsService                *services.PermissionsService
 	EventRepository                   *repositories.EventRepository
 	TopicRepository                   *repositories.TopicRepository
+	GroupTopicRepository              *repositories.GroupTopicRepository
 	PromptingTemplateRepository       *repositories.PromptingTemplateRepository
 	UserRepository                    *repositories.UserRepository
 	ProfileRepository                 *repositories.ProfileRepository
@@ -80,6 +81,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	// Initialize repositories
 	eventRepository := repositories.NewEventRepository(db.DB)
 	topicRepository := repositories.NewTopicRepository(db.DB)
+	groupTopicRepository := repositories.NewGroupTopicRepository(db.DB)
 	promptingTemplateRepository := repositories.NewPromptingTemplateRepository(db.DB)
 	userRepository := repositories.NewUserRepository(db.DB)
 	profileRepository := repositories.NewProfileRepository(db.DB)
@@ -116,7 +118,6 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 
 	// Initialize scheduled tasks
 	scheduledTasks := []tasks.Task{
-		tasks.NewSessionKeepAliveTask(30 * time.Minute),
 		tasks.NewDailySummarizationTask(appConfig, summarizationService),
 		tasks.NewRandomCoffeePollTask(appConfig, randomCoffeeService),
 		tasks.NewRandomCoffeePairsTask(appConfig, randomCoffeeService),
@@ -142,6 +143,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 		PermissionsService:                permissionsService,
 		EventRepository:                   eventRepository,
 		TopicRepository:                   topicRepository,
+		GroupTopicRepository:              groupTopicRepository,
 		PromptingTemplateRepository:       promptingTemplateRepository,
 		UserRepository:                    userRepository,
 		ProfileRepository:                 profileRepository,
@@ -223,12 +225,6 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 			deps.MessageSenderService,
 			deps.PermissionsService,
 		),
-
-		adminhandlers.NewCodeHandler(
-			deps.AppConfig,
-			deps.MessageSenderService,
-			deps.PermissionsService,
-		),
 		adminhandlers.NewAdminProfilesHandler(
 			deps.AppConfig,
 			deps.MessageSenderService,
@@ -248,6 +244,7 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 
 	// Register group chat handlers
 	groupHandlers := []ext.Handler{
+		grouphandlers.NewSaveMessagesHandler(deps.GroupTopicRepository), //always goes first!
 		grouphandlers.NewCleanClosedThreadsHandler(
 			deps.AppConfig,
 			deps.MessageSenderService,
@@ -264,6 +261,7 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 		grouphandlers.NewRepliesFromClosedThreadsHandler(
 			deps.AppConfig,
 			deps.MessageSenderService,
+			deps.GroupTopicRepository,
 		),
 	}
 
@@ -351,6 +349,7 @@ func (b *TgBotClient) Start() {
 			},
 			AllowedUpdates: []string{
 				"message",
+				"edited_message",
 				"chat_member",
 				"callback_query",
 				"poll_answer",
