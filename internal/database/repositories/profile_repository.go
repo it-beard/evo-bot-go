@@ -235,7 +235,7 @@ func (r *ProfileRepository) GetAllWithUsers() ([]ProfileWithUser, error) {
 			u.id, u.tg_id, u.firstname, u.lastname, u.tg_username, u.score, u.has_coffee_ban, u.is_club_member, u.created_at, u.updated_at
 		FROM profiles p
 		INNER JOIN users u ON p.user_id = u.id
-		WHERE p.bio != '' AND p.bio IS NOT NULL
+		WHERE p.bio != '' AND p.bio IS NOT NULL AND p.published_message_id IS NOT NULL
 		ORDER BY p.updated_at DESC`
 
 	rows, err := r.db.Query(query)

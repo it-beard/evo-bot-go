@@ -716,10 +716,10 @@ func (h *profileHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 		// Call the cancel function to stop any ongoing API calls
 		if cf, ok := cancelFunc.(context.CancelFunc); ok {
 			cf()
-			h.messageSenderService.Reply(msg, "Операция поиска профилей отменена.", nil)
+			h.messageSenderService.Send(msg.Chat.Id, "Операция поиска профилей отменена.", nil)
 		}
 	} else {
-		h.messageSenderService.Reply(msg, "Сессия работы с профилями завершена.", nil)
+		h.messageSenderService.Send(msg.Chat.Id, "Сессия работы с профилями завершена.", nil)
 	}
 
 	h.RemovePreviousMessage(b, &userId)
