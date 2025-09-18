@@ -1,86 +1,79 @@
-package grouphandlers
+package grouphandlersservices
 
 import (
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
+	"evo-bot-go/internal/database/repositories"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 	"log"
 	"strings"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 )
 
-type AdminMessageControlHandler struct {
-	saveUpdateMessageService *services.SaveUpdateMessageService
-	permissionsService       *services.PermissionsService
-	config                   *config.Config
+type AdminSaveMessageService struct {
+	groupMessageRepository   *repositories.GroupMessageRepository
 	bot                      *gotgbot.Bot
+	config                   *config.Config
+	saveUpdateMessageService *SaveUpdateMessageService
 	messageSenderService     *services.MessageSenderService
 }
 
-func NewAdminMessageControlHandler(
-	saveUpdateMessageService *services.SaveUpdateMessageService,
-	permissionsService *services.PermissionsService,
-	config *config.Config,
+func NewAdminSaveMessageService(
+	groupMessageRepository *repositories.GroupMessageRepository,
 	bot *gotgbot.Bot,
+	config *config.Config,
+	saveUpdateMessageService *SaveUpdateMessageService,
 	messageSenderService *services.MessageSenderService,
-) ext.Handler {
-	h := &AdminMessageControlHandler{
-		saveUpdateMessageService: saveUpdateMessageService,
-		permissionsService:       permissionsService,
-		config:                   config,
+) *AdminSaveMessageService {
+	return &AdminSaveMessageService{
+		groupMessageRepository:   groupMessageRepository,
 		bot:                      bot,
+		config:                   config,
+		saveUpdateMessageService: saveUpdateMessageService,
 		messageSenderService:     messageSenderService,
 	}
-	return handlers.NewMessage(h.check, h.handle)
 }
 
-func (h *AdminMessageControlHandler) check(msg *gotgbot.Message) bool {
-	if msg == nil {
-		return false
-	}
-
-	// Skip private chats
-	if msg.Chat.Type == constants.PrivateChatType {
-		return false
-	}
-
-	// Must be a reply to another message
-	if msg.ReplyToMessage == nil {
-		return false
-	}
-
-	// Must be from an admin or GroupAnonymousBot
-	if !utils.IsUserAdminOrCreator(h.bot, msg.From.Id, h.config) &&
-		(msg.From.IsBot && msg.From.Username != "GroupAnonymousBot") {
-		return false
-	}
-
-	// Must be "update" or "delete" command
-	return msg.Text == constants.AdminMessageControlUpdateCommand ||
-		msg.Text == constants.AdminMessageControlDeleteCommand
-}
-
-func (h *AdminMessageControlHandler) handle(b *gotgbot.Bot, ctx *ext.Context) error {
-	msg := ctx.EffectiveMessage
+func (s *AdminSaveMessageService) SaveOrUpdateMessage(msg *gotgbot.Message) error {
 	command := strings.ToLower(strings.TrimSpace(msg.Text))
 	repliedMessage := msg.ReplyToMessage
 
 	switch command {
-	case constants.AdminMessageControlUpdateCommand:
-		return h.handleUpdateCommand(msg, repliedMessage)
-	case constants.AdminMessageControlDeleteCommand:
-		return h.handleDeleteCommand(msg, repliedMessage)
+	case constants.AdminSaveMessage_ReplyUpdateMesageCommand:
+		return s.handleUpdateCommand(msg, repliedMessage)
+	case constants.AdminSaveMessage_ReplyDeleteMessageCommand:
+		return s.handleDeleteCommand(msg, repliedMessage)
 	default:
 		return nil // Should not reach here due to check() method
 	}
 }
 
-// handleUpdateCommand processes the "update" command
-func (h *AdminMessageControlHandler) handleUpdateCommand(adminMsg *gotgbot.Message, repliedMessage *gotgbot.Message) error {
+func (s *AdminSaveMessageService) IsMessageShouldBeSavedOrUpdated(msg *gotgbot.Message) bool {
+	// Must be a reply to another message
+	if msg.ReplyToMessage == nil {
+		return false
+	}
+
+	// Must be in content or tool topic
+	if msg.MessageThreadId != int64(s.config.ContentTopicID) &&
+		msg.MessageThreadId != int64(s.config.ToolTopicID) {
+		return false
+	}
+
+	// Must be from an admin or GroupAnonymousBot
+	if !utils.IsUserAdminOrCreator(s.bot, msg.From.Id, s.config) &&
+		(msg.From.IsBot && msg.From.Username != "GroupAnonymousBot") {
+		return false
+	}
+
+	// Must be "update" or "delete" command
+	return msg.Text == constants.AdminSaveMessage_ReplyUpdateMesageCommand ||
+		msg.Text == constants.AdminSaveMessage_ReplyDeleteMessageCommand
+}
+
+func (h *AdminSaveMessageService) handleUpdateCommand(adminMsg *gotgbot.Message, repliedMessage *gotgbot.Message) error {
 	// Try to save or update the replied message
 	err := h.saveUpdateMessageService.SaveOrUpdate(repliedMessage)
 	if err != nil {
@@ -111,8 +104,7 @@ func (h *AdminMessageControlHandler) handleUpdateCommand(adminMsg *gotgbot.Messa
 	return nil
 }
 
-// handleDeleteCommand processes the "delete" command
-func (h *AdminMessageControlHandler) handleDeleteCommand(adminMsg *gotgbot.Message, repliedMessage *gotgbot.Message) error {
+func (h *AdminSaveMessageService) handleDeleteCommand(adminMsg *gotgbot.Message, repliedMessage *gotgbot.Message) error {
 
 	// First, try to delete the replied message from Telegram and database
 	err := h.saveUpdateMessageService.Delete(repliedMessage)
@@ -137,7 +129,7 @@ func (h *AdminMessageControlHandler) handleDeleteCommand(adminMsg *gotgbot.Messa
 	return nil
 }
 
-func (h *AdminMessageControlHandler) getAdminUserID(adminMsg *gotgbot.Message) int64 {
+func (h *AdminSaveMessageService) getAdminUserID(adminMsg *gotgbot.Message) int64 {
 	adminUserID := adminMsg.From.Id
 	if adminMsg.From.IsBot && adminMsg.From.Username == "GroupAnonymousBot" {
 		adminUserID = h.config.AdminUserID

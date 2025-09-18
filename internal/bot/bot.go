@@ -16,6 +16,7 @@ import (
 	"evo-bot-go/internal/handlers/privatehandlers"
 	"evo-bot-go/internal/handlers/privatehandlers/topicshandlers"
 	"evo-bot-go/internal/services"
+	"evo-bot-go/internal/services/grouphandlersservices"
 	"evo-bot-go/internal/tasks"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -31,7 +32,6 @@ type HandlerDependencies struct {
 	RandomCoffeeService               *services.RandomCoffeeService
 	MessageSenderService              *services.MessageSenderService
 	PermissionsService                *services.PermissionsService
-	SaveUpdateMessageService          *services.SaveUpdateMessageService
 	EventRepository                   *repositories.EventRepository
 	TopicRepository                   *repositories.TopicRepository
 	GroupTopicRepository              *repositories.GroupTopicRepository
@@ -42,6 +42,15 @@ type HandlerDependencies struct {
 	RandomCoffeeParticipantRepository *repositories.RandomCoffeeParticipantRepository
 	RandomCoffeePairRepository        *repositories.RandomCoffeePairRepository
 	GroupMessageRepository            *repositories.GroupMessageRepository
+	RandomCoffeePollAnswersService    *grouphandlersservices.RandomCoffeePollAnswersService
+	JoinLeftService                   *grouphandlersservices.JoinLeftService
+	CleanClosedThreadsService         *grouphandlersservices.CleanClosedThreadsService
+	RepliesFromClosedThreadsService   *grouphandlersservices.RepliesFromClosedThreadsService
+	DeleteJoinLeftMessagesService     *grouphandlersservices.DeleteJoinLeftMessagesService
+	SaveTopicService                  *grouphandlersservices.SaveTopicService
+	AdminSaveMessageService           *grouphandlersservices.AdminSaveMessageService
+	SaveMessageService                *grouphandlersservices.SaveMessageService
+	SaveUpdateMessageService          *grouphandlersservices.SaveUpdateMessageService
 }
 
 // TgBotClient represents a Telegram bot client with all required dependencies
@@ -101,12 +110,6 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 		bot,
 		messageSenderService,
 	)
-	saveUpdateMessageService := services.NewSaveUpdateMessageService(
-		groupMessageRepository,
-		userRepository,
-		appConfig,
-		bot,
-	)
 	summarizationService := services.NewSummarizationService(
 		appConfig,
 		openaiClient,
@@ -125,6 +128,44 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 		profileRepository,
 		randomCoffeePairRepository,
 		userRepository,
+	)
+	randomCoffeePollAnswersService := grouphandlersservices.NewRandomCoffeePollAnswersService(
+		messageSenderService,
+		appConfig,
+		randomCoffeePollRepository,
+		randomCoffeeParticipantRepository,
+		userRepository,
+	)
+	joinLeftService := grouphandlersservices.NewJoinLeftService(userRepository)
+	cleanClosedThreadsService := grouphandlersservices.NewCleanClosedThreadsService(
+		appConfig,
+		messageSenderService,
+		groupTopicRepository,
+	)
+	saveUpdateMessageService := grouphandlersservices.NewSaveUpdateMessageService(
+		groupMessageRepository,
+		userRepository,
+		appConfig,
+		bot,
+	)
+	repliesFromClosedThreadsService := grouphandlersservices.NewRepliesFromClosedThreadsService(
+		appConfig,
+		messageSenderService,
+		groupTopicRepository,
+		saveUpdateMessageService,
+	)
+	deleteJoinLeftMessagesService := grouphandlersservices.NewDeleteJoinLeftMessagesService()
+	saveTopicService := grouphandlersservices.NewSaveTopicService(groupTopicRepository)
+	adminSaveMessageService := grouphandlersservices.NewAdminSaveMessageService(
+		groupMessageRepository,
+		bot,
+		appConfig,
+		saveUpdateMessageService,
+		messageSenderService,
+	)
+	saveMessageService := grouphandlersservices.NewSaveMessageService(
+		groupMessageRepository,
+		saveUpdateMessageService,
 	)
 
 	// Initialize scheduled tasks
@@ -152,7 +193,6 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 		RandomCoffeeService:               randomCoffeeService,
 		MessageSenderService:              messageSenderService,
 		PermissionsService:                permissionsService,
-		SaveUpdateMessageService:          saveUpdateMessageService,
 		EventRepository:                   eventRepository,
 		TopicRepository:                   topicRepository,
 		GroupTopicRepository:              groupTopicRepository,
@@ -163,6 +203,15 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 		RandomCoffeeParticipantRepository: randomCoffeeParticipantRepository,
 		RandomCoffeePairRepository:        randomCoffeePairRepository,
 		GroupMessageRepository:            groupMessageRepository,
+		RandomCoffeePollAnswersService:    randomCoffeePollAnswersService,
+		JoinLeftService:                   joinLeftService,
+		CleanClosedThreadsService:         cleanClosedThreadsService,
+		RepliesFromClosedThreadsService:   repliesFromClosedThreadsService,
+		DeleteJoinLeftMessagesService:     deleteJoinLeftMessagesService,
+		SaveTopicService:                  saveTopicService,
+		AdminSaveMessageService:           adminSaveMessageService,
+		SaveMessageService:                saveMessageService,
+		SaveUpdateMessageService:          saveUpdateMessageService,
 	}
 
 	// Register all handlers
@@ -257,36 +306,18 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 
 	// Register group chat handlers
 	groupHandlers := []ext.Handler{
-		grouphandlers.NewSaveTopicsHandler(deps.GroupTopicRepository), //always goes first!
-		grouphandlers.NewAdminMessageControlHandler(
-			deps.SaveUpdateMessageService,
-			deps.PermissionsService,
-			deps.AppConfig,
-			b.bot,
-			deps.MessageSenderService,
+		grouphandlers.NewChatMemberHandler(deps.JoinLeftService),
+		grouphandlers.NewPollAnswerHandler(
+			deps.RandomCoffeePollAnswersService,
 		),
-		grouphandlers.NewSaveMessagesHandler(
-			deps.SaveUpdateMessageService,
-			deps.AppConfig,
-			b.bot,
-		),
-		grouphandlers.NewCleanClosedThreadsHandler(
-			deps.AppConfig,
+		grouphandlers.NewMessageHandler(
 			deps.MessageSenderService,
-		),
-		grouphandlers.NewDeleteJoinLeftMessagesHandler(),
-		grouphandlers.NewJoinLeftHandler(deps.UserRepository),
-		grouphandlers.NewRandomCoffeePollAnswerHandler(
-			deps.AppConfig,
-			deps.UserRepository,
-			deps.RandomCoffeePollRepository,
-			deps.RandomCoffeeParticipantRepository,
-			deps.MessageSenderService,
-		),
-		grouphandlers.NewRepliesFromClosedThreadsHandler(
-			deps.AppConfig,
-			deps.MessageSenderService,
-			deps.GroupTopicRepository,
+			deps.CleanClosedThreadsService,
+			deps.RepliesFromClosedThreadsService,
+			deps.DeleteJoinLeftMessagesService,
+			deps.SaveTopicService,
+			deps.AdminSaveMessageService,
+			deps.SaveMessageService,
 		),
 	}
 
@@ -352,7 +383,7 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 	}
 
 	// Combine all handlers
-	allHandlers := append(append(adminHandlers, groupHandlers...), privateHandlers...)
+	allHandlers := append(append(privateHandlers, adminHandlers...), groupHandlers...)
 	for _, handler := range allHandlers {
 		b.dispatcher.AddHandler(handler)
 	}

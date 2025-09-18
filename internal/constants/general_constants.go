@@ -1,6 +1,7 @@
 package constants
 
 const PrivateChatType = "private"
+const SuperGroupChatType = "supergroup"
 const CancelCommand = "cancel"
 
 // Profile fields
