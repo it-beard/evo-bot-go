@@ -2,13 +2,22 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [message_sender_service.go](file://internal/services/message_sender_service.go)
-- [bot.go](file://internal/bot/bot.go)
-- [profile_formaters.go](file://internal/formatters/profile_formaters.go)
-- [markdown_utils.go](file://internal/utils/markdown_utils.go)
-- [random_coffee_service.go](file://internal/services/random_coffee_service.go)
-- [daily_summarization_task.go](file://internal/tasks/daily_summarization_task.go)
+- [message_sender_service.go](file://internal/services/message_sender_service.go) - *Core service implementation*
+- [bot.go](file://internal/bot/bot.go) - *Service initialization and dependency injection*
+- [profile_formaters.go](file://internal/formatters/profile_formaters.go) - *Message content formatting*
+- [random_coffee_service.go](file://internal/services/random_coffee_service.go) - *Usage example in coffee pairing workflow*
+- [daily_summarization_task.go](file://internal/tasks/daily_summarization_task.go) - *Usage example in daily summaries*
+- [save_update_message_service.go](file://internal/services/grouphandlersservices/save_update_message_service.go) - *New dependency relationship*
+- [admin_save_message_service.go](file://internal/services/grouphandlersservices/admin_save_message_service.go) - *New service using MessageSenderService*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated dependency injection context to include new services that depend on MessageSenderService
+- Added information about SaveUpdateMessageService and AdminSaveMessageService integration
+- Enhanced architecture diagram to show new service relationships
+- Updated section sources to reflect current file dependencies
+- Added new diagram sources for updated architectural visualization
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -47,7 +56,7 @@ The service also includes reply-specific methods like `Reply`, `ReplyMarkdown`, 
 ## Integration with TgBotClient
 The MessageSenderService is tightly integrated with the TgBotClient from bot.go, receiving the initialized bot instance during construction through the `NewMessageSenderService` function. This integration occurs during the bot client initialization process, where the MessageSenderService is created and passed to other services that require messaging capabilities, such as the RandomCoffeeService and SummarizationService.
 
-The service is registered as a dependency in the HandlerDependencies struct and made available to various handlers throughout the application. This dependency injection pattern ensures that all components have access to a consistent messaging interface while maintaining loose coupling between components.
+The service is registered as a dependency in the HandlerDependencies struct and made available to various handlers throughout the application. This dependency injection pattern ensures that all components have access to a consistent messaging interface while maintaining loose coupling between components. Notably, the recent addition of SaveUpdateMessageService and AdminSaveMessageService has expanded the dependency graph, with these services now relying on MessageSenderService for administrative message operations.
 
 ```mermaid
 graph TD
@@ -55,6 +64,9 @@ TgBotClient[TgBotClient] --> MessageSenderService[MessageSenderService]
 MessageSenderService --> RandomCoffeeService[RandomCoffeeService]
 MessageSenderService --> SummarizationService[SummarizationService]
 MessageSenderService --> PermissionsService[PermissionsService]
+MessageSenderService --> SaveUpdateMessageService[SaveUpdateMessageService]
+SaveUpdateMessageService --> AdminSaveMessageService[AdminSaveMessageService]
+MessageSenderService --> AdminSaveMessageService
 MessageSenderService --> Handlers[Various Handlers]
 style MessageSenderService fill:#f9f,stroke:#333
 ```
@@ -62,10 +74,14 @@ style MessageSenderService fill:#f9f,stroke:#333
 **Diagram sources**
 - [bot.go](file://internal/bot/bot.go#L93-L134)
 - [message_sender_service.go](file://internal/services/message_sender_service.go#L14-L16)
+- [save_update_message_service.go](file://internal/services/grouphandlersservices/save_update_message_service.go#L14-L19)
+- [admin_save_message_service.go](file://internal/services/grouphandlersservices/admin_save_message_service.go#L19-L27)
 
 **Section sources**
 - [bot.go](file://internal/bot/bot.go#L31-L31)
 - [message_sender_service.go](file://internal/services/message_sender_service.go#L14-L16)
+- [save_update_message_service.go](file://internal/services/grouphandlersservices/save_update_message_service.go#L14-L19)
+- [admin_save_message_service.go](file://internal/services/grouphandlersservices/admin_save_message_service.go#L19-L27)
 
 ## Message Formatting and Utilities
 The MessageSenderService works in conjunction with formatting utilities to construct properly formatted messages. While the service itself handles the delivery mechanics, it relies on formatters like those in profile_formaters.go to create the actual message content. For example, when sending profile information, the service uses formatted HTML content generated by FormatProfileManagerView to display user information with proper links and styling.
@@ -130,4 +146,4 @@ The service supports concurrency through goroutine-safe operations, allowing mul
 - [message_sender_service.go](file://internal/services/message_sender_service.go#L1-L20)
 
 ## Conclusion
-The MessageSenderService is a foundational component of the evocoders-bot-go application, providing a robust and flexible interface for all Telegram message operations. By abstracting the complexities of the Telegram Bot API, it enables other services and handlers to focus on business logic while ensuring consistent, reliable message delivery. Its comprehensive error handling, support for various message types, and integration with formatting utilities make it a critical piece of the application's communication infrastructure.
+The MessageSenderService is a foundational component of the evocoders-bot-go application, providing a robust and flexible interface for all Telegram message operations. By abstracting the complexities of the Telegram Bot API, it enables other services and handlers to focus on business logic while ensuring consistent, reliable message delivery. Its comprehensive error handling, support for various message types, and integration with formatting utilities make it a critical piece of the application's communication infrastructure. Recent architectural changes have expanded its role, with new services like SaveUpdateMessageService and AdminSaveMessageService now depending on its messaging capabilities for database operations and administrative functions.

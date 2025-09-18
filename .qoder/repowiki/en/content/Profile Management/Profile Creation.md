@@ -2,13 +2,22 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go)
+- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go) - *Updated message formatting to HTML in commit ad0f920*
+- [message_sender_service.go](file://internal/services/message_sender_service.go) - *Added HTML message support in commit ad0f920*
 - [profile_service.go](file://internal/services/profile_service.go)
 - [profile_repository.go](file://internal/database/repositories/profile_repository.go)
 - [profile_formaters.go](file://internal/formatters/profile_formaters.go)
 - [handlers_private_constants.go](file://internal/constants/handlers_private_constants.go)
 - [20250519_add_users_and_profiles_tables.go](file://internal/database/migrations/implementations/20250519_add_users_and_profiles_tables.go)
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated all message formatting references from Markdown to HTML format
+- Modified return value examples to reflect HTML-based message formatting
+- Updated diagram sources to reflect actual implementation changes
+- Enhanced source tracking with commit annotations
+- Corrected message formatting method references throughout documentation
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -49,12 +58,12 @@ Handler-->>User : Success message
 ```
 
 **Diagram sources**
-- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L179-L204)
+- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L179-L204) - *Updated in commit ad0f920*
 - [profile_service.go](file://internal/services/profile_service.go#L30-L37)
 - [profile_repository.go](file://internal/database/repositories/profile_repository.go#L74-L105)
 
 **Section sources**
-- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L179-L230)
+- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L179-L230) - *Updated in commit ad0f920*
 
 ## User Input Validation
 The system implements comprehensive validation for user inputs to ensure data quality and consistency. Validation occurs at multiple levels: input length, content format, and required field presence. The validation rules are enforced through the profile handler's input processing methods.
@@ -83,12 +92,12 @@ SaveData --> End
 ```
 
 **Diagram sources**
-- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L404-L441)
-- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L499-L530)
-- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L532-L553)
+- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L404-L441) - *Updated in commit ad0f920*
+- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L499-L530) - *Updated in commit ad0f920*
+- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L532-L553) - *Updated in commit ad0f920*
 
 **Section sources**
-- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L404-L553)
+- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L404-L553) - *Updated in commit ad0f920*
 
 ## Field Requirements and Data Formatting
 The profile system requires three essential fields for a complete profile: first name, last name, and bio. These requirements are enforced by the `IsProfileComplete` method in the ProfileService, which validates that none of these fields are empty. The system stores these fields in separate database tables: user information (first and last names) in the users table and bio information in the profiles table.
@@ -170,11 +179,11 @@ ProfileHandler --> UserDataStore : "uses"
 ```
 
 **Diagram sources**
-- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L57-L93)
-- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L179-L230)
+- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L57-L93) - *Updated in commit ad0f920*
+- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L179-L230) - *Updated in commit ad0f920*
 
 **Section sources**
-- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L0-L1006)
+- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L0-L1006) - *Updated in commit ad0f920*
 
 ## Profile Service and Repository Integration
 The profile creation process involves tight integration between the ProfileService and ProfileRepository components. The ProfileService contains the business logic for determining profile completeness, while the ProfileRepository handles all database operations for profile data persistence.
@@ -226,8 +235,8 @@ System errors, such as database connection issues or repository failures, are lo
 The handler also addresses concurrency issues by using the UserDataStore to manage user session state, preventing race conditions when multiple messages are sent in quick succession. The duplicate message detection mechanism prevents processing the same input multiple times, which could lead to inconsistent state or database errors.
 
 **Section sources**
-- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L404-L553)
-- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L709-L745)
+- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L404-L553) - *Updated in commit ad0f920*
+- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L709-L745) - *Updated in commit ad0f920*
 - [profile_repository.go](file://internal/database/repositories/profile_repository.go#L74-L105)
 
 ## Configuration Options
@@ -239,19 +248,20 @@ The system also relies on configuration values from the main config object, part
 
 **Section sources**
 - [handlers_private_constants.go](file://internal/constants/handlers_private_constants.go#L0-L29)
-- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L179-L204)
+- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L179-L204) - *Updated in commit ad0f920*
 
 ## Return Values and Status Indicators
 The profile creation system provides clear return values and status indicators to inform users of the outcome of their actions. Successful operations are indicated with checkmark emojis (✅) and success messages, while errors are indicated with cross emojis (❌) and descriptive error messages.
 
 When a field is successfully saved, the system displays a confirmation message with the "✅ [Field] saved!" format, providing immediate positive feedback. When a profile is successfully published, the system provides a link to the published message in the intro channel, allowing users to easily view their published profile.
 
-For validation failures, the system returns specific error messages that indicate the nature of the problem, such as "Name is too long" or "Required fields are missing". These messages are designed to be actionable, guiding users toward successful completion of their task. The system also maintains visual consistency by using the same message editing pattern throughout the flow, replacing previous messages rather than creating new ones.
+For validation failures, the system returns specific error messages that indicate the nature of the problem, such as "Name is too long" or "Required fields are missing". These messages are designed to be actionable, guiding users toward successful completion of their task. The system now uses HTML formatting for all messages through the `SendHtmlWithReturnMessage` method in the MessageSenderService, ensuring proper rendering of HTML entities and links.
 
 **Section sources**
-- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L499-L530)
-- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L532-L553)
-- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L815-L870)
+- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L499-L530) - *Updated in commit ad0f920*
+- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L532-L553) - *Updated in commit ad0f920*
+- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L815-L870) - *Updated in commit ad0f920*
+- [message_sender_service.go](file://internal/services/message_sender_service.go#L102-L135) - *Added in commit ad0f920*
 
 ## Conclusion
-The Profile Creation feature in evocoders-bot-go provides a robust and user-friendly system for managing user profiles. By following a clear flow from initiation to completion, implementing thorough validation, and providing informative feedback, the system ensures a positive user experience. The separation of concerns between handler, service, and repository components makes the codebase maintainable and extensible. Developers can build upon this foundation to add new profile fields, integrate with additional services, or modify the validation rules to meet evolving requirements. The comprehensive error handling and clear status indicators make the system reliable and user-friendly, even in edge cases or error conditions.
+The Profile Creation feature in evocoders-bot-go provides a robust and user-friendly system for managing user profiles. By following a clear flow from initiation to completion, implementing thorough validation, and providing informative feedback, the system ensures a positive user experience. The separation of concerns between handler, service, and repository components makes the codebase maintainable and extensible. Developers can build upon this foundation to add new profile fields, integrate with additional services, or modify the validation rules to meet evolving requirements. The comprehensive error handling and clear status indicators make the system reliable and user-friendly, even in edge cases or error conditions. Recent updates have standardized message formatting to use HTML across all profile interactions, improving consistency and security in message rendering.

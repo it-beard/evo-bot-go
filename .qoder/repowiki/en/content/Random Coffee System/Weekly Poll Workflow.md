@@ -6,10 +6,19 @@
 - [random_coffee_service.go](file://internal/services/random_coffee_service.go)
 - [random_coffee_poll_repository.go](file://internal/database/repositories/random_coffee_poll_repository.go)
 - [random_coffee_participant_repository.go](file://internal/database/repositories/random_coffee_participant_repository.go)
-- [random_coffee_poll_answer_handler.go](file://internal/handlers/grouphandlers/random_coffee_poll_answer_handler.go)
+- [poll_answer_handler.go](file://internal/handlers/grouphandlers/poll_answer_handler.go)
+- [randomcofee_poll_answers_service.go](file://internal/services/grouphandlersservices/randomcofee_poll_answers_service.go)
 - [20250602_add_random_coffee_poll_tables.go](file://internal/database/migrations/implementations/20250602_add_random_coffee_poll_tables.go)
 - [20250609_add_random_coffee_pairs_table.go](file://internal/database/migrations/implementations/20250609_add_random_coffee_pairs_table.go)
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated User Response Handling section to reflect removal of supergroup chat check
+- Added new section sources for poll_answer_handler.go and randomcofee_poll_answers_service.go
+- Removed outdated information about message origin validation
+- Updated diagram sources to reflect current file structure
+- Enhanced error handling description with updated validation logic
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -59,10 +68,13 @@ Service-->>Scheduler : Poll creation complete
 - [random_coffee_poll_repository.go](file://internal/database/repositories/random_coffee_poll_repository.go#L0-L47)
 
 ## User Response Handling
-User interactions with the weekly poll are managed by the `random_coffee_poll_answer_handler`, which listens for poll answer events from the Telegram Bot API and processes them accordingly. When a user submits or changes their response to the poll, the handler receives a `PollAnswer` update containing the user's ID, the poll ID, and the selected option(s). The handler first performs validation checks to ensure the responding user is not a bot and has not been banned from participating in Random Coffee events. It then retrieves the internal user ID from the database using the `GetOrCreate` method of the `UserRepository`, establishing a mapping between the Telegram user and the system's internal user representation. The handler queries the `RandomCoffeePollRepository` to find the corresponding poll in the database using the Telegram poll ID, ensuring that only responses to active Random Coffee polls are processed. Based on the user's selection, the handler either creates a new participation record or updates an existing one in the `random_coffee_participants` table, with the `UpsertParticipant` method handling both insertion and update operations through a database upsert pattern that prevents duplicate entries.
+User interactions with the weekly poll are managed by the `poll_answer_handler`, which listens for poll answer events from the Telegram Bot API and processes them accordingly. When a user submits or changes their response to the poll, the handler receives a `PollAnswer` update containing the user's ID, the poll ID, and the selected option(s). The handler first performs validation checks to ensure the responding user is not a bot and has not been banned from participating in Random Coffee events. It then retrieves the internal user ID from the database using the `GetOrCreate` method of the `UserRepository`, establishing a mapping between the Telegram user and the system's internal user representation. The handler queries the `RandomCoffeePollRepository` to find the corresponding poll in the database using the Telegram poll ID, ensuring that only responses to active Random Coffee polls are processed. Based on the user's selection, the handler either creates a new participation record or updates an existing one in the `random_coffee_participants` table, with the `UpsertParticipant` method handling both insertion and update operations through a database upsert pattern that prevents duplicate entries.
+
+The handler has been updated to remove the check for message originating from a supergroup chat, as this validation was deemed redundant given that poll answers are inherently tied to the specific Telegram group context. This refactoring simplifies the handler logic while maintaining security through other validation layers.
 
 **Section sources**
-- [random_coffee_poll_answer_handler.go](file://internal/handlers/grouphandlers/random_coffee_poll_answer_handler.go#L0-L126)
+- [poll_answer_handler.go](file://internal/handlers/grouphandlers/poll_answer_handler.go#L0-L33)
+- [randomcofee_poll_answers_service.go](file://internal/services/grouphandlersservices/randomcofee_poll_answers_service.go#L0-L116)
 - [random_coffee_participant_repository.go](file://internal/database/repositories/random_coffee_participant_repository.go#L0-L42)
 
 ## State Management and Poll Lifecycle

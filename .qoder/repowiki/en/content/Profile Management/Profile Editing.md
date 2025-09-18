@@ -2,12 +2,20 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go)
+- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go) - *Updated in recent commit: message formatting changed to HTML*
 - [profile_repository.go](file://internal/database/repositories/profile_repository.go)
 - [profile_service.go](file://internal/services/profile_service.go)
 - [profile_handler_buttons.go](file://internal/buttons/profile_handler_buttons.go)
 - [handlers_private_constants.go](file://internal/constants/handlers_private_constants.go)
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated all message formatting references from Markdown to HTML in relevant sections
+- Modified code examples and method calls to reflect the use of HTML formatting
+- Updated success message formatting to show correct HTML usage
+- Adjusted error message handling examples to use HTML methods
+- Removed outdated references to Markdown formatting methods
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -24,10 +32,10 @@
 12. [Conclusion](#conclusion)
 
 ## Introduction
-The Profile Editing feature in evocoders-bot-go enables users to modify their personal information through a structured conversation flow initiated via inline keyboard buttons. This documentation details the implementation of the edit functionality, covering the complete workflow from user interaction to data persistence. The system employs a state-based conversation model to guide users through editing their profile information, with validation and error handling at each step. The architecture follows a clean separation of concerns between handlers, services, and repositories, ensuring maintainability and testability of the codebase.
+The Profile Editing feature in evocoders-bot-go enables users to modify their personal information through a structured conversation flow initiated via inline keyboard buttons. This documentation details the implementation of the edit functionality, covering the complete workflow from user interaction to data persistence. The system employs a state-based conversation model to guide users through editing their profile information, with validation and error handling at each step. The architecture follows a clean separation of concerns between handlers, services, and repositories, ensuring maintainability and testability of the codebase. All message formatting now uses HTML instead of Markdown for consistent rendering of profile information.
 
 ## Profile Edit Flow Overview
-The profile editing process follows a sequential flow initiated by user interaction with inline buttons. When a user selects the "Edit" option from the profile menu, the system transitions into an editing state where specific fields can be modified. The flow begins with the display of editing options for firstname, lastname, and bio fields. Upon selecting a field to edit, the user is prompted to enter new values. The system validates input length and content before persisting changes to the database. After successful updates, users receive confirmation messages with options to continue editing or publish their updated profile. The entire process maintains context using a UserDataStore to track conversation states and pending operations for each user.
+The profile editing process follows a sequential flow initiated by user interaction with inline buttons. When a user selects the "Edit" option from the profile menu, the system transitions into an editing state where specific fields can be modified. The flow begins with the display of editing options for firstname, lastname, and bio fields. Upon selecting a field to edit, the user is prompted to enter new values. The system validates input length and content before persisting changes to the database. After successful updates, users receive confirmation messages with options to continue editing or publish their updated profile. The entire process maintains context using a UserDataStore to track conversation states and pending operations for each user. Message formatting is consistently handled using HTML to ensure proper rendering of special characters and formatting.
 
 **Section sources**
 - [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L203-L230)
@@ -93,7 +101,7 @@ J --> L["Log Error"]
 - [profile_repository.go](file://internal/database/repositories/profile_repository.go#L57-L105)
 
 ## Component Interaction
-The profile editing functionality is implemented through a well-defined interaction between handler, service, and repository components. The ProfileHandler receives user input and manages the conversation flow, delegating data operations to the ProfileRepository. The ProfileService provides business logic functions, such as determining if a profile is complete for publishing. The UserRepository handles user-related data operations, while the ProfileRepository manages profile-specific data. These components are injected into the handler through dependency injection in the NewProfileHandler constructor, promoting loose coupling and testability. The MessageSenderService is used to communicate with users through Telegram messages, while the UserDataStore maintains session state across interactions.
+The profile editing functionality is implemented through a well-defined interaction between handler, service, and repository components. The ProfileHandler receives user input and manages the conversation flow, delegating data operations to the ProfileRepository. The ProfileService provides business logic functions, such as determining if a profile is complete for publishing. The UserRepository handles user-related data operations, while the ProfileRepository manages profile-specific data. These components are injected into the handler through dependency injection in the NewProfileHandler constructor, promoting loose coupling and testability. The MessageSenderService is used to communicate with users through Telegram messages using HTML formatting, while the UserDataStore maintains session state across interactions.
 
 ```mermaid
 classDiagram
@@ -146,25 +154,25 @@ The profile editing system supports modification of three primary fields: firstn
 - [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L709-L745)
 
 ## Success and Failure Indicators
-The system provides clear feedback to users regarding the outcome of edit operations through both visual indicators and status messages. Upon successful updates, users receive confirmation messages with a checkmark emoji (✅) indicating completion, such as "✅ Биография сохранена!" (Bio saved!). Failed operations trigger error messages with appropriate guidance, such as length requirements for oversized inputs. The interface updates to reflect the new state, showing success messages with options to continue editing or publish the profile. In the backend, all operations return explicit error values that include contextual information for debugging, using wrapped errors with type names and operation details. The system also handles edge cases like duplicate messages from the same timestamp by silently ignoring them to prevent processing errors.
+The system provides clear feedback to users regarding the outcome of edit operations through both visual indicators and status messages. Upon successful updates, users receive confirmation messages with a checkmark emoji (✅) indicating completion, such as "✅ Биография сохранена!" (Bio saved!). Failed operations trigger error messages with appropriate guidance, such as length requirements for oversized inputs. The interface updates to reflect the new state, showing success messages with options to continue editing or publish the profile. In the backend, all operations return explicit error values that include contextual information for debugging, using wrapped errors with type names and operation details. The system also handles edge cases like duplicate messages from the same timestamp by silently ignoring them to prevent processing errors. All success and failure messages are now sent using HTML formatting to ensure consistent rendering.
 
 **Section sources**
 - [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L740-L745)
 - [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L450-L455)
 
 ## Configuration and Permissions
-Profile editing functionality is governed by configuration settings and permission checks to ensure appropriate access control. The system verifies that operations occur in private chat contexts and that users have the necessary club member permissions before allowing profile modifications. These checks are performed in the handleCommand method before initiating any editing workflow. Configuration values such as the bio length limit are defined as constants and can be adjusted without modifying the core logic. The system also respects user privacy by not exposing sensitive information and by properly escaping HTML content in bio fields to prevent injection attacks. The conversation flow is designed to be cancellable at any point, with appropriate cleanup of temporary state.
+Profile editing functionality is governed by configuration settings and permission checks to ensure appropriate access control. The system verifies that operations occur in private chat contexts and that users have the necessary club member permissions before allowing profile modifications. These checks are performed in the handleCommand method before initiating any editing workflow. Configuration values such as the bio length limit are defined as constants and can be adjusted without modifying the core logic. The system also respects user privacy by not exposing sensitive information and by properly escaping HTML content in bio fields to prevent injection attacks. The conversation flow is designed to be cancellable at any point, with appropriate cleanup of temporary state. All user-facing messages are formatted using HTML to maintain consistency in presentation.
 
 **Section sources**
 - [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L130-L138)
 - [handlers_private_constants.go](file://internal/constants/handlers_private_constants.go#L5-L13)
 
 ## Common Issues and Solutions
-The profile editing system addresses several common issues through proactive design and error handling. Concurrent edits are managed through the state-based conversation model, which ensures that each user's editing session is isolated and tracked independently. Invalid field changes are prevented through client-side validation that checks input length before submission. The system handles cases where users send multiple messages with the same timestamp by tracking the last message time and ignoring duplicates. Database update failures are caught and reported to users with appropriate error messages, while detailed error logging helps diagnose underlying issues. The UserDataStore is properly cleared when conversations end to prevent memory leaks and ensure fresh sessions. Transactional integrity is maintained by updating the updated_at timestamp with each modification, providing an audit trail of changes.
+The profile editing system addresses several common issues through proactive design and error handling. Concurrent edits are managed through the state-based conversation model, which ensures that each user's editing session is isolated and tracked independently. Invalid field changes are prevented through client-side validation that checks input length before submission. The system handles cases where users send multiple messages with the same timestamp by tracking the last message time and ignoring duplicates. Database update failures are caught and reported to users with appropriate error messages, while detailed error logging helps diagnose underlying issues. The UserDataStore is properly cleared when conversations end to prevent memory leaks and ensure fresh sessions. Transactional integrity is maintained by updating the updated_at timestamp with each modification, providing an audit trail of changes. The transition to HTML message formatting has eliminated issues related to Markdown parsing inconsistencies.
 
 **Section sources**
 - [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L709-L745)
 - [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L420-L425)
 
 ## Conclusion
-The Profile Editing feature in evocoders-bot-go demonstrates a robust implementation of user profile management through Telegram interactions. By leveraging a state-based conversation model, the system provides a guided experience for users to modify their personal information securely and efficiently. The clean separation between handler, service, and repository components ensures maintainability and testability of the codebase. Comprehensive validation and error handling protect data integrity while providing clear feedback to users. The system effectively manages state, handles edge cases, and maintains transactional consistency throughout the editing process. This implementation serves as a solid foundation for profile management that can be extended with additional fields or validation rules as needed.
+The Profile Editing feature in evocoders-bot-go demonstrates a robust implementation of user profile management through Telegram interactions. By leveraging a state-based conversation model, the system provides a guided experience for users to modify their personal information securely and efficiently. The clean separation between handler, service, and repository components ensures maintainability and testability of the codebase. Comprehensive validation and error handling protect data integrity while providing clear feedback to users. The system effectively manages state, handles edge cases, and maintains transactional consistency throughout the editing process. With the recent update to use HTML formatting for all messages, the system now provides more consistent and reliable message rendering. This implementation serves as a solid foundation for profile management that can be extended with additional fields or validation rules as needed.

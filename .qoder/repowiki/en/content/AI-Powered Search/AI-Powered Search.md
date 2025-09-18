@@ -13,6 +13,14 @@
 - [config.go](file://internal/config/config.go)
 </cite>
 
+## Update Summary
+**Changes Made**   
+- Updated OpenAI model and reasoning effort configuration in OpenAI Integration section
+- Corrected outdated model name references from GPT-5 to GPT-5 Mini
+- Updated reasoning effort setting from minimal to medium based on latest code changes
+- Added clarification about model configuration in OpenAI client
+- Removed obsolete model comments from code examples
+
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Search Functionality Overview](#search-functionality-overview)
@@ -68,7 +76,7 @@ OpenAI-->>Handler : Return AI-generated response
 Handler->>User : Format and send response
 ```
 
-**Diagram sources**
+**Section sources**
 - [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L105-L138)
 - [tools_handler.go](file://internal/handlers/privatehandlers/tools_handler.go#L105-L138)
 - [intro_handler.go](file://internal/handlers/privatehandlers/intro_handler.go#L105-L138)
@@ -102,7 +110,7 @@ PromptingTemplateRepository --> PromptingTemplate : "retrieves"
 - [intro_prompt.go](file://internal/database/prompts/intro_prompt.go#L0-L23)
 
 ## OpenAI Integration
-The system integrates with OpenAI through a dedicated OpenAiClient that abstracts the API interaction. The client is configured to use the o3-mini model for chat completions, providing a balance of capability and cost efficiency. The integration follows a clean separation of concerns, with the client handling authentication, request formatting, and response parsing.
+The system integrates with OpenAI through a dedicated OpenAiClient that abstracts the API interaction. The client is configured to use the ChatModelGPT5Mini model for chat completions with ReasoningEffortMedium setting, providing a balance of capability and cost efficiency. The integration follows a clean separation of concerns, with the client handling authentication, request formatting, and response parsing.
 
 When processing a search query, the system constructs a comprehensive prompt by combining the retrieved template with contextual data and the user's query. The prompt includes structured data in JSON format, providing the AI model with rich context for generating accurate responses. During processing, the system displays typing indicators every 5 seconds to maintain user engagement during potentially lengthy AI responses.
 

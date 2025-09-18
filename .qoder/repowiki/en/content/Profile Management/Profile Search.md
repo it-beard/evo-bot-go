@@ -2,12 +2,19 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [intro_handler.go](file://internal/handlers/privatehandlers/intro_handler.go)
-- [profile_prompt.go](file://internal/database/prompts/profile_prompt.go)
-- [profile_repository.go](file://internal/database/repositories/profile_repository.go)
+- [intro_handler.go](file://internal/handlers/privatehandlers/intro_handler.go) - *Updated in commit 63fee724519bc00e2d47f977cd4db421ca79c506*
+- [profile_repository.go](file://internal/database/repositories/profile_repository.go) - *Updated in commit 63fee724519bc00e2d47f977cd4db421ca79c506*
 - [openai_client.go](file://internal/clients/openai_client.go)
 - [config.go](file://internal/config/config.go)
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated method name references from `GetAllWithUsers` to `GetAllActiveWithUserInfo` across documentation
+- Corrected profile retrieval logic to reflect filtering for active club members only
+- Updated section sources to reflect actual file paths and line ranges from codebase
+- Removed reference to non-existent `profile_prompt.go` file
+- Added clarification on active member filtering criteria in profile data retrieval
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -48,7 +55,7 @@ participant Response as "MessageSenderService"
 User->>Bot : Sends /intro command
 Bot->>Handler : Routes to introHandler
 Handler->>Handler : Validates user permissions
-Handler->>Repository : GetAllWithUsers()
+Handler->>Repository : GetAllActiveWithUserInfo()
 Repository-->>Handler : Returns profiles with bios
 Handler->>Repository : Get(prompt_template)
 Repository-->>Handler : Returns profile prompt
@@ -109,7 +116,7 @@ When a query is received, the system implements concurrency control using a user
 - [intro_handler.go](file://internal/handlers/privatehandlers/intro_handler.go#L100-L150)
 
 ## Prompt Engineering and AI Integration
-The AI-powered search relies heavily on carefully engineered prompts that guide the language model in interpreting user queries and retrieving relevant profiles. The prompt structure is stored in the database and retrieved at runtime.
+The AI-powered search relies heavily on carefully engineered prompts that guide the language model in interpreting user queries and retrieving relevant profiles. The prompt structure is retrieved from the database at runtime through the prompting template repository.
 
 ```mermaid
 flowchart TD
@@ -126,16 +133,14 @@ C --> D["Example Response"]
 end
 ```
 
-**Diagram sources**
-- [profile_prompt.go](file://internal/database/prompts/profile_prompt.go#L5-L37)
-
 **Section sources**
-- [profile_prompt.go](file://internal/database/prompts/profile_prompt.go#L5-L37)
+- [intro_handler.go](file://internal/handlers/privatehandlers/intro_handler.go#L289-L305)
+- [profile_repository.go](file://internal/database/repositories/profile_repository.go#L265-L285)
 
 The prompt template defines strict formatting rules, including using third-level headers for names, providing Telegram username links when available, and limiting biography descriptions to two sentences. It also includes a fallback message when no relevant profiles are found and encourages users to create or update their own profiles.
 
 ## Profile Data Retrieval Strategy
-The system retrieves profile data through the profile repository, which executes a SQL query to fetch all profiles with associated user information. The query specifically filters for profiles that have non-empty bios, as these contain the introduction content used for search.
+The system retrieves profile data through the profile repository, which executes a SQL query to fetch all profiles with associated user information. The query specifically filters for profiles that have non-empty bios, published message IDs, and belong to users who are active club members.
 
 The data is structured as a JSON array containing key profile information: ID, first name, last name, username, bio, and message ID. This structured data is then embedded within the AI prompt, allowing the language model to analyze and search through the biographical content.
 
@@ -169,6 +174,7 @@ PROFILE ||--|| USER : user_id
 
 **Section sources**
 - [profile_repository.go](file://internal/database/repositories/profile_repository.go#L265-L285)
+- [intro_handler.go](file://internal/handlers/privatehandlers/intro_handler.go#L320-L325)
 
 ## Result Ranking and Response Formatting
 The AI model is responsible for ranking and selecting the most relevant profiles based on the user's query. By default, it returns up to five of the most relevant matches, though this can be influenced by the user's request. The model analyzes the semantic meaning of both the query and profile bios to determine relevance rather than relying on keyword matching.
@@ -176,7 +182,7 @@ The AI model is responsible for ranking and selecting the most relevant profiles
 The response is formatted in Markdown according to the specifications in the prompt template. Each matched profile is presented with the member's name as a third-level header, followed by their Telegram username (if available) as a mention, and a concise summary of their bio. The system ensures consistent formatting across all responses, making it easy for users to scan and identify relevant profiles.
 
 **Section sources**
-- [profile_prompt.go](file://internal/database/prompts/profile_prompt.go#L5-L37)
+- [intro_handler.go](file://internal/handlers/privatehandlers/intro_handler.go#L335-L340)
 
 ## Configuration Options
 The Profile Search functionality is configured through environment variables that are loaded into the application configuration. Key settings include the OpenAI API key, which authenticates requests to the AI service, and various Telegram topic IDs that define where profile information is stored and displayed.
@@ -203,7 +209,7 @@ Search responses may take several seconds due to the AI processing time. The sys
 - [openai_client.go](file://internal/clients/openai_client.go#L58-L70)
 
 ## Performance Considerations
-As the user base grows, the profile search functionality may face performance challenges. Currently, the system retrieves all profiles with bios for each search request, which could become inefficient with thousands of members. For scaling, consider implementing database-level filtering or caching frequently accessed profile data.
+As the user base grows, the profile search functionality may face performance challenges. Currently, the system retrieves all active profiles with bios for each search request, which could become inefficient with thousands of members. For scaling, consider implementing database-level filtering or caching frequently accessed profile data.
 
 The AI processing time is typically the main bottleneck in the search workflow. Each request requires the entire dataset to be sent to the OpenAI API, which limits parallelization opportunities. Future improvements could include pre-processing profiles into embeddings for vector-based similarity search, reducing the amount of data sent to the AI model.
 

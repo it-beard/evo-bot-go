@@ -2,12 +2,22 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [tools_handler.go](file://internal/handlers/privatehandlers/tools_handler.go)
-- [tool_prompt.go](file://internal/database/prompts/tool_prompt.go)
-- [config.go](file://internal/config/config.go)
-- [prompting_templates_repository.go](file://internal/database/repositories/prompting_templates_repository.go)
-- [message_sender_service.go](file://internal/services/message_sender_service.go)
+- [tools_handler.go](file://internal/handlers/privatehandlers/tools_handler.go) - *Updated in recent commit*
+- [tool_prompt.go](file://internal/database/prompts/tool_prompt.go) - *Prompt template definition*
+- [openai_client.go](file://internal/clients/openai_client.go) - *Updated in commit 3d05b696 and 882a1521*
+- [config.go](file://internal/config/config.go) - *Configuration parameters*
+- [prompting_templates_repository.go](file://internal/database/repositories/prompting_templates_repository.go) - *Template retrieval logic*
+- [message_sender_service.go](file://internal/services/message_sender_service.go) - *Message delivery and typing indicators*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated OpenAI client integration details to reflect v2.5.0 upgrade and model changes
+- Modified OpenAI model specification from GPT-5 to GPT-5 Mini based on recent commits
+- Updated reasoning effort setting from minimal to medium in OpenAI API calls
+- Refreshed code examples and implementation details to match current codebase
+- Added new section sources reflecting updated files
+- Updated diagram sources to include accurate file references
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -23,6 +33,9 @@
 ## Introduction
 The Tool Search feature (/tool) in evocoders-bot-go enables users to search for AI development tools discussed in the "Tools" channel of the EvoCoders club. This functionality is powered by an AI assistant named Jenkins Webster, who acts as a butler for the club. The feature leverages OpenAI's language model to interpret user queries, search through a database of tool descriptions, and return relevant results in a structured Markdown format. The implementation involves a conversation handler that manages user interaction, retrieves prompt templates from the database, constructs dynamic prompts with context, and handles the full lifecycle of the search request.
 
+**Section sources**
+- [tools_handler.go](file://internal/handlers/privatehandlers/tools_handler.go#L100-L130)
+
 ## Conversation Flow
 The tool search process follows a structured conversation flow initiated by the `/tool` command. The handler first validates that the user is in a private chat and has club member permissions before proceeding. It then prompts the user to enter a search query, transitioning into the `toolsStateStartToolSearch` state. In this state, the handler processes the user's message, validates the query, and initiates the search process. The conversation includes a cancel mechanism via the `/cancel` command or a cancel button, allowing users to terminate ongoing requests. Upon successful completion, the conversation ends with the delivery of search results, while errors or cancellations lead to appropriate user feedback and conversation termination.
 
@@ -37,7 +50,7 @@ The toolsHandler implements state management using a combination of conversation
 - [tools_handler.go](file://internal/handlers/privatehandlers/tools_handler.go#L170-L180)
 
 ## Prompt Template Retrieval and Construction
-The handler retrieves the tool-specific prompt template using the `GetToolPromptTemplateDbKey` constant ("get_tool_prompt") to query the `prompting_templates` database table. This template defines Jenkins Webster's behavior, including formatting rules, response structure, and search logic. The final prompt is constructed by combining the retrieved template with dynamic elements: the link to the Tools channel (using `SuperGroupChatID` and `ToolTopicID`), the JSON-formatted message database, and the user's query. All dynamic content is properly escaped using `utils.EscapeMarkdown` to prevent formatting issues. The constructed prompt guides the AI to find relevant tools, format responses in Markdown with proper linking, and include related club content when available.
+The handler retrieves the tool-specific prompt template using the `GetToolPromptKey` constant ("get_tool_prompt") to query the `prompting_templates` database table. This template defines Jenkins Webster's behavior, including formatting rules, response structure, and search logic. The final prompt is constructed by combining the retrieved template with dynamic elements: the link to the Tools channel (using `SuperGroupChatID` and `ToolTopicID`), the JSON-formatted message database, and the user's query. All dynamic content is properly escaped using `utils.EscapeMarkdown` to prevent formatting issues. The constructed prompt guides the AI to find relevant tools, format responses in Markdown with proper linking, and include related club content when available.
 
 **Section sources**
 - [tools_handler.go](file://internal/handlers/privatehandlers/tools_handler.go#L220-L250)
@@ -45,10 +58,11 @@ The handler retrieves the tool-specific prompt template using the `GetToolPrompt
 - [prompting_templates_repository.go](file://internal/database/repositories/prompting_templates_repository.go#L25-L40)
 
 ## OpenAI Integration and Response Processing
-The toolsHandler integrates with the OpenAI client through a cancellable context that allows for request termination when users cancel their queries. Before making the API call, the handler starts a periodic typing indicator that sends "typing" actions every 5 seconds to provide user feedback during potentially long-running searches. The `GetCompletion` method is called with the constructed prompt, and the context is monitored for cancellation. If the context is cancelled, the request terminates gracefully. Successful responses are delivered to the user via `ReplyMarkdown`, while various error conditions (API errors, context cancellation, message sending failures) are logged and reported to the user with appropriate messages.
+The toolsHandler integrates with the OpenAI client through a cancellable context that allows for request termination when users cancel their queries. Before making the API call, the handler starts a periodic typing indicator that sends "typing" actions every 5 seconds to provide user feedback during potentially long-running searches. The `GetCompletion` method is called with the constructed prompt, and the context is monitored for cancellation. The OpenAI client has been upgraded to v2.5.0 and now uses the `ChatModelGPT5Mini` model with `ReasoningEffortMedium` settings. If the context is cancelled, the request terminates gracefully. Successful responses are delivered to the user via `ReplyMarkdown`, while various error conditions (API errors, context cancellation, message sending failures) are logged and reported to the user with appropriate messages.
 
 **Section sources**
 - [tools_handler.go](file://internal/handlers/privatehandlers/tools_handler.go#L250-L300)
+- [openai_client.go](file://internal/clients/openai_client.go#L50-L70)
 - [message_sender_service.go](file://internal/services/message_sender_service.go#L380-L390)
 
 ## Message Formatting and Delivery

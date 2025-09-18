@@ -10,6 +10,15 @@
 - [go.mod](file://go.mod)
 </cite>
 
+## Update Summary
+**Changes Made**   
+- Updated OpenAI client version from v0.1.0-beta.10 to v2.5.0
+- Updated import paths for OpenAI client to reflect new module structure
+- Updated model reference from o3-mini to ChatModelGPT5Mini
+- Added ReasoningEffort parameter to chat completion requests
+- Updated dependency analysis section to reflect new version
+- Modified component interactions section to reflect updated OpenAI client usage
+
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Core Technology Stack](#core-technology-stack)
@@ -35,8 +44,8 @@ The application is built using Go version 1.23.3, as specified in the `go.mod` f
 ### Telegram Integration: gotgbot/v2
 The bot uses the `gotgbot/v2` library (version v2.0.0-rc.32) to interface with the Telegram Bot API. This lightweight, actively maintained library provides a clean abstraction over Telegram's update system, enabling event-driven handling of messages, callbacks, polls, and chat events. It supports long polling with configurable timeouts and handles deserialization of Telegram's JSON payloads into Go structs.
 
-### AI Capabilities: github.com/openai/openai-go
-The `github.com/openai/openai-go` library (v0.1.0-beta.10) enables integration with OpenAI's API for natural language processing tasks. The bot leverages this for generating responses, summarizing content, and powering conversational features. The client uses the `o3-mini` model for chat completions and `text-embedding-ada-002` for embedding generation, supporting semantic search and context-aware interactions.
+### AI Capabilities: github.com/openai/openai-go/v2
+The `github.com/openai/openai-go/v2` library (v2.5.0) enables integration with OpenAI's API for natural language processing tasks. The bot leverages this for generating responses, summarizing content, and powering conversational features. The client uses the `ChatModelGPT5Mini` model for chat completions and `text-embedding-ada-002` for embedding generation, supporting semantic search and context-aware interactions. The updated client includes the ReasoningEffort parameter to control processing depth.
 
 ### Database Connectivity: github.com/lib/pq
 PostgreSQL connectivity is provided by the `github.com/lib/pq` driver (v1.10.9), a pure Go PostgreSQL driver that supports the `database/sql` interface. It enables secure, efficient communication with the PostgreSQL database, including connection pooling, SSL, and prepared statements.
@@ -72,7 +81,7 @@ I[Scheduled Tasks] --> C
 - [openai_client.go](file://internal/clients/openai_client.go#L1-L97)
 
 ### OpenAI Client Initialization and Usage
-The OpenAI client is initialized at startup in `main.go` and passed to the bot constructor. It is used by various handlers and services to generate AI-powered responses. The client is configured with the API key from environment variables and exposes methods for chat completions and embeddings.
+The OpenAI client is initialized at startup in `main.go` and passed to the bot constructor. It is used by various handlers and services to generate AI-powered responses. The client is configured with the API key from environment variables and exposes methods for chat completions and embeddings. The updated v2.5.0 client uses a new import path and includes enhanced parameters for controlling reasoning effort.
 
 ```mermaid
 sequenceDiagram
@@ -89,7 +98,7 @@ OpenAI-->>OpenAIClient : Response
 OpenAIClient-->>Bot : Completion text
 ```
 
-**Diagram sources**
+**Section sources**
 - [main.go](file://main.go#L1-L53)
 - [openai_client.go](file://internal/clients/openai_client.go#L1-L97)
 - [bot.go](file://internal/bot/bot.go#L1-L384)
@@ -158,12 +167,9 @@ F --> |Present| G
 G[Initialize Components] --> H[Start Bot]
 ```
 
-**Diagram sources**
-- [config.go](file://internal/config/config.go#L1-L340)
-- [main.go](file://main.go#L1-L53)
-
 **Section sources**
 - [config.go](file://internal/config/config.go#L1-L340)
+- [main.go](file://main.go#L1-L53)
 
 ## Infrastructure Requirements and Scalability
 
@@ -190,7 +196,7 @@ For horizontal scaling, multiple bot instances could be deployed behind a load b
 The application depends on the following key libraries:
 - `github.com/PaulSonOfLars/gotgbot/v2`: Telegram Bot API client
 - `github.com/lib/pq`: PostgreSQL driver
-- `github.com/openai/openai-go`: OpenAI API client
+- `github.com/openai/openai-go/v2`: OpenAI API client (v2.5.0)
 - `github.com/stretchr/testify`: Testing utilities
 
 ### Indirect Dependencies
@@ -203,16 +209,13 @@ Several indirect dependencies support core functionality:
 graph LR
 A[evocoders-bot-go] --> B[gotgbot/v2]
 A --> C[lib/pq]
-A --> D[openai-go]
+A --> D[openai-go/v2]
 A --> E[testify]
 B --> F[websocket]
 C --> G[database/sql]
 D --> H[go-faster/jx]
 E --> I[diff]
 ```
-
-**Diagram sources**
-- [go.mod](file://go.mod#L1-L35)
 
 **Section sources**
 - [go.mod](file://go.mod#L1-L35)

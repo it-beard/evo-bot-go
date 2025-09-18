@@ -2,12 +2,21 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go)
-- [openai_client.go](file://internal/clients/openai_client.go)
+- [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go) - *Updated in recent commit*
+- [openai_client.go](file://internal/clients/openai_client.go) - *Updated in recent commit*
 - [content_prompt.go](file://internal/database/prompts/content_prompt.go)
 - [config.go](file://internal/config/config.go)
 - [prompting_templates_repository.go](file://internal/database/repositories/prompting_templates_repository.go)
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated OpenAI model from GPT-5 to GPT-5 Mini in OpenAiClient
+- Changed reasoning effort from minimal to medium in OpenAI API call
+- Updated import paths for OpenAI Go client v2.5.0
+- Modified OpenAI integration section to reflect new model and reasoning settings
+- Updated technical deep dive section to reflect client changes
+- Updated configuration parameters section to reflect updated model name
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -72,7 +81,7 @@ The validation process occurs in the processContentSearch method, which verifies
 - [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L105-L138)
 
 ## Prompt Construction and Template Retrieval
-The prompt construction process begins with retrieving a template from the database using the GetContentPromptTemplateDbKey constant. The PromptingTemplateRepository queries the prompting_templates table for the template associated with this key, falling back to a default template if none is found.
+The prompt construction process begins with retrieving a template from the database using the GetContentPromptKey constant. The PromptingTemplateRepository queries the prompting_templates table for the template associated with this key, falling back to a default template if none is found.
 
 Once retrieved, the template is populated with dynamic values including the topic link (constructed from SuperGroupChatID and ContentTopicID), formatted message data, and the user's query. The prepareTelegramMessages method converts raw message data into a JSON structure with properly formatted dates, which is then escaped for safe inclusion in the prompt. The complete prompt is logged to a temporary file for debugging purposes.
 
@@ -101,7 +110,7 @@ J --> K[Send to OpenAI]
 - [content_prompt.go](file://internal/database/prompts/content_prompt.go#L0-L38)
 
 ## OpenAI Integration and Response Handling
-The system integrates with OpenAI through the OpenAiClient, which provides a clean interface for generating completions. The GetCompletion method sends the constructed prompt to OpenAI's API using the o3-mini model, with the request scoped to the cancellable context created for the operation.
+The system integrates with OpenAI through the OpenAiClient, which provides a clean interface for generating completions. The GetCompletion method sends the constructed prompt to OpenAI's API using the GPT-5 Mini model with medium reasoning effort, with the request scoped to the cancellable context created for the operation.
 
 While waiting for the OpenAI response, the system sends periodic typing indicators to the user every 5 seconds, enhancing the user experience during potentially long processing times. Upon receiving a response, the system validates that the context wasn't cancelled before proceeding. Successful responses are delivered to the user using ReplyMarkdown, preserving the formatting instructions from the prompt. Error responses are handled gracefully with appropriate user feedback and logging.
 

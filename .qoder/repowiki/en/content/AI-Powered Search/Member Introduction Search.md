@@ -9,6 +9,14 @@
 - [prompting_templates_repository.go](file://internal/database/repositories/prompting_templates_repository.go)
 </cite>
 
+## Update Summary
+**Changes Made**   
+- Updated OpenAI client configuration to reflect the upgraded Go client v2.5.0
+- Corrected AI model reference from GPT-5 to GPT-5 Mini based on recent changes
+- Updated reasoning effort setting from minimal to medium in OpenAI API calls
+- Modified import paths to align with the new OpenAI Go client version
+- Ensured all documentation accurately reflects current AI model usage and configuration
+
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Core Components](#core-components)
@@ -33,7 +41,7 @@ The Member Introduction Search feature is built around several key components th
 
 ## Data Flow and Processing
 
-The data flow for the Member Introduction Search feature follows a structured sequence from user input to AI-generated response. When a user invokes the /intro command, the introHandler initiates a conversation state and prompts for a search query. The system first validates user permissions and checks for any ongoing requests to prevent concurrent processing. Once a query is received, the handler retrieves all member profiles with associated user information through the GetAllWithUsers method of the ProfileRepository. This data is then transformed into a structured JSON format by the prepareProfileData method, which extracts relevant fields like names, usernames, bios, and message IDs. The JSON data is incorporated into a prompt template retrieved from the database using the Get method of the PromptingTemplateRepository. This complete prompt, containing both the knowledge base and user query, is sent to OpenAI for processing. The resulting response is formatted in Markdown and returned to the user, completing the search cycle.
+The data flow for the Member Introduction Search feature follows a structured sequence from user input to AI-generated response. When a user invokes the /intro command, the introHandler initiates a conversation state and prompts for a search query. The system first validates user permissions and checks for any ongoing requests to prevent concurrent processing. Once a query is received, the handler retrieves all member profiles with associated user information through the GetAllActiveWithUserInfo method of the ProfileRepository. This data is then transformed into a structured JSON format by the prepareProfileData method, which extracts relevant fields like names, usernames, bios, and message IDs. The JSON data is incorporated into a prompt template retrieved from the database using the Get method of the PromptingTemplateRepository. This complete prompt, containing both the knowledge base and user query, is sent to OpenAI for processing. The resulting response is formatted in HTML and returned to the user, completing the search cycle.
 
 ```mermaid
 flowchart TD
@@ -122,7 +130,7 @@ class introHandler {
 }
 class ProfileRepository {
 +db *sql.DB
-+GetAllWithUsers() ([]ProfileWithUser, error)
++GetAllActiveWithUserInfo() ([]ProfileWithUser, error)
 }
 class PromptingTemplateRepository {
 +db *sql.DB
@@ -168,7 +176,7 @@ introHandler->>introHandler : Validate permissions
 introHandler->>User : Request search query
 User->>introHandler : Send query
 introHandler->>introHandler : Mark as processing
-introHandler->>ProfileRepository : GetAllWithUsers()
+introHandler->>ProfileRepository : GetAllActiveWithUserInfo()
 ProfileRepository-->>introHandler : Return profiles
 introHandler->>introHandler : Transform to JSON
 introHandler->>PromptingTemplateRepository : Get("get_intro_prompt")
@@ -177,7 +185,7 @@ introHandler->>introHandler : Construct prompt
 introHandler->>MessageSenderService : SendTypingAction()
 introHandler->>OpenAiClient : GetCompletion(prompt)
 OpenAiClient-->>introHandler : Return response
-introHandler->>MessageSenderService : ReplyMarkdown(response)
+introHandler->>MessageSenderService : ReplyHtml(response)
 introHandler->>introHandler : Cleanup state
 introHandler-->>User : Display results
 ```
