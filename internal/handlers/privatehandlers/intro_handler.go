@@ -296,7 +296,7 @@ func (h *introHandler) prepareProfileData() ([]byte, error) {
 	}
 
 	// Get all profiles with users from the repository
-	profilesWithUsers, err := h.profileRepository.GetAllWithUsers()
+	profilesWithUsers, err := h.profileRepository.GetAllActiveWithUserInfo()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get profiles from repository: %w", err)
 	}
