@@ -258,7 +258,18 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 	// Register group chat handlers
 	groupHandlers := []ext.Handler{
 		grouphandlers.NewSaveTopicsHandler(deps.GroupTopicRepository), //always goes first!
-		grouphandlers.NewSaveMessagesHandler(deps.SaveUpdateMessageService),
+		grouphandlers.NewAdminMessageControlHandler(
+			deps.SaveUpdateMessageService,
+			deps.PermissionsService,
+			deps.AppConfig,
+			b.bot,
+			deps.MessageSenderService,
+		),
+		grouphandlers.NewSaveMessagesHandler(
+			deps.SaveUpdateMessageService,
+			deps.AppConfig,
+			b.bot,
+		),
 		grouphandlers.NewCleanClosedThreadsHandler(
 			deps.AppConfig,
 			deps.MessageSenderService,

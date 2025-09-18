@@ -42,6 +42,13 @@ func TestSaveUpdateMessageService_extractMessageTextAndEntities(t *testing.T) {
 		assert.Equal(t, "Photo caption", text)
 		assert.Len(t, entities, 1)
 	})
+
+	t.Run("Empty message", func(t *testing.T) {
+		msg := &gotgbot.Message{}
+		text, entities := service.extractMessageTextAndEntities(msg)
+		assert.Equal(t, "[Media]", text)
+		assert.Len(t, entities, 0)
+	})
 }
 
 func TestSaveUpdateMessageService_getMediaTypeDescription(t *testing.T) {
@@ -128,24 +135,104 @@ func TestSaveUpdateMessageService_extractGroupTopicID(t *testing.T) {
 	}
 }
 
-func TestSaveUpdateMessageService_isMessageForDeletion(t *testing.T) {
+func TestSaveUpdateMessageService_extractAndFormatMessageContent(t *testing.T) {
 	service := &SaveUpdateMessageService{}
 
-	tests := []struct {
-		messageText string
-		expected    bool
-	}{
-		{"[delete]", true},
-		{"[удалить]", true},
-		{"Hello world", false},
-		{"", false},
-		{"[DELETE]", false},
-	}
+	t.Run("Text message with formatting", func(t *testing.T) {
+		msg := &gotgbot.Message{
+			Text: "Hello world",
+			Entities: []gotgbot.MessageEntity{
+				{Type: "bold", Offset: 0, Length: 5},
+			},
+		}
+		result := service.extractAndFormatMessageContent(msg)
+		// The actual HTML conversion is handled by utils.ConvertToHTML
+		// We just verify that the method doesn't panic and returns a string
+		assert.NotEmpty(t, result)
+	})
 
-	for _, tt := range tests {
-		t.Run(tt.messageText, func(t *testing.T) {
-			result := service.isMessageForDeletion(tt.messageText)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
+	t.Run("Photo message without caption", func(t *testing.T) {
+		msg := &gotgbot.Message{
+			Photo: []gotgbot.PhotoSize{{FileId: "test"}},
+		}
+		result := service.extractAndFormatMessageContent(msg)
+		assert.NotEmpty(t, result)
+	})
+
+	t.Run("Caption message with entities", func(t *testing.T) {
+		msg := &gotgbot.Message{
+			Caption: "Photo caption",
+			CaptionEntities: []gotgbot.MessageEntity{
+				{Type: "italic", Offset: 0, Length: 5},
+			},
+		}
+		result := service.extractAndFormatMessageContent(msg)
+		assert.NotEmpty(t, result)
+	})
+}
+
+func TestSaveUpdateMessageService_getMessageText(t *testing.T) {
+	service := &SaveUpdateMessageService{}
+
+	t.Run("Text message", func(t *testing.T) {
+		msg := &gotgbot.Message{
+			Text: "Hello world",
+		}
+		result := service.getMessageText(msg)
+		assert.Equal(t, "Hello world", result)
+	})
+
+	t.Run("Caption message", func(t *testing.T) {
+		msg := &gotgbot.Message{
+			Caption: "Photo caption",
+		}
+		result := service.getMessageText(msg)
+		assert.Equal(t, "Photo caption", result)
+	})
+
+	t.Run("Media message without caption", func(t *testing.T) {
+		msg := &gotgbot.Message{
+			Photo: []gotgbot.PhotoSize{{FileId: "test"}},
+		}
+		result := service.getMessageText(msg)
+		assert.Equal(t, "[Photo]", result)
+	})
+
+	t.Run("Empty message", func(t *testing.T) {
+		msg := &gotgbot.Message{}
+		result := service.getMessageText(msg)
+		assert.Equal(t, "[Media]", result)
+	})
+
+	t.Run("Video message without caption", func(t *testing.T) {
+		msg := &gotgbot.Message{
+			Video: &gotgbot.Video{FileId: "test"},
+		}
+		result := service.getMessageText(msg)
+		assert.Equal(t, "[Video]", result)
+	})
+
+	t.Run("Voice message", func(t *testing.T) {
+		msg := &gotgbot.Message{
+			Voice: &gotgbot.Voice{FileId: "test"},
+		}
+		result := service.getMessageText(msg)
+		assert.Equal(t, "[Voice message]", result)
+	})
+
+	t.Run("Document message", func(t *testing.T) {
+		msg := &gotgbot.Message{
+			Document: &gotgbot.Document{FileId: "test"},
+		}
+		result := service.getMessageText(msg)
+		assert.Equal(t, "[Document]", result)
+	})
+
+	t.Run("Sticker message", func(t *testing.T) {
+		msg := &gotgbot.Message{
+			Sticker: &gotgbot.Sticker{FileId: "test"},
+		}
+		result := service.getMessageText(msg)
+		assert.Equal(t, "[Sticker]", result)
+	})
 }

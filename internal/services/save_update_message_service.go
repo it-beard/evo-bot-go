@@ -33,11 +33,45 @@ func NewSaveUpdateMessageService(
 		bot:                    bot,
 	}
 }
+func (s *SaveUpdateMessageService) Save(msg *gotgbot.Message) error {
+	return s.handleSaveOrUpdate(msg, true)
+}
 
-// SaveMessage processes regular user messages and saves them to database
-func (s *SaveUpdateMessageService) SaveMessage(msg *gotgbot.Message) error {
+func (s *SaveUpdateMessageService) SaveOrUpdate(msg *gotgbot.Message) error {
+	return s.handleSaveOrUpdate(msg, false)
+}
+
+// SaveOrUpdate saves a new message or updates an existing one in the database
+func (s *SaveUpdateMessageService) handleSaveOrUpdate(msg *gotgbot.Message, isSaveOnly bool) error {
 	// Extract message content and convert to HTML
 	markdownText := s.extractAndFormatMessageContent(msg)
+
+	if !isSaveOnly {
+		// First, try to get the message from the database
+		existingMessage, err := s.groupMessageRepository.GetByMessageID(msg.MessageId)
+		if err != nil && err != sql.ErrNoRows {
+			return fmt.Errorf("%s: failed to get existing message: %w", utils.GetCurrentTypeName(), err)
+		}
+
+		// If message exists in database, update it
+		if err != sql.ErrNoRows && existingMessage != nil {
+			// Only update if content actually changed
+			if markdownText != existingMessage.MessageText {
+				err = s.groupMessageRepository.Update(existingMessage.ID, markdownText)
+				if err != nil {
+					return fmt.Errorf("%s: failed to update group message: %w", utils.GetCurrentTypeName(), err)
+				}
+
+				log.Printf("%s: Successfully updated group message - ID: %d, User: %d",
+					utils.GetCurrentTypeName(), msg.MessageId, msg.From.Id)
+			}
+			return nil
+		}
+
+		// Message doesn't exist, save it as new
+		log.Printf("%s: Message not found in database, saving as new message - ID: %d",
+			utils.GetCurrentTypeName(), msg.MessageId)
+	}
 
 	// Get replied message ID if exists
 	replyToMessageID := s.extractReplyToMessageID(msg)
@@ -61,6 +95,7 @@ func (s *SaveUpdateMessageService) SaveMessage(msg *gotgbot.Message) error {
 	if msg.From.IsBot && msg.From.Username == "GroupAnonymousBot" {
 		msg.From.Id = s.config.AdminUserID
 	}
+
 	// Save the message
 	_, err = s.groupMessageRepository.Create(
 		msg.MessageId,
@@ -76,52 +111,8 @@ func (s *SaveUpdateMessageService) SaveMessage(msg *gotgbot.Message) error {
 	return nil
 }
 
-// UpdateMessage processes edited messages
-func (s *SaveUpdateMessageService) UpdateMessage(msg *gotgbot.Message) error {
-	// Check if the message indicates deletion first
-	messageText := s.getMessageText(msg)
-	if s.isMessageForDeletion(messageText) {
-		return s.handleMessageDeletion(msg)
-	}
-
-	// Update the message in the database
-	return s.handleMessageUpdate(msg)
-}
-
-// handleMessageUpdate updates an existing message in the database
-func (s *SaveUpdateMessageService) handleMessageUpdate(msg *gotgbot.Message) error {
-	// Get existing message from database
-	existingMessage, err := s.groupMessageRepository.GetByMessageID(msg.MessageId)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			// If message doesn't exist, save it as a new message
-			log.Printf("%s: Edited message not found in database, saving as new message - ID: %d",
-				utils.GetCurrentTypeName(), msg.MessageId)
-			return s.SaveMessage(msg)
-		}
-		return fmt.Errorf("%s: failed to get existing message: %w", utils.GetCurrentTypeName(), err)
-	}
-
-	// Extract updated message content and convert to HTML
-	markdownText := s.extractAndFormatMessageContent(msg)
-
-	// Only update if content actually changed
-	if markdownText != existingMessage.MessageText {
-		// Update the message
-		err = s.groupMessageRepository.Update(existingMessage.ID, markdownText)
-		if err != nil {
-			return fmt.Errorf("%s: failed to update group message: %w", utils.GetCurrentTypeName(), err)
-		}
-
-		log.Printf("%s: Successfully updated group message - ID: %d, User: %d",
-			utils.GetCurrentTypeName(), msg.MessageId, msg.From.Id)
-	}
-
-	return nil
-}
-
-// handleMessageDeletion deletes a message from both Telegram and the database
-func (s *SaveUpdateMessageService) handleMessageDeletion(msg *gotgbot.Message) error {
+// Delete deletes a message from both Telegram and the database
+func (s *SaveUpdateMessageService) Delete(msg *gotgbot.Message) error {
 	// First, get the existing message from database to get the internal ID
 	existingMessage, err := s.groupMessageRepository.GetByMessageID(msg.MessageId)
 	if err != nil {
@@ -225,9 +216,4 @@ func (s *SaveUpdateMessageService) extractGroupTopicID(msg *gotgbot.Message) int
 func (s *SaveUpdateMessageService) getMessageText(msg *gotgbot.Message) string {
 	messageText, _ := s.extractMessageTextAndEntities(msg)
 	return messageText
-}
-
-// isMessageForDeletion checks if a message indicates deletion
-func (s *SaveUpdateMessageService) isMessageForDeletion(messageText string) bool {
-	return messageText == "[delete]" || messageText == "[удалить]"
 }
