@@ -57,6 +57,7 @@ var expectedConstructors = []string{
 
 	// Group
 	"NewSaveTopicsHandler",
+	"NewAdminMessageControlHandler",
 	"NewSaveMessagesHandler",
 	"NewCleanClosedThreadsHandler",
 	"NewDeleteJoinLeftMessagesHandler",

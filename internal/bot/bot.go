@@ -31,6 +31,7 @@ type HandlerDependencies struct {
 	RandomCoffeeService               *services.RandomCoffeeService
 	MessageSenderService              *services.MessageSenderService
 	PermissionsService                *services.PermissionsService
+	SaveUpdateMessageService          *services.SaveUpdateMessageService
 	EventRepository                   *repositories.EventRepository
 	TopicRepository                   *repositories.TopicRepository
 	GroupTopicRepository              *repositories.GroupTopicRepository
@@ -100,6 +101,12 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 		bot,
 		messageSenderService,
 	)
+	saveUpdateMessageService := services.NewSaveUpdateMessageService(
+		groupMessageRepository,
+		userRepository,
+		appConfig,
+		bot,
+	)
 	summarizationService := services.NewSummarizationService(
 		appConfig,
 		openaiClient,
@@ -145,6 +152,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 		RandomCoffeeService:               randomCoffeeService,
 		MessageSenderService:              messageSenderService,
 		PermissionsService:                permissionsService,
+		SaveUpdateMessageService:          saveUpdateMessageService,
 		EventRepository:                   eventRepository,
 		TopicRepository:                   topicRepository,
 		GroupTopicRepository:              groupTopicRepository,
@@ -250,7 +258,18 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 	// Register group chat handlers
 	groupHandlers := []ext.Handler{
 		grouphandlers.NewSaveTopicsHandler(deps.GroupTopicRepository), //always goes first!
-		grouphandlers.NewSaveMessagesHandler(deps.GroupMessageRepository, deps.UserRepository, deps.AppConfig, b.bot),
+		grouphandlers.NewAdminMessageControlHandler(
+			deps.SaveUpdateMessageService,
+			deps.PermissionsService,
+			deps.AppConfig,
+			b.bot,
+			deps.MessageSenderService,
+		),
+		grouphandlers.NewSaveMessagesHandler(
+			deps.SaveUpdateMessageService,
+			deps.AppConfig,
+			b.bot,
+		),
 		grouphandlers.NewCleanClosedThreadsHandler(
 			deps.AppConfig,
 			deps.MessageSenderService,
