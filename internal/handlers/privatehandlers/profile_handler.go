@@ -427,7 +427,7 @@ func (h *profileHandler) handleBioInput(b *gotgbot.Bot, ctx *ext.Context) error 
 
 	h.RemovePreviousMessage(b, &msg.From.Id)
 	b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
-	sendMsg, err := h.messageSenderService.SendMarkdownWithReturnMessage(msg.Chat.Id,
+	sendMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(msg.Chat.Id,
 		fmt.Sprintf("*%s*", profileMenuEditBioHeader)+
 			"\n\n✅ Биография сохранена!"+profilePublishedMessage,
 		&gotgbot.SendMessageOpts{
@@ -475,7 +475,7 @@ func (h *profileHandler) handleFirstnameInput(b *gotgbot.Bot, ctx *ext.Context) 
 	// Send success message
 	h.RemovePreviousMessage(b, &msg.From.Id)
 	b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
-	sendMsg, err := h.messageSenderService.SendMarkdownWithReturnMessage(msg.Chat.Id,
+	sendMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(msg.Chat.Id,
 		fmt.Sprintf("*%s*", profileMenuEditFirstnameHeader)+
 			"\n\n✅ Имя сохранено!"+profilePublishedMessage,
 		&gotgbot.SendMessageOpts{
