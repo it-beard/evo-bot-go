@@ -227,15 +227,15 @@ type ProfileWithUser struct {
 	User    *User
 }
 
-// GetAllWithUsers retrieves all profiles with their associated user information
-func (r *ProfileRepository) GetAllWithUsers() ([]ProfileWithUser, error) {
+// GetAllActiveWithUserInfo retrieves all profiles of active club members with their associated user information
+func (r *ProfileRepository) GetAllActiveWithUserInfo() ([]ProfileWithUser, error) {
 	query := `
 		SELECT 
 			p.id, p.user_id, p.bio, p.published_message_id, p.created_at, p.updated_at,
 			u.id, u.tg_id, u.firstname, u.lastname, u.tg_username, u.score, u.has_coffee_ban, u.is_club_member, u.created_at, u.updated_at
 		FROM profiles p
 		INNER JOIN users u ON p.user_id = u.id
-		WHERE p.bio != '' AND p.bio IS NOT NULL AND p.published_message_id IS NOT NULL
+		WHERE p.bio != '' AND p.bio IS NOT NULL AND p.published_message_id IS NOT NULL AND u.is_club_member = true
 		ORDER BY p.updated_at DESC`
 
 	rows, err := r.db.Query(query)
