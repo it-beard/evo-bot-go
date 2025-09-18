@@ -38,8 +38,8 @@ func (c *OpenAiClient) GetCompletion(ctx context.Context, message string) (strin
 		Messages: []openai.ChatCompletionMessageParamUnion{
 			openai.UserMessage(message),
 		},
-		Model:           openai.ChatModelGPT5,
-		ReasoningEffort: openai.ReasoningEffortMinimal,
+		Model:           openai.ChatModelGPT5Mini,
+		ReasoningEffort: openai.ReasoningEffortMedium,
 		//Model: openai.ChatModelO3Mini,
 		//Model: "o4-mini",
 		//Model: "gpt-4.1-mini",
