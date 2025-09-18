@@ -1,61 +1,42 @@
-package grouphandlers
+package grouphandlersservices
 
 import (
-	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/repositories"
 	"evo-bot-go/internal/utils"
 	"fmt"
 	"log"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 )
 
-type SaveTopicsHandler struct {
+type SaveTopicService struct {
 	groupTopicRepository *repositories.GroupTopicRepository
 }
 
-func NewSaveTopicsHandler(
-	groupTopicRepository *repositories.GroupTopicRepository,
-) ext.Handler {
-	h := &SaveTopicsHandler{
-		groupTopicRepository: groupTopicRepository,
-	}
-	return handlers.NewMessage(h.check, h.handle)
+func NewSaveTopicService(groupTopicRepository *repositories.GroupTopicRepository) *SaveTopicService {
+	return &SaveTopicService{groupTopicRepository: groupTopicRepository}
 }
 
-func (h *SaveTopicsHandler) check(msg *gotgbot.Message) bool {
-	if msg == nil {
-		return false
-	}
-
-	// Skip private chats
-	if msg.Chat.Type == constants.PrivateChatType {
-		return false
-	}
-
-	// Handle forum topic created or edited messages
-	return msg.ForumTopicCreated != nil || msg.ForumTopicEdited != nil
-}
-
-func (h *SaveTopicsHandler) handle(b *gotgbot.Bot, ctx *ext.Context) error {
-	msg := ctx.EffectiveMessage
-
+func (s *SaveTopicService) SaveOrUpdateTopic(msg *gotgbot.Message) error {
 	if msg.ForumTopicCreated != nil {
 		// Handle forum topic creation
-		return h.handleForumTopicCreated(msg)
+		return s.handleForumTopicCreated(msg)
 	}
 
 	if msg.ForumTopicEdited != nil {
 		// Handle forum topic edit
-		return h.handleForumTopicEdited(msg)
+		return s.handleForumTopicEdited(msg)
 	}
 
 	return nil
 }
 
-func (h *SaveTopicsHandler) handleForumTopicCreated(msg *gotgbot.Message) error {
+func (s *SaveTopicService) IsTopicShouldBeSavedOrUpdated(msg *gotgbot.Message) bool {
+	// Handle forum topic created or edited messages
+	return msg.ForumTopicCreated != nil || msg.ForumTopicEdited != nil
+}
+
+func (h *SaveTopicService) handleForumTopicCreated(msg *gotgbot.Message) error {
 	topicCreated := msg.ForumTopicCreated
 	topicID := msg.MessageThreadId
 	topicName := topicCreated.Name
@@ -74,7 +55,7 @@ func (h *SaveTopicsHandler) handleForumTopicCreated(msg *gotgbot.Message) error 
 	return nil
 }
 
-func (h *SaveTopicsHandler) handleForumTopicEdited(msg *gotgbot.Message) error {
+func (h *SaveTopicService) handleForumTopicEdited(msg *gotgbot.Message) error {
 	topicEdited := msg.ForumTopicEdited
 	topicID := msg.MessageThreadId
 

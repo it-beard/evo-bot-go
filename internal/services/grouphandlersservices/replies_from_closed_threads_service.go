@@ -1,8 +1,7 @@
-package grouphandlers
+package grouphandlersservices
 
 import (
 	"evo-bot-go/internal/config"
-	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/repositories"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
@@ -13,81 +12,78 @@ import (
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 )
 
-type RepliesFromClosedThreadsHandler struct {
-	config               *config.Config
-	closedTopics         map[int]bool
-	messageSenderService *services.MessageSenderService
-	groupTopicRepository *repositories.GroupTopicRepository
+type RepliesFromClosedThreadsService struct {
+	config                   *config.Config
+	closedTopics             map[int]bool
+	messageSenderService     *services.MessageSenderService
+	groupTopicRepository     *repositories.GroupTopicRepository
+	saveUpdateMessageService *SaveUpdateMessageService
 }
 
-func NewRepliesFromClosedThreadsHandler(
+func NewRepliesFromClosedThreadsService(
 	config *config.Config,
 	messageSenderService *services.MessageSenderService,
 	groupTopicRepository *repositories.GroupTopicRepository,
-) ext.Handler {
+	saveUpdateMessageService *SaveUpdateMessageService,
+) *RepliesFromClosedThreadsService {
 	// Create map of closed topics
 	closedTopics := make(map[int]bool)
 	for _, id := range config.ClosedTopicsIDs {
 		closedTopics[id] = true
 	}
-
-	h := &RepliesFromClosedThreadsHandler{
-		closedTopics:         closedTopics,
-		messageSenderService: messageSenderService,
-		config:               config,
-		groupTopicRepository: groupTopicRepository,
+	return &RepliesFromClosedThreadsService{
+		config:                   config,
+		closedTopics:             closedTopics,
+		messageSenderService:     messageSenderService,
+		groupTopicRepository:     groupTopicRepository,
+		saveUpdateMessageService: saveUpdateMessageService,
 	}
-
-	return handlers.NewMessage(h.check, h.handle)
 }
 
-func (h *RepliesFromClosedThreadsHandler) check(msg *gotgbot.Message) bool {
-	if msg == nil || msg.ReplyToMessage == nil {
-		return false
+func (h *RepliesFromClosedThreadsService) RepliesFromClosedThreads(
+	msg *gotgbot.Message, b *gotgbot.Bot, ctx *ext.Context) error {
+
+	// Forward reply message
+	err := h.forwardReplyMessage(ctx)
+	if err != nil {
+		log.Printf(
+			"%s: error >> failed to forward reply message: %v",
+			utils.GetCurrentTypeName(),
+			err)
 	}
 
-	// Skip private chats
-	if msg.Chat.Type == constants.PrivateChatType {
-		return false
-	}
-
-	// Don't forward frow GroupAnonymousBot
-	if msg.From.IsBot && msg.From.Username == "GroupAnonymousBot" {
-		return false
-	}
-
-	// Trigger if message is in closed topics and not reply to itself
-	return h.closedTopics[int(msg.MessageThreadId)] && msg.ReplyToMessage.MessageId != msg.MessageThreadId
-}
-
-func (h *RepliesFromClosedThreadsHandler) handle(b *gotgbot.Bot, ctx *ext.Context) error {
-	msg := ctx.EffectiveMessage
-
-	if msg.ReplyToMessage != nil &&
-		h.closedTopics[int(msg.MessageThreadId)] &&
-		msg.ReplyToMessage.MessageId != msg.MessageThreadId {
-		if err := h.forwardReplyMessage(ctx, b); err != nil {
-			log.Printf(
-				"%s: error >> failed to forward reply message: %v",
-				utils.GetCurrentTypeName(),
-				err)
-		}
-		_, err := msg.Delete(b, nil)
-		if err != nil {
-			log.Printf(
-				"%s: error >> failed to delete original message after forwarding: %v",
-				utils.GetCurrentTypeName(),
-				err)
-		}
+	// Delete original message
+	_, err = msg.Delete(b, nil)
+	if err != nil {
+		log.Printf(
+			"%s: error >> failed to delete original message after forwarding: %v",
+			utils.GetCurrentTypeName(),
+			err)
 	}
 
 	return nil
 }
 
-func (h *RepliesFromClosedThreadsHandler) forwardReplyMessage(ctx *ext.Context, b *gotgbot.Bot) error {
+func (h *RepliesFromClosedThreadsService) IsReplyShouldBeForwarded(msg *gotgbot.Message, b *gotgbot.Bot) bool {
+	// Do nothing if message is not a reply
+	if msg.ReplyToMessage == nil {
+		return false
+	}
+
+	// Don't forward if message is from GroupAnonymousBot
+	if msg.From.IsBot && msg.From.Username == "GroupAnonymousBot" {
+		return false
+	}
+
+	// Trigger if message is in closed topics and not reply to itself
+	return h.closedTopics[int(msg.MessageThreadId)] &&
+		msg.ReplyToMessage.MessageId != msg.MessageThreadId
+
+}
+
+func (h *RepliesFromClosedThreadsService) forwardReplyMessage(ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	replyToMessageUrl := fmt.Sprintf(
 		"https://t.me/c/%s/%d",
@@ -181,6 +177,9 @@ func (h *RepliesFromClosedThreadsHandler) forwardReplyMessage(ctx *ext.Context, 
 	if err != nil {
 		return fmt.Errorf("%s: error >> failed to forward reply message: %w", utils.GetCurrentTypeName(), err)
 	}
+
+	// Save message to DB
+	h.saveUpdateMessageService.SaveOrUpdate(msg)
 
 	return nil
 }

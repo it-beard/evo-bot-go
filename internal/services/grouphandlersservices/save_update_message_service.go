@@ -1,4 +1,4 @@
-package services
+package grouphandlersservices
 
 import (
 	"database/sql"

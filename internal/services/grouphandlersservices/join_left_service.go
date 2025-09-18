@@ -1,4 +1,4 @@
-package grouphandlers
+package grouphandlersservices
 
 import (
 	"evo-bot-go/internal/database/repositories"
@@ -8,20 +8,17 @@ import (
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/chatmember"
 )
 
-type JoinLeftHandler struct {
+type JoinLeftService struct {
 	userRepo *repositories.UserRepository
 }
 
-func NewJoinLeftHandler(userRepo *repositories.UserRepository) ext.Handler {
-	h := &JoinLeftHandler{userRepo: userRepo}
-	return handlers.NewChatMember(chatmember.All, h.handle)
+func NewJoinLeftService(userRepo *repositories.UserRepository) *JoinLeftService {
+	return &JoinLeftService{userRepo: userRepo}
 }
 
-func (h *JoinLeftHandler) handle(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *JoinLeftService) HandleJoinLeftMember(b *gotgbot.Bot, ctx *ext.Context) error {
 	chatMember := ctx.ChatMember
 	user := chatMember.NewChatMember.GetUser()
 

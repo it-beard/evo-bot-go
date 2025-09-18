@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"evo-bot-go/internal/config"
+	"evo-bot-go/internal/constants"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 )
@@ -46,4 +47,8 @@ func IsUserAdminOrCreator(b ChatMemberGetter, userId int64, config *config.Confi
 		return true
 	}
 	return false
+}
+
+func IsMessageFromSuperGroupChat(chat gotgbot.Chat) bool {
+	return chat.Type == constants.SuperGroupChatType
 }
