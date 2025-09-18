@@ -8,7 +8,19 @@
 - [permissions_service.go](file://internal/services/permissions_service.go)
 - [message_sender_service.go](file://internal/services/message_sender_service.go)
 - [bot.go](file://internal/bot/bot.go)
+- [save_update_message_service.go](file://internal/services/grouphandlersservices/save_update_message_service.go) - *Added in commit cfbbd57e*
+- [admin_save_message_service.go](file://internal/services/grouphandlersservices/admin_save_message_service.go) - *Updated in commit 099d6f26*
+- [save_message_service.go](file://internal/services/grouphandlersservices/save_message_service.go) - *Updated in commit cfbbd57e*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Added new section for SaveUpdateMessageService to document the newly introduced service
+- Updated Service Architecture Overview to include the new message handling service
+- Enhanced Service Invocation Relationships diagram to reflect new dependencies
+- Updated MessageSenderService section to reference new message handling logic
+- Added new usage example for admin message control
+- Updated section sources to include newly analyzed files
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -18,10 +30,11 @@
 5. [SummarizationService](#summarizationservice)
 6. [PermissionsService](#permissionsservice)
 7. [MessageSenderService](#messagesenderservice)
-8. [Service Invocation Relationships](#service-invocation-relationships)
-9. [Usage Patterns and Examples](#usage-patterns-and-examples)
-10. [Common Issues and Solutions](#common-issues-and-solutions)
-11. [Conclusion](#conclusion)
+8. [SaveUpdateMessageService](#saveupdatemessageservice)
+9. [Service Invocation Relationships](#service-invocation-relationships)
+10. [Usage Patterns and Examples](#usage-patterns-and-examples)
+11. [Common Issues and Solutions](#common-issues-and-solutions)
+12. [Conclusion](#conclusion)
 
 ## Introduction
 The Service Layer in evocoders-bot-go implements the core business logic that orchestrates interactions between the Telegram bot interface, data repositories, and external services. This layer encapsulates complex operations such as generating random coffee pairs, creating profile summaries using AI, managing user permissions, and sending formatted messages. The services are designed with separation of concerns, making them reusable across different handlers while maintaining clean dependencies on repositories and external clients.
@@ -44,6 +57,7 @@ ProfileService
 SummarizationService
 PermissionsService
 MessageSenderService
+SaveUpdateMessageService
 end
 subgraph "Dependencies"
 Repositories[Repositories]
@@ -58,6 +72,8 @@ SummarizationService --> MessageSenderService
 PermissionsService --> MessageSenderService
 MessageSenderService --> Bot
 ProfileService --> Bot
+SaveUpdateMessageService --> Repositories
+SaveUpdateMessageService --> Bot
 ```
 
 **Diagram sources**
@@ -66,10 +82,12 @@ ProfileService --> Bot
 - [permissions_service.go](file://internal/services/permissions_service.go#L11-L15)
 - [message_sender_service.go](file://internal/services/message_sender_service.go#L14-L16)
 - [profile_service.go](file://internal/services/profile_service.go#L8-L10)
+- [save_update_message_service.go](file://internal/services/grouphandlersservices/save_update_message_service.go#L14-L19)
 
 **Section sources**
 - [random_coffee_service.go](file://internal/services/random_coffee_service.go#L1-L480)
 - [summarization_service.go](file://internal/services/summarization_service.go#L1-L177)
+- [save_update_message_service.go](file://internal/services/grouphandlersservices/save_update_message_service.go#L1-L220)
 
 ## RandomCoffeeService
 The RandomCoffeeService manages the lifecycle of the Random Coffee event, from creating participation polls to generating and announcing participant pairs. It implements smart pairing logic that considers historical pairings to minimize repeats, enhancing user experience by promoting diverse interactions within the community.
@@ -228,8 +246,41 @@ ReturnResult([Return sent message or error])
 **Section sources**
 - [message_sender_service.go](file://internal/services/message_sender_service.go#L1-L481)
 
+## SaveUpdateMessageService
+The SaveUpdateMessageService handles the persistence of messages in the database, providing unified operations for saving, updating, and deleting messages. This service was introduced to centralize message handling logic that was previously scattered across handlers.
+
+### Key Functions
+- **Save**: Creates a new record in the database for a message.
+- **SaveOrUpdate**: Updates an existing message if it exists, otherwise creates a new one.
+- **Delete**: Removes a message from both Telegram and the database.
+- **handleSaveOrUpdate**: Internal method that implements the core save/update logic with content change detection.
+
+### Implementation Details
+The service extracts message content and entities, converts them to HTML format, and stores them in the database. It handles various message types including text, media, and captions. When updating messages, it only performs database updates if the content has actually changed. The service also manages user information by ensuring users exist in the database before saving their messages.
+
+```mermaid
+flowchart TD
+Start([SaveOrUpdate]) --> ExtractContent["Extract message content"]
+ExtractContent --> CheckExisting["Get existing message from DB"]
+CheckExisting --> Exists{"Message exists?"}
+Exists --> |Yes| CompareContent{"Content changed?"}
+CompareContent --> |Yes| UpdateDB["Update in database"]
+CompareContent --> |No| End["No update needed"]
+Exists --> |No| CheckUser["Ensure user exists"]
+CheckUser --> SaveNew["Create new message record"]
+UpdateDB --> End
+SaveNew --> End
+```
+
+**Diagram sources**
+- [save_update_message_service.go](file://internal/services/grouphandlersservices/save_update_message_service.go#L39-L73)
+- [save_update_message_service.go](file://internal/services/grouphandlersservices/save_update_message_service.go#L110-L143)
+
+**Section sources**
+- [save_update_message_service.go](file://internal/services/grouphandlersservices/save_update_message_service.go#L1-L220)
+
 ## Service Invocation Relationships
-Services in the evocoders-bot-go application are interconnected through well-defined dependencies, with higher-level services orchestrating lower-level ones. The architecture follows a clear hierarchy where business logic services depend on utility services like MessageSenderService, but not vice versa.
+Services in the evocoders-bot-go application are interconnected through well-defined dependencies, with higher-level services orchestrating lower-level ones. The architecture follows a clear hierarchy where business logic services depend on utility services like MessageSenderService and SaveUpdateMessageService, but not vice versa.
 
 ```mermaid
 classDiagram
@@ -252,6 +303,17 @@ class MessageSenderService {
 +ReplyWithCleanupAfterDelayWithPing() error
 +PinMessage() error
 }
+class SaveUpdateMessageService {
++Save() error
++SaveOrUpdate() error
++Delete() error
+}
+class SaveMessageService {
++SaveOrUpdateMessage() error
+}
+class AdminSaveMessageService {
++SaveOrUpdateMessage() error
+}
 RandomCoffeeService --> MessageSenderService : "uses"
 RandomCoffeeService --> PollSenderService : "uses"
 SummarizationService --> OpenAiClient : "uses"
@@ -260,17 +322,26 @@ SummarizationService --> PromptingTemplateRepository : "uses"
 PermissionsService --> MessageSenderService : "uses"
 PermissionsService --> Bot : "uses"
 MessageSenderService --> Bot : "uses"
+SaveUpdateMessageService --> GroupMessageRepository : "uses"
+SaveUpdateMessageService --> UserRepository : "uses"
+SaveUpdateMessageService --> Bot : "uses"
+SaveMessageService --> SaveUpdateMessageService : "delegates"
+AdminSaveMessageService --> SaveUpdateMessageService : "delegates"
+AdminSaveMessageService --> MessageSenderService : "uses"
 ```
 
 **Diagram sources**
-- [bot.go](file://internal/bot/bot.go#L28-L32)
+- [bot.go](file://internal/bot/bot.go#L28-L52)
 - [random_coffee_service.go](file://internal/services/random_coffee_service.go#L17-L27)
 - [summarization_service.go](file://internal/services/summarization_service.go#L20-L25)
 - [permissions_service.go](file://internal/services/permissions_service.go#L11-L15)
 - [message_sender_service.go](file://internal/services/message_sender_service.go#L14-L16)
+- [save_update_message_service.go](file://internal/services/grouphandlersservices/save_update_message_service.go#L14-L19)
+- [save_message_service.go](file://internal/services/grouphandlersservices/save_message_service.go#L36-L51)
+- [admin_save_message_service.go](file://internal/services/grouphandlersservices/admin_save_message_service.go#L42-L80)
 
 **Section sources**
-- [bot.go](file://internal/bot/bot.go#L28-L32)
+- [bot.go](file://internal/bot/bot.go#L28-L52)
 
 ## Usage Patterns and Examples
 
@@ -315,10 +386,23 @@ if !permissionsService.CheckAdminAndPrivateChat(message, "profilesManager") {
 
 This pattern ensures that only administrators can access certain functionality and that it's used in the appropriate chat context.
 
+### Admin Message Control
+Administrators can now control message persistence in content and tool topics using special commands:
+
+```go
+// In Content or Tool topic, reply to a message with:
+// "update" - to save/update the message in database
+// "delete" - to remove the message from database
+```
+
+This feature uses the AdminSaveMessageService to handle admin commands and delegates actual message operations to SaveUpdateMessageService.
+
 **Section sources**
 - [random_coffee_service.go](file://internal/services/random_coffee_service.go#L1-L480)
 - [summarization_service.go](file://internal/services/summarization_service.go#L1-L177)
 - [permissions_service.go](file://internal/services/permissions_service.go#L1-L97)
+- [admin_save_message_service.go](file://internal/services/grouphandlersservices/admin_save_message_service.go#L42-L80)
+- [save_update_message_service.go](file://internal/services/grouphandlersservices/save_update_message_service.go#L39-L73)
 
 ## Common Issues and Solutions
 
@@ -334,11 +418,15 @@ The RandomCoffeeService updates user information (username, first name, last nam
 ### Permission Enforcement
 The PermissionsService provides consistent error messaging and automatic cleanup of unauthorized commands, maintaining a clean user interface while enforcing security policies. The delayed cleanup allows users to see the error message before it disappears.
 
+### Message Persistence Management
+The introduction of SaveUpdateMessageService centralizes message persistence logic, eliminating code duplication and ensuring consistent behavior across different message handling scenarios. The service handles edge cases like media messages without captions and properly manages user records in the database.
+
 **Section sources**
 - [message_sender_service.go](file://internal/services/message_sender_service.go#L1-L481)
 - [summarization_service.go](file://internal/services/summarization_service.go#L1-L177)
 - [random_coffee_service.go](file://internal/services/random_coffee_service.go#L1-L480)
 - [permissions_service.go](file://internal/services/permissions_service.go#L1-L97)
+- [save_update_message_service.go](file://internal/services/grouphandlersservices/save_update_message_service.go#L1-L220)
 
 ## Conclusion
-The Service Layer in evocoders-bot-go effectively encapsulates the application's business logic, providing a clean separation between user interface, data access, and core functionality. Each service has a well-defined responsibility and follows consistent patterns for dependency management and error handling. The architecture supports extensibility, making it easy to add new services or modify existing ones without affecting unrelated components. By leveraging dependency injection and clear interfaces, the service layer enables robust, maintainable code that can evolve with the community's needs.
+The Service Layer in evocoders-bot-go effectively encapsulates the application's business logic, providing a clean separation between user interface, data access, and core functionality. Each service has a well-defined responsibility and follows consistent patterns for dependency management and error handling. The recent addition of SaveUpdateMessageService demonstrates the project's commitment to refactoring and improving code organization by centralizing message handling logic. The architecture supports extensibility, making it easy to add new services or modify existing ones without affecting unrelated components. By leveraging dependency injection and clear interfaces, the service layer enables robust, maintainable code that can evolve with the community's needs.

@@ -2,13 +2,21 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go)
+- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go) - *Updated in recent commit ad0f920*
 - [profiles_manager_handler.go](file://internal/handlers/adminhandlers/profiles_manager_handler.go)
 - [message_sender_service.go](file://internal/services/message_sender_service.go)
 - [profile_formaters.go](file://internal/formatters/profile_formaters.go)
 - [profile_repository.go](file://internal/database/repositories/profile_repository.go)
 - [config.go](file://internal/config/config.go)
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated documentation to reflect the migration from Markdown to HTML message formatting in profile publishing
+- Added clarification on HTML parsing mode usage in message delivery
+- Removed outdated references to Markdown formatting in the Message Delivery Process section
+- Updated code examples and flow descriptions to accurately represent current HTML-based implementation
+- Enhanced error handling description to include HTML-specific considerations
 
 ## Table of Contents
 1. [Introduction](#introduction)

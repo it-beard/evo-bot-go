@@ -9,7 +9,17 @@
 - [random_coffee_participant_repository.go](file://internal/database/repositories/random_coffee_participant_repository.go)
 - [random_coffee_pair_repository.go](file://internal/database/repositories/random_coffee_pair_repository.go)
 - [config.go](file://internal/config/config.go)
+- [poll_answer_handler.go](file://internal/handlers/grouphandlers/poll_answer_handler.go) - *Updated in recent commit*
+- [randomcofee_poll_answers_service.go](file://internal/services/grouphandlersservices/randomcofee_poll_answers_service.go) - *Implementation details for poll answer processing*
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated documentation to reflect removal of supergroup chat check in poll answer handler
+- Added detailed analysis of poll answer processing workflow
+- Enhanced explanation of participant tracking mechanism
+- Updated section sources to include newly analyzed files
+- Maintained all architectural diagrams as they remain accurate
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -247,6 +257,52 @@ PinMessage --> End([Success])
 - [random_coffee_service.go](file://internal/services/random_coffee_service.go#L1-L480)
 - [random_coffee_poll_repository.go](file://internal/database/repositories/random_coffee_poll_repository.go#L1-L30)
 - [random_coffee_participant_repository.go](file://internal/database/repositories/random_coffee_participant_repository.go#L1-L30)
+
+### Poll Answer Processing Analysis
+The system processes poll answers through a dedicated handler that validates responses and updates participant status. The `PollAnswerHandler` receives poll answer updates from Telegram and delegates processing to the `RandomCoffeePollAnswersService`.
+
+```mermaid
+sequenceDiagram
+participant TelegramBot
+participant PollAnswerHandler
+participant RandomCoffeePollAnswersService
+participant PollRepo
+participant ParticipantRepo
+participant UserRepo
+participant DB[(Database)]
+TelegramBot->>PollAnswerHandler : PollAnswer update
+PollAnswerHandler->>RandomCoffeePollAnswersService : GetInternalUser()
+RandomCoffeePollAnswersService->>UserRepo : GetOrCreate()
+UserRepo->>DB : SELECT/INSERT users
+DB-->>UserRepo : User data
+UserRepo-->>RandomCoffeePollAnswersService : User object
+RandomCoffeePollAnswersService-->>PollAnswerHandler : InternalUser
+PollAnswerHandler->>RandomCoffeePollAnswersService : IsAnswerShouldBeProcessed()
+RandomCoffeePollAnswersService->>PollAnswerHandler : Boolean result
+alt Should be processed
+PollAnswerHandler->>RandomCoffeePollAnswersService : ProcessAnswer()
+RandomCoffeePollAnswersService->>PollRepo : GetPollByTelegramPollID()
+PollRepo->>DB : SELECT random_coffee_polls
+DB-->>PollRepo : Poll data
+PollRepo-->>RandomCoffeePollAnswersService : RetrievedPoll
+alt Vote retracted
+RandomCoffeePollAnswersService->>ParticipantRepo : RemoveParticipant()
+else New/changed vote
+RandomCoffeePollAnswersService->>ParticipantRepo : UpsertParticipant()
+end
+ParticipantRepo->>DB : UPDATE/INSERT random_coffee_participants
+DB-->>ParticipantRepo : Result
+ParticipantRepo-->>RandomCoffeePollAnswersService : Error or nil
+end
+```
+
+**Diagram sources**
+- [poll_answer_handler.go](file://internal/handlers/grouphandlers/poll_answer_handler.go#L1-L33)
+- [randomcofee_poll_answers_service.go](file://internal/services/grouphandlersservices/randomcofee_poll_answers_service.go#L1-L117)
+
+**Section sources**
+- [poll_answer_handler.go](file://internal/handlers/grouphandlers/poll_answer_handler.go#L1-L33) - *Updated in commit 4a4d37ff3d71fe24f8a88c922366dc6494e4a1c5*
+- [randomcofee_poll_answers_service.go](file://internal/services/grouphandlersservices/randomcofee_poll_answers_service.go#L1-L117)
 
 ### Scheduled Tasks Analysis
 The system uses two scheduled tasks to automate the weekly workflow: one for initiating polls and another for generating pairs. These tasks run independently but coordinate through shared state in the database.

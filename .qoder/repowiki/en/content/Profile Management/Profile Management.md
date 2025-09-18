@@ -2,18 +2,24 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go)
+- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go) - *Updated to use HTML formatting*
+- [profile_repository.go](file://internal/database/repositories/profile_repository.go) - *Refactored to GetAllActiveWithUserInfo*
+- [intro_handler.go](file://internal/handlers/privatehandlers/intro_handler.go) - *Uses updated profile retrieval method*
 - [profile_service.go](file://internal/services/profile_service.go)
-- [profile_repository.go](file://internal/database/repositories/profile_repository.go)
-- [profile_formaters.go](file://internal/formatters/profile_formaters.go)
 - [config.go](file://internal/config/config.go)
 - [20250519_add_users_and_profiles_tables.go](file://internal/database/migrations/implementations/20250519_add_users_and_profiles_tables.go)
 - [20250520_add_published_message_id_to_profiles.go](file://internal/database/migrations/implementations/20250520_add_published_message_id_to_profiles.go)
-- [20250807_add_profile_search_prompt.go](file://internal/database/migrations/implementations/20250807_add_profile_search_prompt.go)
-- [profile_prompt.go](file://internal/database/prompts/profile_prompt.go)
 - [profile_handler_buttons.go](file://internal/buttons/profile_handler_buttons.go)
 - [handlers_private_constants.go](file://internal/constants/handlers_private_constants.go)
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated profile retrieval method from GetAllWithUsers to GetAllActiveWithUserInfo to filter for active club members
+- Changed message formatting from Markdown to HTML across all profile interactions
+- Updated documentation to reflect new method names and HTML formatting usage
+- Modified section sources to reflect actual file changes in recent commits
+- Updated diagram sources to align with current codebase structure
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -104,14 +110,14 @@ end
 - [20250520_add_published_message_id_to_profiles.go](file://internal/database/migrations/implementations/20250520_add_published_message_id_to_profiles.go#L0-L83)
 
 ## Search Functionality
-The search functionality in evocoders-bot-go provides two distinct methods for finding profiles: direct username/name search and AI-powered bio search. The direct search allows users to find profiles by Telegram username (with or without @) or by full name (firstname and lastname separated by space). This search is implemented through database queries in the UserRepository, first attempting to match by username and falling back to name search if no results are found. The AI-powered search uses OpenAI's completion API to analyze profile bios based on natural language queries. The search process begins by retrieving all profiles with bios from the database, formatting them into a structured data payload, and combining this with a predefined prompt template from the database. The system implements request cancellation through context management, allowing users to cancel ongoing search operations. Rate limiting is enforced by preventing concurrent searches for the same user.
+The search functionality in evocoders-bot-go provides two distinct methods for finding profiles: direct username/name search and AI-powered bio search. The direct search allows users to find profiles by Telegram username (with or without @) or by full name (firstname and lastname separated by space). This search is implemented through database queries in the UserRepository, first attempting to match by username and falling back to name search if no results are found. The AI-powered search uses OpenAI's completion API to analyze profile bios based on natural language queries. The search process begins by retrieving all profiles of active club members with bios from the database through the `GetAllActiveWithUserInfo` method, formatting them into a structured data payload, and combining this with a predefined prompt template from the database. The system implements request cancellation through context management, allowing users to cancel ongoing search operations. Rate limiting is enforced by preventing concurrent searches for the same user.
 
 ```mermaid
 flowchart TD
 Start([User initiates search]) --> CheckProcessing["Check if already processing"]
 CheckProcessing --> |Processing| ShowWait["Show wait message"]
 CheckProcessing --> |Not Processing| MarkProcessing["Mark as processing"]
-MarkProcessing --> GetProfiles["Get all profiles with users"]
+MarkProcessing --> GetProfiles["Get all active profiles with users"]
 GetProfiles --> PrepareData["Prepare profiles data for AI"]
 PrepareData --> GetTemplate["Get profile search prompt template"]
 GetTemplate --> FormatPrompt["Format prompt with query and data"]
@@ -127,14 +133,13 @@ SendResult --> Cleanup["Cleanup processing state"]
 
 **Diagram sources**
 - [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L834-L898)
-- [profile_repository.go](file://internal/database/repositories/profile_repository.go#L200-L245)
-- [profile_prompt.go](file://internal/database/prompts/profile_prompt.go#L0-L18)
+- [profile_repository.go](file://internal/database/repositories/profile_repository.go#L230-L284)
+- [intro_handler.go](file://internal/handlers/privatehandlers/intro_handler.go#L290-L310)
 
 **Section sources**
 - [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L285-L317)
-- [profile_repository.go](file://internal/database/repositories/profile_repository.go#L200-L245)
-- [20250807_add_profile_search_prompt.go](file://internal/database/migrations/implementations/20250807_add_profile_search_prompt.go#L0-L60)
-- [profile_prompt.go](file://internal/database/prompts/profile_prompt.go#L0-L18)
+- [profile_repository.go](file://internal/database/repositories/profile_repository.go#L230-L284)
+- [intro_handler.go](file://internal/handlers/privatehandlers/intro_handler.go#L290-L310)
 
 ## Component Interaction Architecture
 The Profile Management feature follows a layered architecture with clear separation of concerns between components. The interaction begins with the ProfileHandler, which receives user input from Telegram and manages the conversation state. The handler delegates business logic to the ProfileService, which contains domain-specific rules such as profile completeness validation. Data persistence operations are handled by the ProfileRepository, which provides an abstraction layer over the database. This architecture enables loose coupling between components, making the system more maintainable and testable. The components are connected through dependency injection, with the ProfileHandler receiving instances of ProfileService, ProfileRepository, and other dependencies through its constructor. The flow of data follows a unidirectional pattern from handler to service to repository and back, ensuring predictable behavior and easier debugging.
@@ -164,7 +169,7 @@ class ProfileRepository {
 +GetOrCreate()
 +Update()
 +UpdatePublishedMessageID()
-+GetAllWithUsers()
++GetAllActiveWithUserInfo()
 }
 ProfileHandler --> ProfileService : "uses"
 ProfileHandler --> ProfileRepository : "uses"

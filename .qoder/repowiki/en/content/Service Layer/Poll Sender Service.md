@@ -4,11 +4,20 @@
 **Referenced Files in This Document**   
 - [poll_sender_service.go](file://internal/services/poll_sender_service.go)
 - [random_coffee_service.go](file://internal/services/random_coffee_service.go)
-- [random_coffee_poll_answer_handler.go](file://internal/handlers/grouphandlers/random_coffee_poll_answer_handler.go)
+- [randomcofee_poll_answers_service.go](file://internal/services/grouphandlersservices/randomcofee_poll_answers_service.go)
+- [poll_answer_handler.go](file://internal/handlers/grouphandlers/poll_answer_handler.go)
 - [random_coffee_poll_repository.go](file://internal/database/repositories/random_coffee_poll_repository.go)
 - [random_coffee_participant_repository.go](file://internal/database/repositories/random_coffee_participant_repository.go)
 - [bot.go](file://internal/bot/bot.go)
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated integration details to reflect new service dependency via RandomCoffeePollAnswersService
+- Revised sequence diagram to show updated flow from PollAnswerHandler to RandomCoffeePollAnswersService
+- Added section on response processing logic in RandomCoffeePollAnswersService
+- Updated diagram sources and section references to include new service files
+- Corrected outdated handler reference from random_coffee_poll_answer_handler.go to current poll_answer_handler.go
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -59,7 +68,7 @@ The PollSenderService manages the complete lifecycle of Telegram polls within th
 - [random_coffee_service.go](file://internal/services/random_coffee_service.go#L111-L130)
 
 ## Integration with Random Coffee System
-The PollSenderService is a critical component of the Random Coffee system, working in concert with the RandomCoffeeService and response handlers. The RandomCoffeeService uses the PollSenderService to create weekly participation polls with specific options ("Да! 🤗" for participation, "Не в этот раз 💁🏽" for non-participation). After poll creation, the system pins the message to ensure visibility. User responses are captured by the RandomCoffeePollAnswerHandler, which processes poll_answer updates from Telegram. This handler validates users, checks for bans, and updates the database with participation status. The integration follows a dependency injection pattern where the PollSenderService is provided to the RandomCoffeeService during initialization, enabling clean separation of concerns while maintaining necessary coordination between components.
+The PollSenderService is a critical component of the Random Coffee system, working in concert with the RandomCoffeeService and response handlers. The RandomCoffeeService uses the PollSenderService to create weekly participation polls with specific options ("Да! 🤗" for participation, "Не в этот раз 💁🏽" for non-participation). After poll creation, the system pins the message to ensure visibility. User responses are captured by the PollAnswerHandler, which processes poll_answer updates from Telegram. This handler delegates processing to the RandomCoffeePollAnswersService, which validates users, checks for bans, and updates the database with participation status. The integration follows a dependency injection pattern where the PollSenderService is provided to the RandomCoffeeService during initialization, enabling clean separation of concerns while maintaining necessary coordination between components.
 
 ```mermaid
 sequenceDiagram
@@ -67,7 +76,8 @@ participant RCS as RandomCoffeeService
 participant PSS as PollSenderService
 participant TGB as Telegram Bot API
 participant DB as Database
-participant Handler as RandomCoffeePollAnswerHandler
+participant Handler as PollAnswerHandler
+participant RCAS as RandomCoffeePollAnswersService
 RCS->>PSS : SendPoll()
 PSS->>TGB : SendPoll API call
 TGB-->>PSS : Return Message with Poll
@@ -75,7 +85,8 @@ PSS-->>RCS : Return sent Message
 RCS->>DB : Save poll to database
 loop User Interaction
 TGB->>Handler : poll_answer update
-Handler->>DB : Update participant status
+Handler->>RCAS : ProcessAnswer()
+RCAS->>DB : Update participant status
 end
 RCS->>PSS : StopPoll()
 PSS->>TGB : StopPoll API call
@@ -85,11 +96,13 @@ PSS-->>RCS : Return stopped Poll
 
 **Diagram sources**
 - [random_coffee_service.go](file://internal/services/random_coffee_service.go#L54-L109)
-- [random_coffee_poll_answer_handler.go](file://internal/handlers/grouphandlers/random_coffee_poll_answer_handler.go#L1-L127)
+- [poll_answer_handler.go](file://internal/handlers/grouphandlers/poll_answer_handler.go#L1-L32)
+- [randomcofee_poll_answers_service.go](file://internal/services/grouphandlersservices/randomcofee_poll_answers_service.go#L1-L116)
 
 **Section sources**
 - [random_coffee_service.go](file://internal/services/random_coffee_service.go#L54-L109)
-- [random_coffee_poll_answer_handler.go](file://internal/handlers/grouphandlers/random_coffee_poll_answer_handler.go#L1-L127)
+- [poll_answer_handler.go](file://internal/handlers/grouphandlers/poll_answer_handler.go#L1-L32)
+- [randomcofee_poll_answers_service.go](file://internal/services/grouphandlersservices/randomcofee_poll_answers_service.go#L1-L116)
 
 ## Data Flow and State Management
 The PollSenderService participates in a sophisticated data flow that ensures consistency between Telegram's state and the application's database. When a poll is sent, its message ID and Telegram poll ID are stored in the random_coffee_polls table along with the week start date. User responses trigger updates to the random_coffee_participants table, recording whether each user is participating. The service uses the Telegram poll ID as a foreign key to associate responses with the correct poll instance. This design allows the system to handle multiple concurrent polls and maintain historical data for pairing algorithms that consider previous interactions. The data flow is event-driven, with the PollSenderService initiating the process and various handlers updating the state as users interact with the poll. Database constraints ensure referential integrity between polls, participants, and users.
@@ -163,9 +176,9 @@ I --> |Yes| K[Log Success and Return Message]
 - [bot.go](file://internal/bot/bot.go#L300-L320)
 
 ## Troubleshooting Guide
-Common issues with the PollSenderService typically involve configuration errors, API connectivity problems, or database inconsistencies. If polls fail to send, verify that SuperGroupChatID and RandomCoffeeTopicID are correctly configured in the application settings. Check Telegram API connectivity and bot token validity, as network issues can prevent poll creation. Database-related problems may occur if the random_coffee_polls or random_coffee_participants tables have schema mismatches or constraint violations. Response parsing errors can arise if Telegram's poll_answer updates don't match expected formats, though the system includes nil checks to prevent crashes. Inconsistent state may manifest as participants not being recorded, which can be diagnosed by checking the RandomCoffeePollAnswerHandler logs for database update errors. Recovery typically involves verifying configuration, checking database connectivity, and ensuring the bot has necessary permissions in the target chat and topic.
+Common issues with the PollSenderService typically involve configuration errors, API connectivity problems, or database inconsistencies. If polls fail to send, verify that SuperGroupChatID and RandomCoffeeTopicID are correctly configured in the application settings. Check Telegram API connectivity and bot token validity, as network issues can prevent poll creation. Database-related problems may occur if the random_coffee_polls or random_coffee_participants tables have schema mismatches or constraint violations. Response parsing errors can arise if Telegram's poll_answer updates don't match expected formats, though the system includes nil checks to prevent crashes. Inconsistent state may manifest as participants not being recorded, which can be diagnosed by checking the RandomCoffeePollAnswersService logs for database update errors. Recovery typically involves verifying configuration, checking database connectivity, and ensuring the bot has necessary permissions in the target chat and topic.
 
 **Section sources**
 - [poll_sender_service.go](file://internal/services/poll_sender_service.go#L35-L52)
-- [random_coffee_poll_answer_handler.go](file://internal/handlers/grouphandlers/random_coffee_poll_answer_handler.go#L1-L127)
+- [randomcofee_poll_answers_service.go](file://internal/services/grouphandlersservices/randomcofee_poll_answers_service.go#L1-L116)
 - [random_coffee_service.go](file://internal/services/random_coffee_service.go#L118-L130)
