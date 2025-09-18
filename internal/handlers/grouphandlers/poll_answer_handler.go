@@ -2,7 +2,6 @@ package grouphandlers
 
 import (
 	"evo-bot-go/internal/services/grouphandlersservices"
-	"evo-bot-go/internal/utils"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -24,10 +23,6 @@ func NewPollAnswerHandler(
 }
 
 func (h *PollAnswerHandler) handleUpdate(b *gotgbot.Bot, ctx *ext.Context) error {
-	if !utils.IsMessageFromSuperGroupChat(ctx.EffectiveMessage.Chat) {
-		return nil
-	}
-
 	internalUser := h.randomCoffeePollAnswersService.GetInternalUser(ctx.PollAnswer)
 
 	if h.randomCoffeePollAnswersService.IsAnswerShouldBeProcessed(ctx.PollAnswer, internalUser) {
