@@ -315,12 +315,14 @@ func (h *UserRepository) GetOrCreate(tgUser *gotgbot.User) (*User, error) {
 		// User exists, check if we need to update any fields
 		fieldsToUpdate := make(map[string]interface{})
 
-		if dbUser.Firstname != tgUser.FirstName && tgUser.FirstName != "" {
+		// Update first & last name only if in DB they are empty
+		if dbUser.Firstname == "" && tgUser.FirstName != "" {
 			fieldsToUpdate["firstname"] = tgUser.FirstName
 		}
-		if dbUser.Lastname != tgUser.LastName && tgUser.LastName != "" {
+		if dbUser.Lastname == "" && tgUser.LastName != "" {
 			fieldsToUpdate["lastname"] = tgUser.LastName
 		}
+		// Update tg username if it changed
 		if dbUser.TgUsername != tgUser.Username && tgUser.Username != "" {
 			fieldsToUpdate["tg_username"] = tgUser.Username
 		}

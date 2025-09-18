@@ -11,32 +11,14 @@ func ProfileMainButtons() gotgbot.InlineKeyboardMarkup {
 		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
 			{
 				{
-					Text:         "👤 Мой профиль",
-					CallbackData: constants.ProfileViewMyProfileCallback,
-				},
-				{
 					Text:         "✏️ Редактировать",
 					CallbackData: constants.ProfileEditMyProfileCallback,
 				},
 			},
 			{
 				{
-					Text:         "📢 Опублик. (+ превью)",
-					CallbackData: constants.ProfilePublishCallback,
-				},
-				{
-					Text:         "📢 Опублик. (- превью)",
-					CallbackData: constants.ProfilePublishWithoutPreviewCallback,
-				},
-			},
-			{
-				{
-					Text:         "🔎 Поиск профиля",
-					CallbackData: constants.ProfileViewOtherProfileCallback,
-				},
-				{
-					Text:         "🧠 ИИ-поиск по био",
-					CallbackData: constants.ProfileBioSearchCallback,
+					Text:         "🔎 Поиск профиля по имени/нику",
+					CallbackData: constants.ProfileSearchProfileCallback,
 				},
 			},
 			{
@@ -87,27 +69,6 @@ func ProfileBackCancelButtons(backCallbackData string) gotgbot.InlineKeyboardMar
 	}
 }
 
-func ProfileBackPublishCancelButtons(backCallbackData string) gotgbot.InlineKeyboardMarkup {
-	return gotgbot.InlineKeyboardMarkup{
-		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
-			{
-				{
-					Text:         "◀️ Назад",
-					CallbackData: backCallbackData,
-				},
-				{
-					Text:         "📢 Опубликовать",
-					CallbackData: constants.ProfilePublishCallback,
-				},
-				{
-					Text:         "❌ Отмена",
-					CallbackData: constants.ProfileFullCancel,
-				},
-			},
-		},
-	}
-}
-
 func ProfileEditButtons(backCallbackData string) gotgbot.InlineKeyboardMarkup {
 	buttons := [][]gotgbot.InlineKeyboardButton{
 		{
@@ -120,7 +81,7 @@ func ProfileEditButtons(backCallbackData string) gotgbot.InlineKeyboardMarkup {
 				CallbackData: constants.ProfileEditLastnameCallback,
 			},
 			{
-				Text:         "📝 О себе",
+				Text:         "📝 Био",
 				CallbackData: constants.ProfileEditBioCallback,
 			},
 		},
@@ -140,4 +101,3 @@ func ProfileEditButtons(backCallbackData string) gotgbot.InlineKeyboardMarkup {
 		InlineKeyboard: buttons,
 	}
 }
-

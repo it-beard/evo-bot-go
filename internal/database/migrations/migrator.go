@@ -44,7 +44,6 @@ func Registry() []implementations.Migration {
 		implementations.NewRemoveChatIdFromRandomCoffeePolls(),
 		implementations.NewAddIsClubMemberToUsers(),
 		implementations.NewAddRandomCoffeePairsTable(),
-		implementations.NewAddProfileSearchPromptMigration(),
 		implementations.NewAddGroupTopicsTable(),
 		implementations.NewAddGroupMessagesTable(),
 		implementations.NewRemoveTgSessionsTable(),

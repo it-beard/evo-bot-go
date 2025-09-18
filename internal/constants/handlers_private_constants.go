@@ -12,17 +12,13 @@ const ProfileCommand = "profile"
 
 // Callback data constants for profile handler
 const (
-	ProfilePrefix                   = "profile_"
-	ProfileViewMyProfileCallback    = ProfilePrefix + "view_my"
-	ProfileEditMyProfileCallback    = ProfilePrefix + "edit_my"
-	ProfileViewOtherProfileCallback = ProfilePrefix + "view_other"
-	ProfileBioSearchCallback        = ProfilePrefix + "bio_search"
+	ProfilePrefix                = "profile_"
+	ProfileEditMyProfileCallback = ProfilePrefix + "edit_my"
+	ProfileSearchProfileCallback = ProfilePrefix + "search_profile"
 
-	ProfileEditBioCallback               = ProfilePrefix + "edit_bio"
-	ProfileEditFirstnameCallback         = ProfilePrefix + "edit_firstname"
-	ProfileEditLastnameCallback          = ProfilePrefix + "edit_lastname"
-	ProfilePublishCallback               = ProfilePrefix + "publish"
-	ProfilePublishWithoutPreviewCallback = ProfilePrefix + "publish_without_preview"
+	ProfileEditBioCallback       = ProfilePrefix + "edit_bio"
+	ProfileEditFirstnameCallback = ProfilePrefix + "edit_firstname"
+	ProfileEditLastnameCallback  = ProfilePrefix + "edit_lastname"
 
 	ProfileStartCallback = ProfilePrefix + "start"
 	ProfileFullCancel    = "full_cancel" + ProfilePrefix
