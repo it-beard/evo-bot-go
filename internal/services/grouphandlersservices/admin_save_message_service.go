@@ -8,6 +8,7 @@ import (
 	"evo-bot-go/internal/utils"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 )
@@ -88,12 +89,15 @@ func (h *AdminSaveMessageService) handleUpdateCommand(adminMsg *gotgbot.Message,
 		return err
 	}
 
-	// Then delete the admin's command message
-	_, err = adminMsg.Delete(h.bot, nil)
-	if err != nil {
-		log.Printf("%s: Failed to delete admin command message %d: %v",
-			utils.GetCurrentTypeName(), adminMsg.MessageId, err)
-	}
+	// Delete the admin's command message after 5 seconds in a goroutine to avoid blocking
+	go func() {
+		time.Sleep(10 * time.Second)
+		_, err := adminMsg.Delete(h.bot, nil)
+		if err != nil {
+			log.Printf("%s: Failed to delete admin command message %d: %v",
+				utils.GetCurrentTypeName(), adminMsg.MessageId, err)
+		}
+	}()
 
 	// Send success message to admin DM
 	_, err = h.messageSenderService.SendWithReturnMessage(h.getAdminUserID(adminMsg), "✅ Сообщение успешно добавлено/обновлено в базе данных.", nil)
@@ -113,12 +117,15 @@ func (h *AdminSaveMessageService) handleDeleteCommand(adminMsg *gotgbot.Message,
 			utils.GetCurrentTypeName(), repliedMessage.MessageId, err)
 	}
 
-	// Then delete the admin's command message
-	_, err = adminMsg.Delete(h.bot, nil)
-	if err != nil {
-		log.Printf("%s: Failed to delete admin command message %d: %v",
-			utils.GetCurrentTypeName(), adminMsg.MessageId, err)
-	}
+	// Delete the admin's command message after 5 seconds in a goroutine to avoid blocking
+	go func() {
+		time.Sleep(10 * time.Second)
+		_, err := adminMsg.Delete(h.bot, nil)
+		if err != nil {
+			log.Printf("%s: Failed to delete admin command message %d: %v",
+				utils.GetCurrentTypeName(), adminMsg.MessageId, err)
+		}
+	}()
 
 	// Send success message to admin DM
 	_, err = h.messageSenderService.SendWithReturnMessage(h.getAdminUserID(adminMsg), "✅ Сообщение успешно удалено из базы данных.", nil)
