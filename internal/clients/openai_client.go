@@ -6,8 +6,8 @@ import (
 
 	"evo-bot-go/internal/config"
 
-	"github.com/openai/openai-go"
-	"github.com/openai/openai-go/option"
+	"github.com/openai/openai-go/v2"
+	"github.com/openai/openai-go/v2/option"
 )
 
 type OpenAiClient struct {
@@ -38,7 +38,9 @@ func (c *OpenAiClient) GetCompletion(ctx context.Context, message string) (strin
 		Messages: []openai.ChatCompletionMessageParamUnion{
 			openai.UserMessage(message),
 		},
-		Model: openai.ChatModelO3Mini,
+		Model:           openai.ChatModelGPT5,
+		ReasoningEffort: openai.ReasoningEffortMinimal,
+		//Model: openai.ChatModelO3Mini,
 		//Model: "o4-mini",
 		//Model: "gpt-4.1-mini",
 	})
