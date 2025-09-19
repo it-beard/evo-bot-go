@@ -1,3 +1,4 @@
+<docs>
 # Handler System
 
 <cite>
@@ -7,17 +8,27 @@
 - [chat_member_handler.go](file://internal/handlers/grouphandlers/chat_member_handler.go) - *Updated in recent commit*
 - [message_handler.go](file://internal/handlers/grouphandlers/message_handler.go) - *Updated in recent commit*
 - [randomcofee_poll_answers_service.go](file://internal/services/grouphandlersservices/randomcofee_poll_answers_service.go) - *Updated in recent commit*
+- [profiles_manager_handler.go](file://internal/handlers/adminhandlers/profiles_manager_handler.go) - *Updated in recent commit*
+- [event_delete_handler.go](file://internal/handlers/adminhandlers/eventhandlers/event_delete_handler.go) - *Updated in recent commit*
+- [event_edit_handler.go](file://internal/handlers/adminhandlers/eventhandlers/event_edit_handler.go) - *Updated in recent commit*
+- [event_setup_handler.go](file://internal/handlers/adminhandlers/eventhandlers/event_setup_handler.go) - *Updated in recent commit*
+- [event_start_handler.go](file://internal/handlers/adminhandlers/eventhandlers/event_start_handler.go) - *Updated in recent commit*
+- [help_handler.go](file://internal/handlers/privatehandlers/help_handler.go) - *Updated in recent commit*
+- [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go) - *Updated in recent commit*
+- [intro_handler.go](file://internal/handlers/privatehandlers/intro_handler.go) - *Updated in recent commit*
+- [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go) - *Updated in recent commit*
+- [tools_handler.go](file://internal/handlers/privatehandlers/tools_handler.go) - *Updated in recent commit*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Updated handler architecture overview to reflect removal of deprecated group handlers
-- Revised handler registration process to match current implementation
-- Updated group handlers implementation section to reflect service-based dependency injection
-- Modified update processing flow to remove outdated supergroup checks
+- Updated handler architecture overview to reflect service-based dependency injection pattern
+- Revised handler registration process to match current implementation with explicit service dependencies
+- Updated group handlers implementation to reflect service-level dependency injection
+- Modified update processing flow to accurately represent current handler delegation patterns
 - Updated public interfaces and signatures to reflect current constructor patterns
-- Removed references to deprecated constants and handlers
 - Enhanced source tracking with updated file references and annotations
+- Added comprehensive documentation for admin, group, and private handler types
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -496,145 +507,4 @@ Help->>Perm : CheckPrivateChatType(message)
 Perm-->>Help : Returns true
 Help->>Perm : CheckClubMemberPermissions(message, "help")
 Perm-->>Help : Returns true
-Help->>Formatter : FormatHelpMessage(isAdmin, config)
-Formatter-->>Help : Returns formatted HTML
-Help->>Sender : ReplyHtml(message, helpText, nil)
-Sender-->>Bot : Message sent
-Bot->>User : Displays help message
-```
-
-**Diagram sources**
-- [help_handler.go](file://internal/handlers/privatehandlers/help_handler.go#L35-L55)
-
-**Section sources**
-- [help_handler.go](file://internal/handlers/privatehandlers/help_handler.go#L35-L55)
-
-When a user sends the `/help` command in a private chat, the dispatcher routes the message to the `helpHandler`. The handler first verifies that the message was sent in a private chat using `CheckPrivateChatType`. It then checks if the user is a club member using `CheckClubMemberPermissions`. If both checks pass, the handler formats the help message using `FormatHelpMessage`, which includes different content based on whether the user is an administrator. Finally, the formatted message is sent back to the user using `ReplyHtml`.
-
-### Handling Join/Leave Messages in Group Context
-
-```mermaid
-sequenceDiagram
-participant Telegram as Telegram
-participant Bot as evocoders-bot-go
-participant ChatMember as ChatMemberHandler
-participant JoinLeft as JoinLeftService
-participant UserRepo as UserRepository
-participant Logger as log
-Telegram->>Bot : Sends ChatMemberUpdated event
-Bot->>ChatMember : Routes to NewChatMemberHandler
-ChatMember->>JoinLeft : HandleJoinLeftMember(b, ctx)
-JoinLeft->>UserRepo : GetOrFullCreate(user)
-UserRepo-->>JoinLeft : Returns user record
-alt User joined group
-JoinLeft->>Logger : Log user joined
-JoinLeft->>UserRepo : SetClubMemberStatus(userID, true)
-UserRepo-->>JoinLeft : Success
-JoinLeft->>Logger : Log status updated
-else User left or banned
-JoinLeft->>UserRepo : GetOrFullCreate(user)
-UserRepo-->>JoinLeft : Returns user record
-alt User was club member
-JoinLeft->>Logger : Log user left
-JoinLeft->>UserRepo : SetClubMemberStatus(userID, false)
-UserRepo-->>JoinLeft : Success
-JoinLeft->>Logger : Log status updated
-end
-end
-JoinLeft-->>ChatMember : Processing complete
-ChatMember-->>Bot : Event processed
-```
-
-**Diagram sources**
-- [chat_member_handler.go](file://internal/handlers/grouphandlers/chat_member_handler.go#L20-L27)
-- [grouphandlersservices/join_left_service.go](file://internal/services/grouphandlersservices/join_left_service.go)
-
-**Section sources**
-- [chat_member_handler.go](file://internal/handlers/grouphandlers/chat_member_handler.go#L20-L27)
-
-When a user joins or leaves the group, Telegram sends a `ChatMemberUpdated` event that is processed by the `ChatMemberHandler`. The handler delegates processing to the `JoinLeftService` which extracts the user information from the update and calls `GetOrFullCreate` to ensure the user exists in the database. If the user's new status is "member", "administrator", or "creator", the service sets their `IsClubMember` status to true. If the user's status is "left" or "kicked", and they were previously a club member, their `IsClubMember` status is set to false. This mechanism automatically maintains accurate membership status based on actual group participation.
-
-## Public Interfaces and Signatures
-
-```mermaid
-classDiagram
-class HandlerDependencies {
-+OpenAiClient *clients.OpenAiClient
-+AppConfig *config.Config
-+ProfileService *services.ProfileService
-+SummarizationService *services.SummarizationService
-+RandomCoffeeService *services.RandomCoffeeService
-+MessageSenderService *services.MessageSenderService
-+PermissionsService *services.PermissionsService
-+EventRepository *repositories.EventRepository
-+TopicRepository *repositories.TopicRepository
-+GroupTopicRepository *repositories.GroupTopicRepository
-+PromptingTemplateRepository *repositories.PromptingTemplateRepository
-+UserRepository *repositories.UserRepository
-+ProfileRepository *repositories.ProfileRepository
-+RandomCoffeePollRepository *repositories.RandomCoffeePollRepository
-+RandomCoffeeParticipantRepository *repositories.RandomCoffeeParticipantRepository
-+RandomCoffeePairRepository *repositories.RandomCoffeePairRepository
-+GroupMessageRepository *repositories.GroupMessageRepository
-+RandomCoffeePollAnswersService *grouphandlersservices.RandomCoffeePollAnswersService
-+JoinLeftService *grouphandlersservices.JoinLeftService
-+CleanClosedThreadsService *grouphandlersservices.CleanClosedThreadsService
-+RepliesFromClosedThreadsService *grouphandlersservices.RepliesFromClosedThreadsService
-+DeleteJoinLeftMessagesService *grouphandlersservices.DeleteJoinLeftMessagesService
-+SaveTopicService *grouphandlersservices.SaveTopicService
-+AdminSaveMessageService *grouphandlersservices.AdminSaveMessageService
-+SaveMessageService *grouphandlersservices.SaveMessageService
-+SaveUpdateMessageService *grouphandlersservices.SaveUpdateMessageService
-}
-class TgBotClient {
-+NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config) (*TgBotClient, error)
-+Start()
-+Close() error
-}
-class "privatehandlers" {
-+NewHelpHandler(config *config.Config, messageSenderService *services.MessageSenderService, permissionsService *services.PermissionsService) ext.Handler
-+NewContentHandler(config *config.Config, openaiClient *clients.OpenAiClient, messageSenderService *services.MessageSenderService, promptingTemplateRepository *repositories.PromptingTemplateRepository, permissionsService *services.PermissionsService) ext.Handler
-+NewProfileHandler(config *config.Config, messageSenderService *services.MessageSenderService, permissionsService *services.PermissionsService, profileService *services.ProfileService, userRepository *repositories.UserRepository, profileRepository *repositories.ProfileRepository, promptingTemplateRepository *repositories.PromptingTemplateRepository, openaiClient *clients.OpenAiClient) ext.Handler
-}
-class "grouphandlers" {
-+NewChatMemberHandler(joinLeftService *grouphandlersservices.JoinLeftService) ext.Handler
-+NewPollAnswerHandler(randomCoffeePollAnswersService *grouphandlersservices.RandomCoffeePollAnswersService) ext.Handler
-+NewMessageHandler(messageSenderService *services.MessageSenderService, cleanClosedThreadsService *grouphandlersservices.CleanClosedThreadsService, repliesFromClosedThreadsService *grouphandlersservices.RepliesFromClosedThreadsService, deleteJoinLeftMessagesService *grouphandlersservices.DeleteJoinLeftMessagesService, saveTopicService *grouphandlersservices.SaveTopicService, adminSaveMessageService *grouphandlersservices.AdminSaveMessageService, saveMessageService *grouphandlersservices.SaveMessageService) ext.Handler
-}
-class "adminhandlers" {
-+NewAdminProfilesHandler(config *config.Config, messageSenderService *services.MessageSenderService, permissionsService *services.PermissionsService, profileService *services.ProfileService, userRepository *repositories.UserRepository, profileRepository *repositories.ProfileRepository) ext.Handler
-+NewShowTopicsHandler(config *config.Config, topicRepository *repositories.TopicRepository, eventRepository *repositories.EventRepository, messageSenderService *services.MessageSenderService, permissionsService *services.PermissionsService) ext.Handler
-}
-class "eventhandlers" {
-+NewEventDeleteHandler(config *config.Config, eventRepository *repositories.EventRepository, messageSenderService *services.MessageSenderService, permissionsService *services.PermissionsService) ext.Handler
-+NewEventEditHandler(config *config.Config, eventRepository *repositories.EventRepository, messageSenderService *services.MessageSenderService, permissionsService *services.PermissionsService) ext.Handler
-+NewEventSetupHandler(config *config.Config, eventRepository *repositories.EventRepository, messageSenderService *services.MessageSenderService, permissionsService *services.PermissionsService) ext.Handler
-+NewEventStartHandler(config *config.Config, eventRepository *repositories.EventRepository, messageSenderService *services.MessageSenderService, permissionsService *services.PermissionsService) ext.Handler
-}
-class "testhandlers" {
-+NewTryCreateCoffeePoolHandler(config *config.Config, messageSenderService *services.MessageSenderService, permissionsService *services.PermissionsService, randomCoffeeService *services.RandomCoffeeService) ext.Handler
-+NewTryGenerateCoffeePairsHandler(config *config.Config, permissionsService *services.PermissionsService, messageSenderService *services.MessageSenderService, randomCoffeePollRepository *repositories.RandomCoffeePollRepository, randomCoffeeParticipantRepository *repositories.RandomCoffeeParticipantRepository, profileRepository *repositories.ProfileRepository, randomCoffeeService *services.RandomCoffeeService) ext.Handler
-+NewTrySummarizeHandler(config *config.Config, summarizationService *services.SummarizationService, messageSenderService *services.MessageSenderService, permissionsService *services.PermissionsService) ext.Handler
-}
-HandlerDependencies <|-- "privatehandlers"
-HandlerDependencies <|-- "grouphandlers"
-HandlerDependencies <|-- "adminhandlers"
-HandlerDependencies <|-- "eventhandlers"
-HandlerDependencies <|-- "testhandlers"
-```
-
-**Diagram sources**
-- [bot.go](file://internal/bot/bot.go#L25-L43)
-- [help_handler.go](file://internal/handlers/privatehandlers/help_handler.go#L30-L35)
-- [chat_member_handler.go](file://internal/handlers/grouphandlers/chat_member_handler.go#L25-L30)
-- [poll_answer_handler.go](file://internal/handlers/grouphandlers/poll_answer_handler.go#L25-L30)
-- [profiles_manager_handler.go](file://internal/handlers/adminhandlers/profiles_manager_handler.go#L100-L105)
-
-**Section sources**
-- [bot.go](file://internal/bot/bot.go#L25-L43)
-- [help_handler.go](file://internal/handlers/privatehandlers/help_handler.go#L30-L35)
-- [chat_member_handler.go](file://internal/handlers/grouphandlers/chat_member_handler.go#L25-L30)
-- [poll_answer_handler.go](file://internal/handlers/grouphandlers/poll_answer_handler.go#L25-L30)
-- [profiles_manager_handler.go](file://internal/handlers/adminhandlers/profiles_manager_handler.go#L100-L105)
-
-The public interfaces of the handler system follow a consistent pattern where each handler type provides a constructor function that returns an `ext.Handler` interface. The `HandlerDependencies` struct is used as a parameter bag to inject all required dependencies, promoting loose coupling and testability. Constructor functions for private handlers typically require the `MessageSenderService` and `PermissionsService` to handle message sending and access control. Group handlers now receive service-level dependencies rather than direct repository access, reflecting recent refactoring efforts. Admin handlers have the most extensive dependencies, reflecting their complex administrative functionality. All handlers implement the `ext.Handler` interface, allowing them to be registered with the dispatcher uniformly.
+Help->>Formatter : FormatHelpMessage(isAdmin, config

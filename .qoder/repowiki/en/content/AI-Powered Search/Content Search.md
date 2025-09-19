@@ -7,16 +7,19 @@
 - [content_prompt.go](file://internal/database/prompts/content_prompt.go)
 - [config.go](file://internal/config/config.go)
 - [prompting_templates_repository.go](file://internal/database/repositories/prompting_templates_repository.go)
+- [general_constants.go](file://internal/constants/general_constants.go) - *Added in recent commit*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Updated OpenAI model from GPT-5 to GPT-5 Mini in OpenAiClient
-- Changed reasoning effort from minimal to medium in OpenAI API call
-- Updated import paths for OpenAI Go client v2.5.0
-- Modified OpenAI integration section to reflect new model and reasoning settings
-- Updated technical deep dive section to reflect client changes
-- Updated configuration parameters section to reflect updated model name
+- Added search type selection with fast/deep options in contentHandler
+- Introduced new conversation states for search type selection
+- Enhanced message processing with HTML formatting and preprocessing
+- Updated OpenAI model to GPT-5 Mini with configurable reasoning effort
+- Added preprocessing step to clean and format message data
+- Modified response handling to use HTML formatting instead of Markdown
+- Added constants for search types (fast/deep) in general_constants.go
+- Updated prompt template to include HTML formatting requirements
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -31,10 +34,10 @@
 10. [Technical Deep Dive](#technical-deep-dive)
 
 ## Introduction
-The Content Search feature (/content) in evocoders-bot-go enables users to search for content within the Evolution Code Club community using natural language queries. This document details the implementation of the contentHandler, which orchestrates the entire search process from user input to AI-generated responses. The system leverages OpenAI's language models with custom prompting templates stored in the database to deliver relevant, formatted results. The feature includes robust state management, cancellation capabilities, and user experience enhancements like typing indicators.
+The Content Search feature (/content) in evocoders-bot-go enables users to search for content within the Evolution Code Club community using natural language queries. This document details the implementation of the contentHandler, which orchestrates the entire search process from user input to AI-generated responses. The system leverages OpenAI's language models with custom prompting templates stored in the database to deliver relevant, formatted results. The feature includes robust state management, cancellation capabilities, and user experience enhancements like typing indicators. Recent updates have added search type selection (fast/deep) and improved message preprocessing for better search quality.
 
 ## Content Search Workflow
-The content search process follows a structured conversation flow initiated by the /content command. The handler manages user interactions through distinct states, ensuring a seamless experience from query input to result delivery. The workflow begins with permission checks, proceeds through query processing, and concludes with response formatting and delivery.
+The content search process follows a structured conversation flow initiated by the /content command. The handler manages user interactions through distinct states, ensuring a seamless experience from query input to result delivery. The workflow begins with permission checks, proceeds through query processing and search type selection, and concludes with response formatting and delivery.
 
 ```mermaid
 flowchart TD
@@ -45,28 +48,32 @@ D --> |No| C
 D --> |Yes| E[Request Query Input]
 E --> F{Valid Query?}
 F --> |Empty| G[Request Valid Input]
-F --> |Valid| H[Process Search]
-H --> I[Retrieve Prompt Template]
-I --> J[Construct Prompt]
-J --> K[Call OpenAI API]
-K --> L{Success?}
-L --> |No| M[Handle Error]
-L --> |Yes| N[Format Response]
-N --> O[Send Markdown Response]
-O --> P[End Conversation]
+F --> |Valid| H[Store Query]
+H --> I[Request Search Type Selection]
+I --> J{Search Type Selected?}
+J --> |No| I
+J --> |Yes| K[Process Search]
+K --> L[Retrieve Prompt Template]
+L --> M[Construct Prompt]
+M --> N[Call OpenAI API]
+N --> O{Success?}
+O --> |No| P[Handle Error]
+O --> |Yes| Q[Format Response]
+Q --> R[Send HTML Response]
+R --> S[End Conversation]
 ```
 
 **Diagram sources**
 - [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L105-L138)
-- [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L170-L208)
+- [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L170-L306)
 
 **Section sources**
 - [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L64-L105)
 
 ## Conversation State Management
-The contentHandler implements a stateful conversation using the gotgbot/v2 framework's conversation system. It maintains state through user-specific data storage, tracking the progression from initial command invocation to final response delivery. The primary state, contentStateProcessQuery, manages the query processing phase after the user initiates the search.
+The contentHandler implements a stateful conversation using the gotgbot/v2 framework's conversation system. It maintains state through user-specific data storage, tracking the progression from initial command invocation to final response delivery. The primary states include contentStateStartSearch, contentStateSelectSearch, and contentStateProcessSearch, which manage the query input, search type selection, and search processing phases respectively.
 
-The handler uses UserDataStore to maintain conversation context across multiple messages, storing critical information such as processing status, cancellation functions, and message identifiers. This approach prevents concurrent searches and enables proper cleanup of resources when conversations end.
+The handler uses UserDataStore to maintain conversation context across multiple messages, storing critical information such as processing status, cancellation functions, and message identifiers. This approach prevents concurrent searches and enables proper cleanup of resources when conversations end. The state transitions are managed through the conversation handler configuration, which maps specific handlers to each state.
 
 **Section sources**
 - [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L39-L64)
@@ -75,10 +82,11 @@ The handler uses UserDataStore to maintain conversation context across multiple 
 ## Query Validation and Processing
 The system implements comprehensive query validation to ensure robust operation. When a user submits a query, the handler first checks if another search is already in progress for that user, preventing resource exhaustion. Empty queries are rejected with a helpful message guiding the user to provide valid input or cancel the operation.
 
-The validation process occurs in the processContentSearch method, which verifies the query's presence and non-empty status before proceeding. During processing, the handler marks the user as "processing" in the UserDataStore, creating a lock that prevents concurrent searches. This mechanism ensures system stability and provides clear feedback when users attempt to initiate multiple searches simultaneously.
+The validation process occurs in the selectSearchType method, which verifies the query's presence and non-empty status before proceeding. During processing, the handler marks the user as "processing" in the UserDataStore, creating a lock that prevents concurrent searches. After validation, the system prompts the user to select a search type (fast or deep) before proceeding with the actual search.
 
 **Section sources**
-- [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L105-L138)
+- [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L130-L163)
+- [general_constants.go](file://internal/constants/general_constants.go#L13-L14)
 
 ## Prompt Construction and Template Retrieval
 The prompt construction process begins with retrieving a template from the database using the GetContentPromptKey constant. The PromptingTemplateRepository queries the prompting_templates table for the template associated with this key, falling back to a default template if none is found.
@@ -95,28 +103,28 @@ D --> F[Insert Topic Link]
 E --> F
 F --> G[Insert Message Data]
 G --> H[Insert User Query]
-H --> I[Escape Markdown]
+H --> I[Escape HTML]
 I --> J[Log Final Prompt]
 J --> K[Send to OpenAI]
 ```
 
 **Diagram sources**
-- [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L170-L208)
-- [content_prompt.go](file://internal/database/prompts/content_prompt.go#L0-L38)
+- [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L170-L306)
+- [content_prompt.go](file://internal/database/prompts/content_prompt.go#L0-L92)
 - [prompting_templates_repository.go](file://internal/database/repositories/prompting_templates_repository.go#L0-L42)
 
 **Section sources**
-- [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L170-L208)
-- [content_prompt.go](file://internal/database/prompts/content_prompt.go#L0-L38)
+- [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L170-L306)
+- [content_prompt.go](file://internal/database/prompts/content_prompt.go#L0-L92)
 
 ## OpenAI Integration and Response Handling
-The system integrates with OpenAI through the OpenAiClient, which provides a clean interface for generating completions. The GetCompletion method sends the constructed prompt to OpenAI's API using the GPT-5 Mini model with medium reasoning effort, with the request scoped to the cancellable context created for the operation.
+The system integrates with OpenAI through the OpenAiClient, which provides a clean interface for generating completions. The GetCompletionWithReasoning method sends the constructed prompt to OpenAI's API using the GPT-5 Mini model with configurable reasoning effort (minimal for fast search, medium for deep search), with the request scoped to the cancellable context created for the operation.
 
-While waiting for the OpenAI response, the system sends periodic typing indicators to the user every 5 seconds, enhancing the user experience during potentially long processing times. Upon receiving a response, the system validates that the context wasn't cancelled before proceeding. Successful responses are delivered to the user using ReplyMarkdown, preserving the formatting instructions from the prompt. Error responses are handled gracefully with appropriate user feedback and logging.
+While waiting for the OpenAI response, the system sends periodic typing indicators to the user every 5 seconds, enhancing the user experience during potentially long processing times. Upon receiving a response, the system validates that the context wasn't cancelled before proceeding. Successful responses are delivered to the user using SendHtml, preserving the HTML formatting instructions from the prompt. Error responses are handled gracefully with appropriate user feedback and logging.
 
 **Section sources**
-- [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L170-L208)
-- [openai_client.go](file://internal/clients/openai_client.go#L49-L97)
+- [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L170-L306)
+- [openai_client.go](file://internal/clients/openai_client.go#L40-L56)
 
 ## Cancellation and Context Management
 The cancellation system provides users with control over long-running searches through both the /cancel command and an inline cancel button. When a search begins, the handler creates a cancellable context and stores its cancellation function in the UserDataStore using the contentCtxDataKeyCancelFunc key.
@@ -124,8 +132,8 @@ The cancellation system provides users with control over long-running searches t
 When cancellation is requested, the stored cancellation function is invoked, terminating the OpenAI API call at the context level. This approach ensures immediate termination of external requests while allowing proper cleanup of resources. The handler then removes any inline keyboards and clears the user's stored data, returning to a clean state. The context cancellation is checked after the OpenAI call to determine if the operation was terminated by user request.
 
 **Section sources**
-- [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L245-L283)
-- [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L105-L138)
+- [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L318-L338)
+- [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L170-L306)
 
 ## Configuration Parameters
 The Content Search feature relies on several configuration parameters defined in the Config struct. The SuperGroupChatID and ContentTopicID parameters are used to construct the topic link included in the prompt, enabling the AI to reference specific content locations. These values are loaded from environment variables during application startup, allowing for deployment-specific configuration without code changes.
@@ -134,7 +142,7 @@ Other relevant configuration includes the OpenAIAPIKey for authenticating with t
 
 **Section sources**
 - [config.go](file://internal/config/config.go#L0-L318)
-- [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L170-L208)
+- [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L170-L306)
 
 ## Error Handling and Common Issues
 The system implements comprehensive error handling for various failure scenarios. Empty queries are handled with user-friendly messages that guide the user toward valid input. Processing delays are mitigated through the typing indicator system, which provides feedback during long operations.
@@ -142,9 +150,9 @@ The system implements comprehensive error handling for various failure scenarios
 API errors from OpenAI are caught and translated into user-appropriate messages, with detailed logging for debugging. Template retrieval failures result in graceful degradation, allowing the system to continue with default templates. The context cancellation mechanism handles timeouts and user-initiated cancellations consistently. All errors are logged with contextual information to facilitate troubleshooting while maintaining a clean user experience.
 
 **Section sources**
-- [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L105-L138)
-- [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L170-L208)
-- [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L245-L283)
+- [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L130-L163)
+- [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L170-L306)
+- [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L318-L338)
 
 ## Technical Deep Dive
 The content search implementation demonstrates several advanced patterns in bot development. The use of conversation states with the gotgbot framework enables complex multi-step interactions while maintaining code clarity. The UserDataStore abstraction provides a clean interface for managing user-specific state across the conversation lifecycle.
@@ -157,26 +165,29 @@ class contentHandler {
 +config *Config
 +openaiClient *OpenAiClient
 +promptingTemplateRepository *PromptingTemplateRepository
++groupMessageRepository *GroupMessageRepository
 +messageSenderService *MessageSenderService
 +userStore *UserDataStore
 +permissionsService *PermissionsService
 +startContentSearch(b *gotgbot.Bot, ctx *ext.Context) error
-+processContentSearch(b *gotgbot.Bot, ctx *ext.Context) error
++selectSearchType(b *gotgbot.Bot, ctx *ext.Context) error
++processContentSearchWithType(b *gotgbot.Bot, ctx *ext.Context) error
 +handleCancel(b *gotgbot.Bot, ctx *ext.Context) error
-+prepareTelegramMessages(messages []*GroupMessage) ([]byte, error)
++preprocessingMessages(messages []*GroupMessage) ([]byte, error)
 }
 class OpenAiClient {
 +client *openai.Client
-+GetCompletion(ctx context.Context, message string) (string, error)
++GetCompletionWithReasoning(ctx context.Context, message string, reasoningEffort openai.ReasoningEffort) (string, error)
 +GetEmbedding(ctx context.Context, text string) ([]float64, error)
 +GetBatchEmbeddings(ctx context.Context, texts []string) ([][]float64, error)
 }
 class PromptingTemplateRepository {
 +db *sql.DB
-+Get(templateKey string) (string, error)
++Get(templateKey string, defaultValue string) (string, error)
 }
 contentHandler --> OpenAiClient : "uses"
 contentHandler --> PromptingTemplateRepository : "uses"
+contentHandler --> GroupMessageRepository : "uses"
 contentHandler --> MessageSenderService : "uses"
 contentHandler --> UserDataStore : "uses"
 contentHandler --> PermissionsService : "uses"
@@ -185,9 +196,9 @@ OpenAiClient ..> "openai.Client" : "wraps"
 
 **Diagram sources**
 - [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L39-L64)
-- [openai_client.go](file://internal/clients/openai_client.go#L0-L49)
+- [openai_client.go](file://internal/clients/openai_client.go#L40-L56)
 - [prompting_templates_repository.go](file://internal/database/repositories/prompting_templates_repository.go#L0-L42)
 
 **Section sources**
-- [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L0-L340)
+- [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L0-L440)
 - [openai_client.go](file://internal/clients/openai_client.go#L0-L97)

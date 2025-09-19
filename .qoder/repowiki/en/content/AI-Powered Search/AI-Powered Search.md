@@ -2,24 +2,28 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go)
-- [tools_handler.go](file://internal/handlers/privatehandlers/tools_handler.go)
-- [intro_handler.go](file://internal/handlers/privatehandlers/intro_handler.go)
-- [openai_client.go](file://internal/clients/openai_client.go)
-- [content_prompt.go](file://internal/database/prompts/content_prompt.go)
-- [tool_prompt.go](file://internal/database/prompts/tool_prompt.go)
-- [intro_prompt.go](file://internal/database/prompts/intro_prompt.go)
-- [prompting_templates_repository.go](file://internal/database/repositories/prompting_templates_repository.go)
-- [config.go](file://internal/config/config.go)
+- [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go) - *Updated with search type selection in commit c1cf1bbe*
+- [tools_handler.go](file://internal/handlers/privatehandlers/tools_handler.go) - *Updated with search type selection in commit d875dc2d*
+- [intro_handler.go](file://internal/handlers/privatehandlers/intro_handler.go) - *Updated with search type selection in commit d875dc2d*
+- [openai_client.go](file://internal/clients/openai_client.go) - *Updated with reasoning effort support in commit 42339c7b*
+- [general_constants.go](file://internal/constants/general_constants.go) - *Added search type constants in commit d875dc2d*
+- [general_buttons.go](file://internal/buttons/general_buttons.go) - *Added search type buttons in commit 42339c7b*
+- [prompting_templates_repository.go](file://internal/database/repositories/prompting_templates_repository.go) - *Unchanged*
+- [content_prompt.go](file://internal/database/prompts/content_prompt.go) - *Unchanged*
+- [tool_prompt.go](file://internal/database/prompts/tool_prompt.go) - *Unchanged*
+- [intro_prompt.go](file://internal/database/prompts/intro_prompt.go) - *Unchanged*
+- [config.go](file://internal/config/config.go) - *Unchanged*
 </cite>
 
 ## Update Summary
 **Changes Made**   
-- Updated OpenAI model and reasoning effort configuration in OpenAI Integration section
-- Corrected outdated model name references from GPT-5 to GPT-5 Mini
-- Updated reasoning effort setting from minimal to medium based on latest code changes
-- Added clarification about model configuration in OpenAI client
-- Removed obsolete model comments from code examples
+- Added search type selection (fast/deep) for all three search functionalities
+- Updated handler flow to include search type selection state
+- Modified OpenAI client integration to support reasoning effort based on search type
+- Added new constants for search types and callback data
+- Introduced inline keyboard buttons for search type selection
+- Updated conversation state machines to handle three-state flow
+- Enhanced user experience with clearer search type options
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -34,7 +38,7 @@
 10. [Implementation Examples](#implementation-examples)
 
 ## Introduction
-The AI-Powered Search feature set in evocoders-bot-go provides three specialized search functionalities: content search (/content), tool search (/tool), and member introduction search (/intro). These features leverage OpenAI's language models to deliver intelligent, context-aware responses to user queries. The system follows a consistent pattern across all search types, using conversation-based handlers that guide users through query input, process requests with AI assistance, and return formatted responses. This documentation details the implementation architecture, component interactions, and operational characteristics of this search system.
+The AI-Powered Search feature set in evocoders-bot-go provides three specialized search functionalities: content search (/content), tool search (/tool), and member introduction search (/intro). These features leverage OpenAI's language models to deliver intelligent, context-aware responses to user queries. The system follows a consistent pattern across all search types, using conversation-based handlers that guide users through query input, search type selection, and AI-assisted processing. This documentation details the implementation architecture, component interactions, and operational characteristics of this enhanced search system.
 
 ## Search Functionality Overview
 The AI-Powered Search system implements three distinct search capabilities through dedicated handlers:
@@ -43,7 +47,7 @@ The AI-Powered Search system implements three distinct search capabilities throu
 2. **Tool Search (/tool)**: Finds AI development tools and related resources shared in the community
 3. **Member Introduction Search (/intro)**: Retrieves information about club members and their expertise
 
-Each search functionality follows a two-step conversation pattern: first prompting the user for a query, then processing that query with AI assistance. The system ensures exclusive processing per user through state management, preventing concurrent requests from the same user. All searches are restricted to private chats and require club membership, enforcing access control through the permissions service.
+Each search functionality follows a three-step conversation pattern: first prompting the user for a query, then allowing selection of search type (fast or deep), and finally processing the request with AI assistance. The system ensures exclusive processing per user through state management, preventing concurrent requests from the same user. All searches are restricted to private chats and require club membership, enforcing access control through the permissions service.
 
 **Section sources**
 - [content_handler.go](file://internal/handlers/privatehandlers/content_handler.go#L37-L64)
@@ -55,10 +59,11 @@ The search system follows a consistent invocation pattern across all three searc
 
 1. The command handler validates the chat type and user permissions
 2. The system prompts the user to enter a search query
-3. Upon receiving the query, the system processes it through the AI pipeline
-4. Results are formatted and returned to the user
+3. Upon receiving the query, the system presents search type options (fast/deep)
+4. After search type selection, the system processes the query with AI assistance
+5. Results are formatted and returned to the user
 
-The conversation state machine ensures proper sequencing of these steps. Each handler uses a two-state conversation: an initial state that captures the user's query, and a processing state that handles the search operation. The system maintains user context through a UserDataStore, tracking processing status, cancellation functions, and message references.
+The conversation state machine ensures proper sequencing of these steps. Each handler uses a three-state conversation: an initial state that captures the user's query, a selection state for choosing search type, and a processing state that handles the search operation. The system maintains user context through a UserDataStore, tracking processing status, cancellation functions, message references, and search type preferences.
 
 ```mermaid
 sequenceDiagram
@@ -69,9 +74,11 @@ participant Database
 User->>Handler : /content command
 Handler->>User : Request search query
 User->>Handler : Submit query
+Handler->>User : Present search type options
+User->>Handler : Select search type
 Handler->>Handler : Validate and mark as processing
 Handler->>Database : Retrieve prompt template
-Handler->>OpenAI : Send formatted prompt
+Handler->>OpenAI : Send formatted prompt with reasoning effort
 OpenAI-->>Handler : Return AI-generated response
 Handler->>User : Format and send response
 ```
@@ -110,7 +117,7 @@ PromptingTemplateRepository --> PromptingTemplate : "retrieves"
 - [intro_prompt.go](file://internal/database/prompts/intro_prompt.go#L0-L23)
 
 ## OpenAI Integration
-The system integrates with OpenAI through a dedicated OpenAiClient that abstracts the API interaction. The client is configured to use the ChatModelGPT5Mini model for chat completions with ReasoningEffortMedium setting, providing a balance of capability and cost efficiency. The integration follows a clean separation of concerns, with the client handling authentication, request formatting, and response parsing.
+The system integrates with OpenAI through a dedicated OpenAiClient that abstracts the API interaction. The client is configured to use the ChatModelGPT5Mini model for chat completions with ReasoningEffortMedium setting for deep searches and ReasoningEffortMinimal for fast searches, providing a balance of capability and cost efficiency. The integration follows a clean separation of concerns, with the client handling authentication, request formatting, and response parsing.
 
 When processing a search query, the system constructs a comprehensive prompt by combining the retrieved template with contextual data and the user's query. The prompt includes structured data in JSON format, providing the AI model with rich context for generating accurate responses. During processing, the system displays typing indicators every 5 seconds to maintain user engagement during potentially lengthy AI responses.
 
@@ -119,8 +126,8 @@ sequenceDiagram
 participant Handler
 participant OpenAiClient
 participant OpenAI
-Handler->>OpenAiClient : GetCompletion(context, prompt)
-OpenAiClient->>OpenAI : Send chat completion request
+Handler->>OpenAiClient : GetCompletionWithReasoning(context, prompt, reasoningEffort)
+OpenAiClient->>OpenAI : Send chat completion request with reasoning effort
 OpenAI-->>OpenAiClient : Return completion response
 OpenAiClient-->>Handler : Extract and return content
 ```
@@ -195,7 +202,7 @@ Cleanup --> End([Search Complete])
 - [intro_handler.go](file://internal/handlers/privatehandlers/intro_handler.go#L238-L271)
 
 ## Implementation Examples
-The three search handlers follow nearly identical implementation patterns with minor variations for their specific domains. The content_handler, tools_handler, and intro_handler each implement the same core structure: command registration, query processing, prompt construction, AI integration, and response delivery.
+The three search handlers follow nearly identical implementation patterns with minor variations for their specific domains. The content_handler, tools_handler, and intro_handler each implement the same core structure: command registration, query processing, search type selection, prompt construction, AI integration, and response delivery.
 
 The primary differences between the handlers lie in the data preparation phase. The content and tools handlers prepare message data from chat topics, while the intro_handler retrieves profile data from the database. Despite these differences, the overall flow remains consistent, demonstrating the system's well-factored design.
 

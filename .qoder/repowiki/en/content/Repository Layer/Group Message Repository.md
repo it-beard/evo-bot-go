@@ -2,11 +2,19 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [group_message_repository.go](file://internal/database/repositories/group_message_repository.go)
+- [group_message_repository.go](file://internal/database/repositories/group_message_repository.go) - *Updated with CreateWithCreatedAt and GetAllByGroupTopicID methods*
 - [20250918_add_group_messages_table.go](file://internal/database/migrations/implementations/20250918_add_group_messages_table.go)
-- [save_messages_handler.go](file://internal/handlers/grouphandlers/save_messages_handler.go)
-- [summarization_service.go](file://internal/services/summarization_service.go)
+- [summarization_service.go](file://internal/services/summarization_service.go) - *Updated to use full message retrieval*
+- [save_message_service.go](file://internal/services/grouphandlersservices/save_message_service.go)
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated **Domain Model** to reflect enhanced timestamp handling
+- Added new **Core Operations** for `CreateWithCreatedAt` and `GetAllByGroupTopicID`
+- Revised **Usage Patterns** section to reflect updated summarization logic
+- Enhanced **Performance Considerations** with new pagination guidance
+- Updated all file references with correct annotations and line ranges
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -26,7 +34,7 @@ The Group Message Repository component in evocoders-bot-go is responsible for st
 - [group_message_repository.go](file://internal/database/repositories/group_message_repository.go#L1-L20)
 
 ## Domain Model
-The GroupMessage entity represents a message within a Telegram group topic and contains essential metadata for message tracking and processing.
+The GroupMessage entity represents a message within a Telegram group topic and contains essential metadata for message tracking and processing. The model now supports explicit timestamp preservation during message creation.
 
 ```mermaid
 classDiagram
@@ -75,17 +83,19 @@ GROUP_MESSAGES }o--|| GROUP_MESSAGES : "replies to"
 - [20250918_add_group_messages_table.go](file://internal/database/migrations/implementations/20250918_add_group_messages_table.go#L15-L35)
 
 ## Core Operations
-The repository provides a comprehensive set of methods for message management, supporting the full CRUD (Create, Read, Update, Delete) operations.
+The repository provides a comprehensive set of methods for message management, supporting the full CRUD (Create, Read, Update, Delete) operations. Recent updates include enhanced timestamp handling and unlimited retrieval capabilities.
 
 ```mermaid
 classDiagram
 class GroupMessageRepository {
 +*sql.DB db
 +Create(messageID int64, messageText string, replyToMessageID *int64, userTgID int64, groupTopicID int64) (*GroupMessage, error)
++CreateWithCreatedAt(messageID int64, messageText string, replyToMessageID *int64, userTgID int64, groupTopicID int64, createdAt time.Time) (*GroupMessage, error)
 +GetByID(id int) (*GroupMessage, error)
 +GetByMessageID(messageID int64) (*GroupMessage, error)
 +GetByUserTgID(userTgID int64, limit int, offset int) ([]*GroupMessage, error)
-+GetByGroupTopicID(groupTopicID int64, limit int, offset int) ([]*GroupMessage, error)
++GetAllByGroupTopicID(groupTopicID int64) ([]*GroupMessage, error)
++GetByGroupTopicIdForpreviousTwentyFourHours(groupTopicID int64) ([]*GroupMessage, error)
 +Update(id int, messageText string) error
 +Delete(id int) error
 +DeleteByMessageID(messageID int64) error
@@ -93,16 +103,16 @@ class GroupMessageRepository {
 ```
 
 **Diagram sources**
-- [group_message_repository.go](file://internal/database/repositories/group_message_repository.go#L21-L263)
+- [group_message_repository.go](file://internal/database/repositories/group_message_repository.go#L21-L267)
 
 **Section sources**
-- [group_message_repository.go](file://internal/database/repositories/group_message_repository.go#L21-L263)
+- [group_message_repository.go](file://internal/database/repositories/group_message_repository.go#L21-L267)
 
 ## Usage Patterns
 The repository supports several key usage patterns for message processing and analysis.
 
 ### Daily Summarization
-Messages are collected within a 24-hour window for daily summaries, with queries filtering by topic and timestamp.
+Messages are collected within a 24-hour window for daily summaries, with queries filtering by topic and timestamp. The summarization service now retrieves all messages without pagination limits for comprehensive analysis.
 
 ```mermaid
 sequenceDiagram
@@ -111,8 +121,8 @@ participant Service as SummarizationService
 participant Repository as GroupMessageRepository
 participant DB as Database
 Task->>Service : RunDailySummarization()
-Service->>Repository : GetByGroupTopicID(topicID, since=24h ago)
-Repository->>DB : SELECT with topic and date filters
+Service->>Repository : GetByGroupTopicIdForpreviousTwentyFourHours(topicID)
+Repository->>DB : SELECT with topic and 24h date filters
 DB-->>Repository : Message records
 Repository-->>Service : []*GroupMessage
 Service->>OpenAI : Generate summary
@@ -120,8 +130,8 @@ Service->>MessageSender : Send summary
 ```
 
 **Diagram sources**
-- [summarization_service.go](file://internal/services/summarization_service.go#L35-L176)
-- [group_message_repository.go](file://internal/database/repositories/group_message_repository.go#L125-L157)
+- [summarization_service.go](file://internal/services/summarization_service.go#L35-L169)
+- [group_message_repository.go](file://internal/database/repositories/group_message_repository.go#L230-L267)
 
 ### Closed Thread Monitoring
 The system identifies messages in closed threads through integration with the CleanClosedThreadsHandler, which prevents new messages in read-only topics.
@@ -141,11 +151,11 @@ CheckAdmin --> |Yes| End
 ```
 
 **Diagram sources**
-- [clean_closed_threads_handler.go](file://internal/handlers/grouphandlers/clean_closed_threads_handler.go#L45-L100)
+- [save_message_service.go](file://internal/services/grouphandlersservices/save_message_service.go#L45-L64)
 
 **Section sources**
-- [summarization_service.go](file://internal/services/summarization_service.go#L35-L176)
-- [clean_closed_threads_handler.go](file://internal/handlers/grouphandlers/clean_closed_threads_handler.go#L45-L100)
+- [summarization_service.go](file://internal/services/summarization_service.go#L35-L169)
+- [save_message_service.go](file://internal/services/grouphandlersservices/save_message_service.go#L45-L64)
 
 ## Integration Points
 The Group Message Repository integrates with various components of the system to provide message persistence and retrieval capabilities.
@@ -163,11 +173,11 @@ class A,B,C,D,E,F,G default;
 ```
 
 **Diagram sources**
-- [save_messages_handler.go](file://internal/handlers/grouphandlers/save_messages_handler.go#L85-L285)
-- [summarization_service.go](file://internal/services/summarization_service.go#L35-L176)
+- [save_message_service.go](file://internal/services/grouphandlersservices/save_message_service.go#L10-L64)
+- [summarization_service.go](file://internal/services/summarization_service.go#L35-L169)
 
 **Section sources**
-- [save_messages_handler.go](file://internal/handlers/grouphandlers/save_messages_handler.go#L85-L285)
+- [save_message_service.go](file://internal/services/grouphandlersservices/save_message_service.go#L10-L64)
 
 ## Performance Considerations
 The repository is optimized for performance with appropriate indexing and query patterns.
@@ -192,7 +202,7 @@ The implementation addresses several common challenges in message repository man
 The repository prevents message duplication through the unique constraint on message_id, ensuring each Telegram message is stored only once.
 
 ### Large Dataset Performance
-For handling large message datasets, the repository implements pagination through limit and offset parameters in retrieval methods, preventing memory issues during bulk operations.
+For handling large message datasets, the repository now provides `GetAllByGroupTopicID` method for complete retrieval without pagination limits, while maintaining `GetByUserTgID` with limit/offset parameters for controlled operations. This allows flexible handling based on use case requirements.
 
 ### Media Message Handling
 Media messages without text content are handled by storing descriptive placeholders (e.g., "[Photo]", "[Video]") in the message_text field, ensuring consistent processing across all message types.
@@ -200,9 +210,12 @@ Media messages without text content are handled by storing descriptive placehold
 ### Message Editing and Deletion
 The repository supports message updates when users edit their messages, and provides both soft and hard deletion capabilities. The system also handles special deletion commands ("[delete]" or "[удалить]") by removing messages from both Telegram and the database.
 
+### Timestamp Preservation
+The new `CreateWithCreatedAt` method allows preservation of original Telegram message timestamps, ensuring accurate temporal representation in summaries and analytics. This is particularly important for messages that are processed with delay or imported from external sources.
+
 **Section sources**
-- [save_messages_handler.go](file://internal/handlers/grouphandlers/save_messages_handler.go#L200-L285)
-- [group_message_repository.go](file://internal/database/repositories/group_message_repository.go#L185-L263)
+- [group_message_repository.go](file://internal/database/repositories/group_message_repository.go#L63-L86)
+- [group_message_repository.go](file://internal/database/repositories/group_message_repository.go#L190-L227)
 
 ## Conclusion
-The Group Message Repository provides a robust foundation for storing and managing Telegram group messages in evocoders-bot-go. By implementing a well-structured domain model, optimized database schema, and comprehensive API, the repository effectively supports key features like daily summarization and thread monitoring. The component demonstrates thoughtful design considerations for performance, data integrity, and integration with other system components, making it a critical piece of the bot's functionality.
+The Group Message Repository provides a robust foundation for storing and managing Telegram group messages in evocoders-bot-go. By implementing a well-structured domain model, optimized database schema, and comprehensive API—including recent enhancements for timestamp preservation and complete message retrieval—the repository effectively supports key features like daily summarization and thread monitoring. The component demonstrates thoughtful design considerations for performance, data integrity, and integration with other system components, making it a critical piece of the bot's functionality.

@@ -2,12 +2,12 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [main.go](file://main.go)
-- [config.go](file://internal/config/config.go)
+- [main.go](file://main.go) - *Updated in recent commit*
+- [config.go](file://internal/config/config.go) - *Updated in recent commit*
 - [bot.go](file://internal/bot/bot.go)
-- [openai_client.go](file://internal/clients/openai_client.go)
+- [openai_client.go](file://internal/clients/openai_client.go) - *Updated in recent commit*
 - [db.go](file://internal/database/db.go)
-- [go.mod](file://go.mod)
+- [go.mod](file://go.mod) - *Updated in recent commit*
 </cite>
 
 ## Update Summary
@@ -15,9 +15,10 @@
 - Updated OpenAI client version from v0.1.0-beta.10 to v2.5.0
 - Updated import paths for OpenAI client to reflect new module structure
 - Updated model reference from o3-mini to ChatModelGPT5Mini
-- Added ReasoningEffort parameter to chat completion requests
+- Added ReasoningEffort parameter to chat completion requests with default medium effort
 - Updated dependency analysis section to reflect new version
 - Modified component interactions section to reflect updated OpenAI client usage
+- Verified configuration loading mechanism for OpenAI API key
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -45,7 +46,7 @@ The application is built using Go version 1.23.3, as specified in the `go.mod` f
 The bot uses the `gotgbot/v2` library (version v2.0.0-rc.32) to interface with the Telegram Bot API. This lightweight, actively maintained library provides a clean abstraction over Telegram's update system, enabling event-driven handling of messages, callbacks, polls, and chat events. It supports long polling with configurable timeouts and handles deserialization of Telegram's JSON payloads into Go structs.
 
 ### AI Capabilities: github.com/openai/openai-go/v2
-The `github.com/openai/openai-go/v2` library (v2.5.0) enables integration with OpenAI's API for natural language processing tasks. The bot leverages this for generating responses, summarizing content, and powering conversational features. The client uses the `ChatModelGPT5Mini` model for chat completions and `text-embedding-ada-002` for embedding generation, supporting semantic search and context-aware interactions. The updated client includes the ReasoningEffort parameter to control processing depth.
+The `github.com/openai/openai-go/v2` library (v2.5.0) enables integration with OpenAI's API for natural language processing tasks. The bot leverages this for generating responses, summarizing content, and powering conversational features. The client uses the `ChatModelGPT5Mini` model for chat completions and `text-embedding-ada-002` for embedding generation, supporting semantic search and context-aware interactions. The updated client includes the ReasoningEffort parameter to control processing depth, with medium effort set as the default.
 
 ### Database Connectivity: github.com/lib/pq
 PostgreSQL connectivity is provided by the `github.com/lib/pq` driver (v1.10.9), a pure Go PostgreSQL driver that supports the `database/sql` interface. It enables secure, efficient communication with the PostgreSQL database, including connection pooling, SSL, and prepared statements.
@@ -81,7 +82,7 @@ I[Scheduled Tasks] --> C
 - [openai_client.go](file://internal/clients/openai_client.go#L1-L97)
 
 ### OpenAI Client Initialization and Usage
-The OpenAI client is initialized at startup in `main.go` and passed to the bot constructor. It is used by various handlers and services to generate AI-powered responses. The client is configured with the API key from environment variables and exposes methods for chat completions and embeddings. The updated v2.5.0 client uses a new import path and includes enhanced parameters for controlling reasoning effort.
+The OpenAI client is initialized at startup in `main.go` and passed to the bot constructor. It is used by various handlers and services to generate AI-powered responses. The client is configured with the API key from environment variables and exposes methods for chat completions and embeddings. The updated v2.5.0 client uses a new import path and includes enhanced parameters for controlling reasoning effort. The `GetCompletion` method now defaults to medium reasoning effort through the `GetCompletionWithReasoning` method.
 
 ```mermaid
 sequenceDiagram
@@ -100,8 +101,9 @@ OpenAIClient-->>Bot : Completion text
 
 **Section sources**
 - [main.go](file://main.go#L1-L53)
-- [openai_client.go](file://internal/clients/openai_client.go#L1-L97)
-- [bot.go](file://internal/bot/bot.go#L1-L384)
+- [openai_client.go](file://internal/clients/openai_client.go#L16-L32)
+- [bot.go](file://internal/bot/bot.go#L65-L221)
+- [openai_client.go](file://internal/clients/openai_client.go#L40-L56)
 
 ### Database Connection Lifecycle
 The database connection is established during bot initialization using the connection string from environment variables. The `database.DB` struct wraps `sql.DB` and manages the lifecycle, including migration execution on startup and graceful shutdown.
@@ -123,9 +125,9 @@ DB-->>Bot : DB instance
 ```
 
 **Diagram sources**
-- [bot.go](file://internal/bot/bot.go#L1-L384)
-- [db.go](file://internal/database/db.go#L1-L44)
-- [migrator.go](file://internal/database/migrations/migrator.go#L1-L20)
+- [bot.go](file://internal/bot/bot.go#L65-L221)
+- [db.go](file://internal/database/db.go#L16-L28)
+- [migrator.go](file://internal/database/migrations/migrator.go#L54-L111)
 
 ## Database Architecture and PostgreSQL Rationale
 
@@ -140,7 +142,7 @@ PostgreSQL was chosen as the persistence layer for several key reasons:
 The database schema is managed through a series of incremental migrations stored in `internal/database/migrations/implementations/`. Each migration is versioned by date and implements the `Migration` interface with `Apply` and `Rollback` methods. This approach ensures reproducible database states across environments and supports rollback capabilities.
 
 **Section sources**
-- [db.go](file://internal/database/db.go#L1-L44)
+- [db.go](file://internal/database/db.go#L31-L38)
 - [migration_base.go](file://internal/database/migrations/implementations/migration_base.go#L1-L24)
 - [20250519_add_users_and_profiles_tables.go](file://internal/database/migrations/implementations/20250519_add_users_and_profiles_tables.go#L1-L50)
 
@@ -168,7 +170,7 @@ G[Initialize Components] --> H[Start Bot]
 ```
 
 **Section sources**
-- [config.go](file://internal/config/config.go#L1-L340)
+- [config.go](file://internal/config/config.go#L1-L318)
 - [main.go](file://main.go#L1-L53)
 
 ## Infrastructure Requirements and Scalability
@@ -187,7 +189,7 @@ For horizontal scaling, multiple bot instances could be deployed behind a load b
 
 **Section sources**
 - [go.mod](file://go.mod#L1-L5)
-- [bot.go](file://internal/bot/bot.go#L1-L384)
+- [bot.go](file://internal/bot/bot.go#L56-L62)
 - [tasks](file://internal/tasks#L1-L20)
 
 ## Dependency Analysis

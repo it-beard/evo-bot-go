@@ -13,6 +13,14 @@
 - [bot.go](file://internal/bot/bot.go)
 </cite>
 
+## Update Summary
+**Changes Made**   
+- Added documentation for new `CreateWithCreatedAt` method in GroupMessageRepository that preserves original Telegram message timestamps
+- Updated Common Use Cases section with new example for retrieving all messages without limits
+- Enhanced Query Optimization section with details about unlimited message retrieval for search completeness
+- Updated diagram sources to reflect new method implementations
+- Added new section sources for summarization_service.go and tools_handler.go where new repository methods are utilized
+
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Architecture Overview](#architecture-overview)
@@ -256,10 +264,12 @@ class GroupMessage {
 }
 class GroupMessageRepository {
 +Create(messageID int64, messageText string, replyToMessageID *int64, userTgID int64, groupTopicID int64) (*GroupMessage, error)
++CreateWithCreatedAt(messageID int64, messageText string, replyToMessageID *int64, userTgID int64, groupTopicID int64, createdAt time.Time) (*GroupMessage, error)
 +GetByID(id int) (*GroupMessage, error)
 +GetByMessageID(messageID int64) (*GroupMessage, error)
 +GetByUserTgID(userTgID int64, limit int, offset int) ([]*GroupMessage, error)
-+GetByGroupTopicID(groupTopicID int64, limit int, offset int) ([]*GroupMessage, error)
++GetAllByGroupTopicID(groupTopicID int64) ([]*GroupMessage, error)
++GetByGroupTopicIdForpreviousTwentyFourHours(groupTopicID int64) ([]*GroupMessage, error)
 +Update(id int, messageText string) error
 +Delete(id int) error
 +DeleteByMessageID(messageID int64) error
@@ -269,6 +279,9 @@ GroupMessageRepository --> GroupMessage : "manages"
 
 **Diagram sources**
 - [group_message_repository.go](file://internal/database/repositories/group_message_repository.go#L20-L263)
+- [group_message_repository.go](file://internal/database/repositories/group_message_repository.go#L63-L86) - *Added CreateWithCreatedAt method*
+- [group_message_repository.go](file://internal/database/repositories/group_message_repository.go#L190-L227) - *Added GetAllByGroupTopicID method*
+- [group_message_repository.go](file://internal/database/repositories/group_message_repository.go#L230-L267) - *Added GetByGroupTopicIdForpreviousTwentyFourHours method*
 
 **Section sources**
 - [group_message_repository.go](file://internal/database/repositories/group_message_repository.go)
@@ -351,9 +364,9 @@ The repository layer implements several optimization techniques:
 2. **Batch Operations**: Where applicable, operations retrieve multiple records in a single query
 3. **Selective Field Retrieval**: Queries only select fields that are needed
 4. **Proper Ordering**: Use of ORDER BY with appropriate indexes for pagination
-5. **Limit and Offset**: Implementation of pagination for large result sets
+5. **Unlimited Retrieval**: For search completeness, certain operations retrieve all messages without limits
 
-For example, the `GetParticipatingUsers` method in RandomCoffeeParticipantRepository uses a JOIN to efficiently retrieve user information along with participation status in a single query, avoiding the N+1 query problem.
+For example, the `GetAllByGroupTopicID` method in GroupMessageRepository retrieves all messages from a topic without pagination limits, ensuring complete data retrieval for search operations. This approach prioritizes data completeness over memory efficiency for specific use cases like content search and tool discovery.
 
 ## Common Use Cases and Examples
 
@@ -369,13 +382,13 @@ This method performs a JOIN between the users and random_coffee_participants tab
 
 ### Retrieving Messages for Summarization
 
-To retrieve group messages for summarization, the system uses the `GetByGroupTopicID` method with pagination:
+To retrieve group messages for summarization, the system uses the `GetByGroupTopicIdForpreviousTwentyFourHours` method with a 24-hour time filter:
 
 ```go
-[SPEC SYMBOL](file://internal/database/repositories/group_message_repository.go#L180-L200)
+[SPEC SYMBOL](file://internal/database/repositories/group_message_repository.go#L230-L267)
 ```
 
-This allows the summarization service to process messages in batches, improving memory efficiency and performance.
+This allows the summarization service to process messages from the last 24 hours, focusing on recent activity.
 
 ### Creating or Updating User Profiles
 
@@ -386,6 +399,26 @@ The `GetOrCreate` pattern is used throughout the system to handle user and profi
 ```
 
 This method first attempts to retrieve an existing user by Telegram ID, and if not found, creates a new user record.
+
+### Preserving Original Message Timestamps
+
+When creating group messages, the system can now preserve the original Telegram message timestamps using the `CreateWithCreatedAt` method:
+
+```go
+[SPEC SYMBOL](file://internal/database/repositories/group_message_repository.go#L63-L86)
+```
+
+This enhancement ensures that message chronology is maintained accurately in the database, reflecting the actual time messages were sent in Telegram.
+
+### Retrieving All Messages for Search Completeness
+
+For comprehensive search operations, the system uses `GetAllByGroupTopicID` to retrieve all messages without pagination limits:
+
+```go
+[SPEC SYMBOL](file://internal/database/repositories/group_message_repository.go#L190-L227)
+```
+
+This method is critical for search functionality, ensuring that no relevant messages are missed during content discovery operations.
 
 ## Error Handling and Common Issues
 
@@ -424,4 +457,4 @@ The repository layer respects database foreign key constraints, with parent enti
 
 ## Conclusion
 
-The Repository Layer in evocoders-bot-go provides a robust, maintainable abstraction over the database layer. By following consistent patterns across all entities, the system achieves code reuse, improved testability, and clear separation of concerns. The repositories effectively encapsulate data access logic while providing a clean interface to the service layer. Key strengths include comprehensive error handling, efficient query construction, and proper handling of relationships between entities. This architecture supports the application's core features including user management, event scheduling, random coffee pairings, and group message processing.
+The Repository Layer in evocoders-bot-go provides a robust, maintainable abstraction over the database layer. By following consistent patterns across all entities, the system achieves code reuse, improved testability, and clear separation of concerns. The repositories effectively encapsulate data access logic while providing a clean interface to the service layer. Key strengths include comprehensive error handling, efficient query construction, and proper handling of relationships between entities. This architecture supports the application's core features including user management, event scheduling, random coffee pairings, and group message processing. Recent enhancements to the GroupMessageRepository, including timestamp preservation and unlimited message retrieval, further strengthen the system's capabilities for content search and summarization use cases.
