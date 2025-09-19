@@ -44,7 +44,6 @@ const (
 	toolsCallbackConfirmCancel = "tools_callback_confirm_cancel"
 	toolsCallbackFastSearch    = "tools_callback_fast_search"
 	toolsCallbackDeepSearch    = "tools_callback_deep_search"
-	toolsCallbackCancelSearch  = "tools_callback_cancel_search"
 
 	// Search types
 	toolsSearchTypeFast = "fast"
@@ -94,14 +93,19 @@ func NewToolsHandler(
 			toolsStateSelectSearchType: {
 				handlers.NewCallback(callbackquery.Equal(toolsCallbackFastSearch), h.handleFastSearchSelection),
 				handlers.NewCallback(callbackquery.Equal(toolsCallbackDeepSearch), h.handleDeepSearchSelection),
-				handlers.NewCallback(callbackquery.Equal(toolsCallbackCancelSearch), h.handleCallbackCancel),
+				handlers.NewCallback(callbackquery.Equal(toolsCallbackConfirmCancel), h.handleCallbackCancel),
+				handlers.NewMessage(message.All, h.processToolSearchWithType),
 			},
 			toolsStateProcessToolSearch: {
+				handlers.NewMessage(message.All, h.processToolSearchWithType),
 				handlers.NewCallback(callbackquery.Equal(toolsCallbackConfirmCancel), h.handleCallbackCancel),
 			},
 		},
 		&handlers.ConversationOpts{
-			Exits: []ext.Handler{handlers.NewCommand(constants.CancelCommand, h.handleCancel)},
+			Exits: []ext.Handler{
+				handlers.NewCommand(constants.CancelCommand, h.handleCancel),
+				handlers.NewCallback(callbackquery.Equal(toolsCallbackConfirmCancel), h.handleCallbackCancel),
+			},
 		},
 	)
 }
@@ -165,7 +169,7 @@ func (h *toolsHandler) selectSearchType(b *gotgbot.Bot, ctx *ext.Context) error 
 			ReplyMarkup: buttons.SearchTypeSelectionButton(
 				toolsCallbackFastSearch,
 				toolsCallbackDeepSearch,
-				toolsCallbackCancelSearch,
+				toolsCallbackConfirmCancel,
 			),
 		},
 	)
@@ -195,7 +199,6 @@ func (h *toolsHandler) handleDeepSearchSelection(b *gotgbot.Bot, ctx *ext.Contex
 
 	// Store search type
 	h.userStore.Set(ctx.EffectiveUser.Id, toolsUserCtxDataKeySearchType, toolsSearchTypeDeep)
-
 	// Proceed to processing
 	return h.processToolSearchWithType(b, ctx)
 }
@@ -222,9 +225,16 @@ func (h *toolsHandler) processToolSearchWithType(b *gotgbot.Bot, ctx *ext.Contex
 
 	// Get stored query and search type
 	queryInterface, _ := h.userStore.Get(userId, toolsUserCtxDataKeySearchQuery)
-	query := queryInterface.(string)
-	searchTypeInterface, _ := h.userStore.Get(userId, toolsUserCtxDataKeySearchType)
-	searchType := searchTypeInterface.(string)
+	query, _ := queryInterface.(string)
+	searchTypeInterface, hasSearchType := h.userStore.Get(userId, toolsUserCtxDataKeySearchType)
+	searchType, okType := searchTypeInterface.(string)
+
+	// If search type isn't chosen yet, don't start processing; prompt the user
+	if !hasSearchType || !okType || strings.TrimSpace(searchType) == "" {
+		// If we're mid-processing, the early return above would have handled it; here we just remind user to choose type
+		h.messageSenderService.Send(msg.Chat.Id, "Сначала выбери тип поиска кнопками выше!", nil)
+		return nil
+	}
 
 	// Mark as processing
 	h.userStore.Set(userId, toolsUserCtxDataKeyProcessing, true)
