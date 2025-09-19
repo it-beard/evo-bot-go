@@ -166,6 +166,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	saveMessageService := grouphandlersservices.NewSaveMessageService(
 		groupMessageRepository,
 		saveUpdateMessageService,
+		appConfig,
 	)
 
 	// Initialize scheduled tasks

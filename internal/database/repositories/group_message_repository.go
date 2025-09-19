@@ -60,6 +60,32 @@ func (r *GroupMessageRepository) Create(messageID int64, messageText string, rep
 	return &message, nil
 }
 
+// CreateWithCreatedAt inserts a new group message with an explicit created_at
+func (r *GroupMessageRepository) CreateWithCreatedAt(messageID int64, messageText string, replyToMessageID *int64, userTgID int64, groupTopicID int64, createdAt time.Time) (*GroupMessage, error) {
+	query := `
+		INSERT INTO group_messages (message_id, message_text, reply_to_message_id, user_tg_id, group_topic_id, created_at, updated_at) 
+		VALUES ($1, $2, $3, $4, $5, $6, $6) 
+		RETURNING id, message_id, message_text, reply_to_message_id, user_tg_id, group_topic_id, created_at, updated_at`
+
+	var message GroupMessage
+	err := r.db.QueryRow(query, messageID, messageText, replyToMessageID, userTgID, groupTopicID, createdAt).Scan(
+		&message.ID,
+		&message.MessageID,
+		&message.MessageText,
+		&message.ReplyToMessageID,
+		&message.UserTgID,
+		&message.GroupTopicID,
+		&message.CreatedAt,
+		&message.UpdatedAt,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("%s: failed to insert group message with created_at: %w", utils.GetCurrentTypeName(), err)
+	}
+
+	return &message, nil
+}
+
 // GetByID retrieves a group message by ID
 func (r *GroupMessageRepository) GetByID(id int) (*GroupMessage, error) {
 	query := `
