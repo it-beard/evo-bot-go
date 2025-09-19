@@ -342,6 +342,7 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 			deps.OpenAiClient,
 			deps.MessageSenderService,
 			deps.PromptingTemplateRepository,
+			deps.GroupMessageRepository,
 			deps.PermissionsService,
 		),
 		privatehandlers.NewEventsHandler(
@@ -378,6 +379,8 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 			deps.OpenAiClient,
 			deps.MessageSenderService,
 			deps.PromptingTemplateRepository,
+			deps.GroupMessageRepository,
+			deps.GroupTopicRepository,
 			deps.PermissionsService,
 		),
 	}

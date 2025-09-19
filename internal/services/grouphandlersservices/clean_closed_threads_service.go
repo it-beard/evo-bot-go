@@ -49,23 +49,21 @@ func (h *CleanClosedThreadsService) CleanClosedThreads(msg *gotgbot.Message, b *
 
 	// Prepare messages
 	chatIdStr := strconv.FormatInt(msg.Chat.Id, 10)[4:]
+	topicName := "Topic name"
 	topic, err := h.groupTopicRepository.GetGroupTopicByTopicID(msg.MessageThreadId)
 	if err != nil {
-		topic.Name = "Unknown"
-		return fmt.Errorf(
-			"%s: error >> failed to get thread name: %w",
-			utils.GetCurrentTypeName(),
-			err)
+		log.Printf("%s: error >> failed to get thread name: %v", utils.GetCurrentTypeName(), err)
+	} else {
+		topicName = topic.Name
 	}
+	mainConversationTopicName := "Main conversation topic name"
 	mainConversationTopic, err := h.groupTopicRepository.GetGroupTopicByTopicID(int64(h.config.ForwardingTopicID))
 	if err != nil {
-		mainConversationTopic.Name = "Unknown"
-		return fmt.Errorf(
-			"%s: error >> failed to get main conversation topic name: %w",
-			utils.GetCurrentTypeName(),
-			err)
+		log.Printf("%s: error >> failed to get main conversation topic name: %v", utils.GetCurrentTypeName(), err)
+	} else {
+		mainConversationTopicName = mainConversationTopic.Name
 	}
-	threadUrl := fmt.Sprintf("<a href=\"https://t.me/c/%s/%d\">\"%s\"</a>", chatIdStr, msg.MessageThreadId, topic.Name)
+	threadUrl := fmt.Sprintf("<a href=\"https://t.me/c/%s/%d\">\"%s\"</a>", chatIdStr, msg.MessageThreadId, topicName)
 	messageText := fmt.Sprintf(
 		"<b>Приношу свои извинения</b> 🧐\n\n"+
 			"Твоё сообщение в канале %s было удалено, поскольку этот канал предназначен только для чтения. \n\n"+
@@ -73,7 +71,7 @@ func (h *CleanClosedThreadsService) CleanClosedThreads(msg *gotgbot.Message, b *
 			"Твой ответ автоматически появится в чате \"<i>%s</i>\" 👌\n\n"+
 			"⬇️ <i>Копия твоего сообщения</i> ⬇️",
 		threadUrl,
-		mainConversationTopic.Name,
+		mainConversationTopicName,
 	)
 
 	// Send notification to user

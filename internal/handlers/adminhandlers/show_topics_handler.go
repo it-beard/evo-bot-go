@@ -178,7 +178,7 @@ func (h *showTopicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Contex
 	if len(topics) > 0 {
 		sentMsg, _ := h.messageSenderService.SendWithReturnMessage(
 			msg.Chat.Id,
-			fmt.Sprintf("\nДля удаления темы отправь ID темы, которую нужно удалить:"),
+			"\nДля удаления темы отправь ID темы, которую нужно удалить:",
 			&gotgbot.SendMessageOpts{
 				ReplyMarkup: buttons.CancelButton(showTopicsCallbackConfirmCancel),
 			},
@@ -280,7 +280,7 @@ func (h *showTopicsHandler) handleTopicDeletion(b *gotgbot.Bot, ctx *ext.Context
 	if len(topics) > 0 {
 		sentMsg, _ := h.messageSenderService.SendWithReturnMessage(
 			msg.Chat.Id,
-			fmt.Sprintf("\nДля удаления еще одной темы отправь ID темы:"),
+			"\nДля удаления еще одной темы отправь ID темы:",
 			&gotgbot.SendMessageOpts{
 				ReplyMarkup: buttons.CancelButton(showTopicsCallbackConfirmCancel),
 			},
