@@ -43,6 +43,8 @@ type toolsHandler struct {
 	config                      *config.Config
 	openaiClient                *clients.OpenAiClient
 	promptingTemplateRepository *repositories.PromptingTemplateRepository
+	groupMessageRepository      *repositories.GroupMessageRepository
+	groupTopicRepository        *repositories.GroupTopicRepository
 	messageSenderService        *services.MessageSenderService
 	userStore                   *utils.UserDataStore
 	permissionsService          *services.PermissionsService
@@ -53,13 +55,17 @@ func NewToolsHandler(
 	openaiClient *clients.OpenAiClient,
 	messageSenderService *services.MessageSenderService,
 	promptingTemplateRepository *repositories.PromptingTemplateRepository,
+	groupMessageRepository *repositories.GroupMessageRepository,
+	groupTopicRepository *repositories.GroupTopicRepository,
 	permissionsService *services.PermissionsService,
 ) ext.Handler {
 	h := &toolsHandler{
 		config:                      config,
 		openaiClient:                openaiClient,
 		promptingTemplateRepository: promptingTemplateRepository,
+		groupMessageRepository:      groupMessageRepository,
 		messageSenderService:        messageSenderService,
+		groupTopicRepository:        groupTopicRepository,
 		userStore:                   utils.NewUserDataStore(),
 		permissionsService:          permissionsService,
 	}
@@ -97,7 +103,7 @@ func (h *toolsHandler) startToolSearch(b *gotgbot.Bot, ctx *ext.Context) error {
 	// Ask user to enter search query
 	sentMsg, _ := h.messageSenderService.ReplyWithReturnMessage(
 		msg,
-		"Введи поисковый запрос по инструментам:",
+		"Пришли мне поисковый запрос по инструментам:",
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: buttons.CancelButton(toolsCallbackConfirmCancel),
 		},
@@ -158,10 +164,14 @@ func (h *toolsHandler) processToolSearch(b *gotgbot.Bot, ctx *ext.Context) error
 	h.messageSenderService.SendTypingAction(msg.Chat.Id)
 
 	// Get messages from chat
-	//[todo] get messages from chat
-	messages := []*repositories.GroupMessage{}
+	messages, err := h.groupMessageRepository.GetAllByGroupTopicID(int64(h.config.ToolTopicID))
+	if err != nil {
+		h.messageSenderService.Reply(msg, "Произошла ошибка при получении сообщений из базы данных.", nil)
+		log.Printf("%s: Error during message retrieval: %v", utils.GetCurrentTypeName(), err)
+		return handlers.EndConversation()
+	}
 
-	dataMessages, err := h.prepareTelegramMessages(messages)
+	dataMessages, err := h.preprocessingMessages(messages)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Произошла ошибка при подготовке сообщений для поиска.", nil)
 		log.Printf("%s: Error during messages preparation: %v", utils.GetCurrentTypeName(), err)
@@ -169,6 +179,13 @@ func (h *toolsHandler) processToolSearch(b *gotgbot.Bot, ctx *ext.Context) error
 	}
 
 	topicLink := fmt.Sprintf("https://t.me/c/%d/%d", h.config.SuperGroupChatID, h.config.ToolTopicID)
+	topicName := "Инструменты"
+	topic, err := h.groupTopicRepository.GetGroupTopicByTopicID(int64(h.config.ToolTopicID))
+	if err != nil {
+		log.Printf("%s: Error during topic information retrieval: %v", utils.GetCurrentTypeName(), err)
+	} else {
+		topicName = topic.Name
+	}
 
 	templateText, err := h.promptingTemplateRepository.Get(prompts.GetToolPromptKey, prompts.GetToolPromptDefaultValue)
 	if err != nil {
@@ -180,6 +197,7 @@ func (h *toolsHandler) processToolSearch(b *gotgbot.Bot, ctx *ext.Context) error
 	prompt := fmt.Sprintf(
 		templateText,
 		topicLink,
+		topicName,
 		topicLink,
 		utils.EscapeMarkdown(string(dataMessages)),
 		utils.EscapeMarkdown(query),
@@ -222,7 +240,7 @@ func (h *toolsHandler) processToolSearch(b *gotgbot.Bot, ctx *ext.Context) error
 		return handlers.EndConversation()
 	}
 
-	err = h.messageSenderService.ReplyMarkdown(msg, responseOpenAi, nil)
+	err = h.messageSenderService.ReplyHtml(msg, responseOpenAi, nil)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Произошла ошибка при отправке ответа.", nil)
 		log.Printf("%s: Error during message sending: %v", utils.GetCurrentTypeName(), err)
@@ -268,31 +286,47 @@ func (h *toolsHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	return handlers.EndConversation()
 }
 
-func (h *toolsHandler) prepareTelegramMessages(messages []*repositories.GroupMessage) ([]byte, error) {
+func (h *toolsHandler) preprocessingMessages(messages []*repositories.GroupMessage) ([]byte, error) {
+	// MessageObject represents the format for tool search processing
 	type MessageObject struct {
-		ID      int    `json:"id"`
-		Message string `json:"message"`
+		MessageID int64  `json:"message_id"` // Telegram message ID
+		Message   string `json:"message"`    // Message content (HTML formatted)
+	}
+
+	if len(messages) == 0 {
+		return nil, fmt.Errorf("%s: no messages found for processing", utils.GetCurrentTypeName())
 	}
 
 	messageObjects := make([]MessageObject, 0, len(messages))
 	for _, message := range messages {
+		// Skip empty messages
+		if strings.TrimSpace(message.MessageText) == "" {
+			continue
+		}
+
+		// Clean message text by removing copyright string
+		cleanedMessage := strings.ReplaceAll(message.MessageText, constants.CopyrightString, "")
+		cleanedMessage = strings.TrimSpace(cleanedMessage)
+
+		// Skip if message becomes empty after cleaning
+		if cleanedMessage == "" {
+			continue
+		}
+
 		messageObjects = append(messageObjects, MessageObject{
-			ID:      message.ID,
-			Message: message.MessageText,
+			MessageID: message.MessageID,
+			Message:   cleanedMessage, // Use cleaned message text
 		})
 	}
 
 	if len(messageObjects) == 0 {
-		return nil, fmt.Errorf("%s: no messages found in chat", utils.GetCurrentTypeName())
+		return nil, fmt.Errorf("%s: no valid messages found after filtering", utils.GetCurrentTypeName())
 	}
 
+	// Marshal to JSON for AI processing
 	dataMessages, err := json.Marshal(messageObjects)
 	if err != nil {
 		return nil, fmt.Errorf("%s: failed to marshal messages to JSON: %w", utils.GetCurrentTypeName(), err)
-	}
-
-	if string(dataMessages) == "" {
-		return nil, fmt.Errorf("%s: no messages found in chat", utils.GetCurrentTypeName())
 	}
 
 	return dataMessages, nil

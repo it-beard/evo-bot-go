@@ -9,6 +9,7 @@ const HelpCommand = "help"
 const StartCommand = "start"
 const IntroCommand = "intro"
 const ProfileCommand = "profile"
+const CopyrightString = "<br> © <a href=\"https://t.me/evocoders\">«Эволюция Кода»</a>"
 
 // Callback data constants for profile handler
 const (

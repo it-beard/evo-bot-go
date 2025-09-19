@@ -161,18 +161,17 @@ func (r *GroupMessageRepository) GetByUserTgID(userTgID int64, limit int, offset
 	return messages, nil
 }
 
-// GetByGroupTopicID retrieves group messages by group topic ID
-func (r *GroupMessageRepository) GetByGroupTopicID(groupTopicID int64, limit int, offset int) ([]*GroupMessage, error) {
+// GetAllByGroupTopicID retrieves all group messages by group topic ID without limit
+func (r *GroupMessageRepository) GetAllByGroupTopicID(groupTopicID int64) ([]*GroupMessage, error) {
 	query := `
 		SELECT id, message_id, message_text, reply_to_message_id, user_tg_id, group_topic_id, created_at, updated_at
 		FROM group_messages
 		WHERE group_topic_id = $1
-		ORDER BY created_at DESC
-		LIMIT $2 OFFSET $3`
+		ORDER BY created_at DESC`
 
-	rows, err := r.db.Query(query, groupTopicID, limit, offset)
+	rows, err := r.db.Query(query, groupTopicID)
 	if err != nil {
-		return nil, fmt.Errorf("%s: failed to get group messages by group topic ID %d: %w", utils.GetCurrentTypeName(), groupTopicID, err)
+		return nil, fmt.Errorf("%s: failed to get all group messages by group topic ID %d: %w", utils.GetCurrentTypeName(), groupTopicID, err)
 	}
 	defer rows.Close()
 

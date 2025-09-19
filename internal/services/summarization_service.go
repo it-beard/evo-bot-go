@@ -66,11 +66,13 @@ func (s *SummarizationService) RunDailySummarization(ctx context.Context, sendTo
 // summarizeTopicMessages summarizes a single topic
 func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topicID int, sendToDM bool) error {
 	// Get topic name
+	topicName := "	Topic name"
 	groupTopic, err := s.groupTopicRepository.GetGroupTopicByTopicID(int64(topicID))
 	if err != nil {
-		return fmt.Errorf("%s: failed to get topic name: %w", utils.GetCurrentTypeName(), err)
+		log.Printf("%s: failed to get topic name: %v", utils.GetCurrentTypeName(), err)
+	} else {
+		topicName = groupTopic.Name
 	}
-	topicName := groupTopic.Name
 
 	// Get messages directly from Telegram with retry logic for rate limiting
 	var messages []*repositories.GroupMessage

@@ -43,6 +43,7 @@ type contentHandler struct {
 	config                      *config.Config
 	openaiClient                *clients.OpenAiClient
 	promptingTemplateRepository *repositories.PromptingTemplateRepository
+	groupMessageRepository      *repositories.GroupMessageRepository
 	messageSenderService        *services.MessageSenderService
 	userStore                   *utils.UserDataStore
 	permissionsService          *services.PermissionsService
@@ -53,12 +54,14 @@ func NewContentHandler(
 	openaiClient *clients.OpenAiClient,
 	messageSenderService *services.MessageSenderService,
 	promptingTemplateRepository *repositories.PromptingTemplateRepository,
+	groupMessageRepository *repositories.GroupMessageRepository,
 	permissionsService *services.PermissionsService,
 ) ext.Handler {
 	h := &contentHandler{
 		config:                      config,
 		openaiClient:                openaiClient,
 		promptingTemplateRepository: promptingTemplateRepository,
+		groupMessageRepository:      groupMessageRepository,
 		messageSenderService:        messageSenderService,
 		userStore:                   utils.NewUserDataStore(),
 		permissionsService:          permissionsService,
@@ -97,7 +100,7 @@ func (h *contentHandler) startContentSearch(b *gotgbot.Bot, ctx *ext.Context) er
 	// Ask user to enter search query
 	sentMsg, _ := h.messageSenderService.ReplyWithReturnMessage(
 		msg,
-		"Введи поисковый запрос по контенту:",
+		"Пришли мне поисковый запрос по контенту:",
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: buttons.CancelButton(contentCallbackConfirmCancel),
 		},
@@ -157,11 +160,15 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 	// Send typing action using MessageSender.
 	h.messageSenderService.SendTypingAction(msg.Chat.Id)
 
-	// Get messages from chat
-	//[todo] get messages from chat
-	messages := []*repositories.GroupMessage{}
+	// Get content messages from DB
+	messages, err := h.groupMessageRepository.GetAllByGroupTopicID(int64(h.config.ContentTopicID))
+	if err != nil {
+		h.messageSenderService.Reply(msg, "Произошла ошибка при получении сообщений из базы данных.", nil)
+		log.Printf("%s: Error during message retrieval: %v", utils.GetCurrentTypeName(), err)
+		return handlers.EndConversation()
+	}
 
-	dataMessages, err := h.prepareTelegramMessages(messages)
+	dataMessages, err := h.preprocessingMessages(messages)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Произошла ошибка при подготовке сообщений для поиска.", nil)
 		log.Printf("%s: Error during messages preparation: %v", utils.GetCurrentTypeName(), err)
@@ -180,7 +187,6 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 
 	prompt := fmt.Sprintf(
 		templateText,
-		topicLink,
 		topicLink,
 		utils.EscapeMarkdown(string(dataMessages)),
 		utils.EscapeMarkdown(query),
@@ -223,7 +229,7 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 		return handlers.EndConversation()
 	}
 
-	err = h.messageSenderService.ReplyMarkdown(msg, responseOpenAi, nil)
+	err = h.messageSenderService.ReplyHtml(msg, responseOpenAi, nil)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Произошла ошибка при отправке ответа.", nil)
 		log.Printf("%s: Error during message sending: %v", utils.GetCurrentTypeName(), err)
@@ -269,15 +275,19 @@ func (h *contentHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	return handlers.EndConversation()
 }
 
-func (h *contentHandler) prepareTelegramMessages(messages []*repositories.GroupMessage) ([]byte, error) {
-	// Modified MessageObject to have Date as string
+func (h *contentHandler) preprocessingMessages(messages []*repositories.GroupMessage) ([]byte, error) {
+	// MessageObject represents the structured format for AI processing
 	type MessageObject struct {
-		ID      int    `json:"id"`
-		Message string `json:"message"`
-		Date    string `json:"date"` // now formatted as "10 february 2024"
+		MessageID int64  `json:"message_id"` // Telegram message ID
+		Message   string `json:"message"`    // Message content (HTML formatted)
+		Date      string `json:"date"`       // Formatted date
 	}
 
-	// Load UTC location
+	if len(messages) == 0 {
+		return nil, fmt.Errorf("no messages found for processing")
+	}
+
+	// Load UTC location for consistent date formatting
 	loc, err := time.LoadLocation("UTC")
 	if err != nil {
 		return nil, fmt.Errorf("failed to load UTC location: %w", err)
@@ -285,29 +295,38 @@ func (h *contentHandler) prepareTelegramMessages(messages []*repositories.GroupM
 
 	messageObjects := make([]MessageObject, 0, len(messages))
 	for _, message := range messages {
-		// Convert Unix timestamp to UTC time
-		t := time.Unix(int64(message.CreatedAt.Unix()), 0).In(loc)
-		// Format date as "day month year" and convert to lowercase
-		dateFormatted := strings.ToLower(t.Format("2 January 2006"))
+		// Skip empty messages
+		if strings.TrimSpace(message.MessageText) == "" {
+			continue
+		}
+
+		// Clean message text by removing copyright string
+		cleanedMessage := strings.ReplaceAll(message.MessageText, constants.CopyrightString, "")
+		cleanedMessage = strings.TrimSpace(cleanedMessage)
+
+		// Skip if message becomes empty after cleaning
+		if cleanedMessage == "" {
+			continue
+		}
+
+		// Format date for readability: "2 January 2006"
+		dateFormatted := message.CreatedAt.In(loc).Format("2006.01.28")
 
 		messageObjects = append(messageObjects, MessageObject{
-			ID:      message.ID,
-			Message: message.MessageText,
-			Date:    dateFormatted,
+			MessageID: message.MessageID,
+			Message:   cleanedMessage, // Use cleaned message text
+			Date:      dateFormatted,
 		})
 	}
 
 	if len(messageObjects) == 0 {
-		return nil, fmt.Errorf("no messages found in chat")
+		return nil, fmt.Errorf("no valid messages found after filtering")
 	}
 
+	// Marshal to JSON for AI processing
 	dataMessages, err := json.Marshal(messageObjects)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal messages to JSON: %w", err)
-	}
-
-	if string(dataMessages) == "" {
-		return nil, fmt.Errorf("no messages found in chat")
 	}
 
 	return dataMessages, nil
