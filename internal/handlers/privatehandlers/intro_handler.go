@@ -105,7 +105,7 @@ func (h *introHandler) startIntroSearch(b *gotgbot.Bot, ctx *ext.Context) error 
 	sentMsg, _ := h.messageSenderService.SendHtmlWithReturnMessage(
 		msg.Chat.Id,
 		fmt.Sprintf("<blockquote> ⚠️ Для быстрого полнотекстового поиска по имени или нику участника лучше использовать менеджер профилей через команду /%s. </blockquote>", constants.ProfileCommand)+
-			"\n\nВведи поисковый запрос для интеллектуального поиска по участникам клуба. Можно использовать любой поисковый запрос, поиск происходит с применением ИИ:",
+			"\n\nПришли мне поисковый запрос для интеллектуального поиска по участникам клуба. Можно использовать любой поисковый запрос, поиск происходит с применением ИИ:",
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: buttons.CancelButton(introCallbackConfirmCancel),
 		},
@@ -167,9 +167,12 @@ func (h *introHandler) processIntroSearch(b *gotgbot.Bot, ctx *ext.Context) erro
 	}
 
 	// Inform user that processing has started
-	sentMsg, _ = h.messageSenderService.SendWithReturnMessage(msg.Chat.Id, fmt.Sprintf("Ищу информацию по запросу: \"%s\"...", query), &gotgbot.SendMessageOpts{
-		ReplyMarkup: buttons.CancelButton(introCallbackConfirmCancel),
-	})
+	sentMsg, _ = h.messageSenderService.SendWithReturnMessage(
+		msg.Chat.Id,
+		fmt.Sprintf("Ищу информацию по запросу: \"%s\"...", query),
+		&gotgbot.SendMessageOpts{
+			ReplyMarkup: buttons.CancelButton(introCallbackConfirmCancel),
+		})
 
 	// Remove search query message
 	msg.Delete(b, nil)

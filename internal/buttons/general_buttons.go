@@ -69,3 +69,28 @@ func BackAndCancelButton(callbackDataBack string, callbackDataCancel string) got
 
 	return inlineKeyboard
 }
+
+func SearchTypeSelectionButton(callbackDataFast string, callbackDataDeep string, callbackDataCancel string) gotgbot.InlineKeyboardMarkup {
+	inlineKeyboard := gotgbot.InlineKeyboardMarkup{
+		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
+			{
+				{
+					Text:         "⚡ Быстрый",
+					CallbackData: callbackDataFast,
+				},
+				{
+					Text:         "🔍 Глубокий",
+					CallbackData: callbackDataDeep,
+				},
+			},
+			{
+				{
+					Text:         "❌ Отмена",
+					CallbackData: callbackDataCancel,
+				},
+			},
+		},
+	}
+
+	return inlineKeyboard
+}
