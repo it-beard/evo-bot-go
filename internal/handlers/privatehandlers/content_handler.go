@@ -23,20 +23,27 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/callbackquery"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/message"
+	"github.com/openai/openai-go/v2"
 )
 
 const (
 	// Conversation states names
-	contentStateProcessQuery = "content_state_process_query"
+	contentStateStartSearch   = "content_state_start_search"
+	contentStateSelectSearch  = "content_state_select_search"
+	contentStateProcessSearch = "content_state_process_search"
 
 	// UserStore keys
 	contentCtxDataKeyProcessing        = "content_ctx_data_processing"
 	contentCtxDataKeyCancelFunc        = "content_ctx_data_cancel_func"
 	contentCtxDataKeyPreviousMessageID = "content_ctx_data_previous_message_id"
 	contentCtxDataKeyPreviousChatID    = "content_ctx_data_previous_chat_id"
+	contentCtxDataKeySearchQuery       = "content_ctx_data_search_query"
+	contentCtxDataKeySearchType        = "content_ctx_data_search_type"
 
 	// Callback data
 	contentCallbackConfirmCancel = "content_callback_confirm_cancel"
+	contentCallbackFastSearch    = "content_callback_fast_search"
+	contentCallbackDeepSearch    = "content_callback_deep_search"
 )
 
 type contentHandler struct {
@@ -72,13 +79,26 @@ func NewContentHandler(
 			handlers.NewCommand(constants.ContentCommand, h.startContentSearch),
 		},
 		map[string][]ext.Handler{
-			contentStateProcessQuery: {
-				handlers.NewMessage(message.All, h.processContentSearch),
+			contentStateStartSearch: {
+				handlers.NewMessage(message.All, h.selectSearchType),
+				handlers.NewCallback(callbackquery.Equal(contentCallbackConfirmCancel), h.handleCallbackCancel),
+			},
+			contentStateSelectSearch: {
+				handlers.NewCallback(callbackquery.Equal(contentCallbackFastSearch), h.handleFastSearchSelection),
+				handlers.NewCallback(callbackquery.Equal(contentCallbackDeepSearch), h.handleDeepSearchSelection),
+				handlers.NewCallback(callbackquery.Equal(contentCallbackConfirmCancel), h.handleCallbackCancel),
+				handlers.NewMessage(message.All, h.processContentSearchWithType),
+			},
+			contentStateProcessSearch: {
+				handlers.NewMessage(message.All, h.processContentSearchWithType),
 				handlers.NewCallback(callbackquery.Equal(contentCallbackConfirmCancel), h.handleCallbackCancel),
 			},
 		},
 		&handlers.ConversationOpts{
-			Exits: []ext.Handler{handlers.NewCommand(constants.CancelCommand, h.handleCancel)},
+			Exits: []ext.Handler{
+				handlers.NewCommand(constants.CancelCommand, h.handleCancel),
+				handlers.NewCallback(callbackquery.Equal(contentCallbackConfirmCancel), h.handleCallbackCancel),
+			},
 		},
 	)
 }
@@ -87,19 +107,16 @@ func NewContentHandler(
 func (h *contentHandler) startContentSearch(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
-	// Only proceed if this is a private chat
 	if !h.permissionsService.CheckPrivateChatType(msg) {
 		return handlers.EndConversation()
 	}
 
-	// Check if user is a club member
 	if !h.permissionsService.CheckClubMemberPermissions(msg, constants.ContentCommand) {
 		return handlers.EndConversation()
 	}
 
-	// Ask user to enter search query
-	sentMsg, _ := h.messageSenderService.ReplyWithReturnMessage(
-		msg,
+	sentMsg, _ := h.messageSenderService.SendWithReturnMessage(
+		msg.Chat.Id,
 		"Пришли мне поисковый запрос по контенту:",
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: buttons.CancelButton(contentCallbackConfirmCancel),
@@ -107,80 +124,129 @@ func (h *contentHandler) startContentSearch(b *gotgbot.Bot, ctx *ext.Context) er
 	)
 
 	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
-	return handlers.NextConversationState(contentStateProcessQuery)
+	return handlers.NextConversationState(contentStateStartSearch)
 }
 
 // 2. processContentSearch handles the actual content search
-func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) error {
+func (h *contentHandler) selectSearchType(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
-	// Check if we're already processing a request for this user
-	if isProcessing, ok := h.userStore.Get(ctx.EffectiveUser.Id, contentCtxDataKeyProcessing); ok && isProcessing.(bool) {
-		h.messageSenderService.Reply(
-			msg,
-			fmt.Sprintf("Пожалуйста, дождись окончания обработки предыдущего запроса, или используй /%s для отмены.", constants.CancelCommand),
-			nil,
-		)
-		return nil // Stay in the same state
-	}
-
-	// Get query from user message
 	query := strings.TrimSpace(msg.Text)
 	if query == "" {
-		h.messageSenderService.Reply(
-			msg,
-			fmt.Sprintf("Поисковый запрос не может быть пустым. Пожалуйста, введи запрос или используй /%s для отмены.", constants.CancelCommand),
+		h.messageSenderService.Send(
+			msg.Chat.Id,
+			fmt.Sprintf("Поисковый запрос не может быть пустым. Пожалуйста, введи запрос или используй /%s для отмены.",
+				constants.CancelCommand),
 			nil,
 		)
-		return nil // Stay in the same state
+		return nil
 	}
 
-	// Mark as processing
-	h.userStore.Set(ctx.EffectiveUser.Id, contentCtxDataKeyProcessing, true)
+	h.userStore.Set(ctx.EffectiveUser.Id, contentCtxDataKeySearchQuery, query)
 
-	// Create a cancellable context for this operation
+	msg.Delete(b, nil)
+	h.RemovePreviousMessage(b, &ctx.EffectiveUser.Id)
+
+	sentMsg, _ := h.messageSenderService.SendWithReturnMessage(
+		msg.Chat.Id,
+		fmt.Sprintf("Запрос: \"%s\"\n\nВыбери тип поиска:", query),
+		&gotgbot.SendMessageOpts{
+			ReplyMarkup: buttons.SearchTypeSelectionButton(
+				contentCallbackFastSearch,
+				contentCallbackDeepSearch,
+				contentCallbackConfirmCancel,
+			),
+		},
+	)
+
+	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
+	return handlers.NextConversationState(contentStateSelectSearch)
+}
+
+func (h *contentHandler) handleFastSearchSelection(b *gotgbot.Bot, ctx *ext.Context) error {
+	cb := ctx.Update.CallbackQuery
+	_, _ = cb.Answer(b, nil)
+	h.userStore.Set(ctx.EffectiveUser.Id, contentCtxDataKeySearchType, constants.SearchTypeFast)
+	return h.processContentSearchWithType(b, ctx)
+}
+
+func (h *contentHandler) handleDeepSearchSelection(b *gotgbot.Bot, ctx *ext.Context) error {
+	cb := ctx.Update.CallbackQuery
+	_, _ = cb.Answer(b, nil)
+	h.userStore.Set(ctx.EffectiveUser.Id, contentCtxDataKeySearchType, constants.SearchTypeDeep)
+	return h.processContentSearchWithType(b, ctx)
+}
+
+func (h *contentHandler) processContentSearchWithType(b *gotgbot.Bot, ctx *ext.Context) error {
+	msg := ctx.EffectiveMessage
+	userId := ctx.EffectiveUser.Id
+
+	if isProcessing, ok := h.userStore.Get(userId, contentCtxDataKeyProcessing); ok && isProcessing.(bool) {
+		h.RemovePreviousMessage(b, &userId)
+		msg.Delete(b, nil)
+		warningMsg, _ := h.messageSenderService.SendWithReturnMessage(
+			msg.Chat.Id,
+			fmt.Sprintf("Пожалуйста, дождись окончания обработки предыдущего запроса, или используй /%s для отмены.",
+				constants.CancelCommand),
+			&gotgbot.SendMessageOpts{ReplyMarkup: buttons.CancelButton(contentCallbackConfirmCancel)},
+		)
+		h.SavePreviousMessageInfo(userId, warningMsg)
+		return nil
+	}
+
+	queryInterface, _ := h.userStore.Get(userId, contentCtxDataKeySearchQuery)
+	query, _ := queryInterface.(string)
+	searchTypeInterface, hasSearchType := h.userStore.Get(userId, contentCtxDataKeySearchType)
+	searchType, okType := searchTypeInterface.(string)
+
+	if !hasSearchType || !okType || strings.TrimSpace(searchType) == "" {
+		h.messageSenderService.Send(msg.Chat.Id, "Сначала выбери тип поиска кнопками выше!", nil)
+		return nil
+	}
+
+	h.userStore.Set(userId, contentCtxDataKeyProcessing, true)
 	typingCtx, cancelTyping := context.WithCancel(context.Background())
-
-	// Store cancel function in user store so it can be called from handleCancel
-	h.userStore.Set(ctx.EffectiveUser.Id, contentCtxDataKeyCancelFunc, cancelTyping)
-
-	// Make sure we clean up the processing flag in all exit paths
+	h.userStore.Set(userId, contentCtxDataKeyCancelFunc, cancelTyping)
 	defer func() {
-		h.userStore.Set(ctx.EffectiveUser.Id, contentCtxDataKeyProcessing, false)
-		h.userStore.Set(ctx.EffectiveUser.Id, contentCtxDataKeyCancelFunc, nil)
+		h.userStore.Set(userId, contentCtxDataKeyProcessing, false)
+		h.userStore.Set(userId, contentCtxDataKeyCancelFunc, nil)
 	}()
 
-	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
-	// Inform user that search has started
-	sentMsg, _ := h.messageSenderService.ReplyWithReturnMessage(msg, fmt.Sprintf("Ищу информацию по запросу: \"%s\"...", query), &gotgbot.SendMessageOpts{
-		ReplyMarkup: buttons.CancelButton(contentCallbackConfirmCancel),
-	})
-	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
+	h.RemovePreviousMessage(b, &userId)
 
-	// Send typing action using MessageSender.
+	searchTypeText := "быстрый"
+	if searchType == constants.SearchTypeDeep {
+		searchTypeText = "глубокий"
+	}
+
+	sentMsg, _ := h.messageSenderService.SendWithReturnMessage(
+		msg.Chat.Id,
+		fmt.Sprintf("Ищу информацию по запросу: \"%s\" (%s поиск)...", query, searchTypeText),
+		&gotgbot.SendMessageOpts{ReplyMarkup: buttons.CancelButton(contentCallbackConfirmCancel)},
+	)
+	h.SavePreviousMessageInfo(userId, sentMsg)
+
 	h.messageSenderService.SendTypingAction(msg.Chat.Id)
 
-	// Get content messages from DB
 	messages, err := h.groupMessageRepository.GetAllByGroupTopicID(int64(h.config.ContentTopicID))
 	if err != nil {
-		h.messageSenderService.Reply(msg, "Произошла ошибка при получении сообщений из базы данных.", nil)
+		h.messageSenderService.Send(msg.Chat.Id, "Произошла ошибка при получении сообщений из базы данных.", nil)
 		log.Printf("%s: Error during message retrieval: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 
 	dataMessages, err := h.preprocessingMessages(messages)
 	if err != nil {
-		h.messageSenderService.Reply(msg, "Произошла ошибка при подготовке сообщений для поиска.", nil)
+		h.messageSenderService.Send(msg.Chat.Id, "Произошла ошибка при подготовке сообщений для поиска.", nil)
 		log.Printf("%s: Error during messages preparation: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 
 	topicLink := fmt.Sprintf("https://t.me/c/%d/%d", h.config.SuperGroupChatID, h.config.ContentTopicID)
 
-	// Get the prompt template from the database
 	templateText, err := h.promptingTemplateRepository.Get(prompts.GetContentPromptKey, prompts.GetContentPromptDefaultValue)
 	if err != nil {
-		h.messageSenderService.Reply(msg, "Произошла ошибка при получении шаблона для поиска контента.", nil)
+		h.messageSenderService.Send(msg.Chat.Id, "Произошла ошибка при получении шаблона для поиска контента.", nil)
 		log.Printf("%s: Error during template retrieval: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
@@ -192,15 +258,11 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 		utils.EscapeMarkdown(query),
 	)
 
-	// Save the prompt into a temporary file for logging purposes.
-	err = os.WriteFile("last-prompt-log.txt", []byte(prompt), 0644)
-	if err != nil {
+	if err = os.WriteFile("last-prompt-log.txt", []byte(prompt), 0644); err != nil {
 		log.Printf("%s: Error writing prompt to file: %v", utils.GetCurrentTypeName(), err)
 	}
 
-	// Start periodic typing action every 5 seconds while waiting for the OpenAI response.
-	defer cancelTyping() // ensure cancellation if function exits early
-
+	defer cancelTyping()
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
@@ -214,31 +276,32 @@ func (h *contentHandler) processContentSearch(b *gotgbot.Bot, ctx *ext.Context) 
 		}
 	}()
 
-	// Get completion from OpenAI using the new context.
-	responseOpenAi, err := h.openaiClient.GetCompletion(typingCtx, prompt)
-	// Check if context was cancelled
+	var responseOpenAi string
+	if searchType == constants.SearchTypeFast {
+		responseOpenAi, err = h.openaiClient.GetCompletionWithReasoning(typingCtx, prompt, openai.ReasoningEffortMinimal)
+	} else {
+		responseOpenAi, err = h.openaiClient.GetCompletionWithReasoning(typingCtx, prompt, openai.ReasoningEffortMedium)
+	}
+
 	if typingCtx.Err() != nil {
 		log.Printf("%s: Request was cancelled", utils.GetCurrentTypeName())
 		return handlers.EndConversation()
 	}
 
-	// Continue only if no errors
 	if err != nil {
-		h.messageSenderService.Reply(msg, "Произошла ошибка при получении ответа от OpenAI.", nil)
+		h.messageSenderService.Send(msg.Chat.Id, "Произошла ошибка при получении ответа от OpenAI.", nil)
 		log.Printf("%s: Error during OpenAI response retrieval: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 
-	err = h.messageSenderService.ReplyHtml(msg, responseOpenAi, nil)
-	if err != nil {
-		h.messageSenderService.Reply(msg, "Произошла ошибка при отправке ответа.", nil)
+	if err = h.messageSenderService.SendHtml(msg.Chat.Id, responseOpenAi, nil); err != nil {
+		h.messageSenderService.Send(msg.Chat.Id, "Произошла ошибка при отправке ответа.", nil)
 		log.Printf("%s: Error during message sending: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 
-	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
-	// Clean up user data
-	h.userStore.Clear(ctx.EffectiveUser.Id)
+	h.RemovePreviousMessage(b, &userId)
+	h.userStore.Clear(userId)
 
 	return handlers.EndConversation()
 }
@@ -261,13 +324,13 @@ func (h *contentHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 		// Call the cancel function to stop any ongoing API calls
 		if cf, ok := cancelFunc.(context.CancelFunc); ok {
 			cf()
-			h.messageSenderService.Reply(msg, "Операция поиска контента отменена.", nil)
+			h.messageSenderService.Send(msg.Chat.Id, "Операция поиска контента отменена.", nil)
 		}
 	} else {
-		h.messageSenderService.Reply(msg, "Операция поиска контента отменена.", nil)
+		h.messageSenderService.Send(msg.Chat.Id, "Операция поиска контента отменена.", nil)
 	}
 
-	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
+	h.RemovePreviousMessage(b, &ctx.EffectiveUser.Id)
 
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)
@@ -351,6 +414,24 @@ func (h *contentHandler) MessageRemoveInlineKeyboard(b *gotgbot.Bot, userID *int
 
 	// Use message sender service to remove the inline keyboard
 	_ = h.messageSenderService.RemoveInlineKeyboard(chatID, messageID)
+}
+
+func (h *contentHandler) RemovePreviousMessage(b *gotgbot.Bot, userID *int64) {
+	var chatID, messageID int64
+
+	if userID != nil {
+		messageID, chatID = h.userStore.GetPreviousMessageInfo(
+			*userID,
+			contentCtxDataKeyPreviousMessageID,
+			contentCtxDataKeyPreviousChatID,
+		)
+	}
+
+	if chatID == 0 || messageID == 0 {
+		return
+	}
+
+	b.DeleteMessage(chatID, messageID, nil)
 }
 
 func (h *contentHandler) SavePreviousMessageInfo(userID int64, sentMsg *gotgbot.Message) {

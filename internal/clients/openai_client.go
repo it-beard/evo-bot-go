@@ -34,12 +34,17 @@ func NewOpenAiClient() (*OpenAiClient, error) {
 
 // GetCompletion sends a message to OpenAI and returns the response
 func (c *OpenAiClient) GetCompletion(ctx context.Context, message string) (string, error) {
+	return c.GetCompletionWithReasoning(ctx, message, openai.ReasoningEffortMedium)
+}
+
+// GetCompletionWithReasoning sends a message to OpenAI with specified reasoning effort and returns the response
+func (c *OpenAiClient) GetCompletionWithReasoning(ctx context.Context, message string, reasoningEffort openai.ReasoningEffort) (string, error) {
 	completion, err := c.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 		Messages: []openai.ChatCompletionMessageParamUnion{
 			openai.UserMessage(message),
 		},
 		Model:           openai.ChatModelGPT5Mini,
-		ReasoningEffort: openai.ReasoningEffortMedium,
+		ReasoningEffort: reasoningEffort,
 		//Model: openai.ChatModelO3Mini,
 		//Model: "o4-mini",
 		//Model: "gpt-4.1-mini",
