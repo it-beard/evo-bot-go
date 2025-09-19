@@ -372,8 +372,8 @@ func (h *contentHandler) preprocessingMessages(messages []*repositories.GroupMes
 			continue
 		}
 
-		// Format date for readability: "2 January 2006"
-		dateFormatted := message.CreatedAt.In(loc).Format("2006.01.28")
+		// Format date as YYYY.MM.DD
+		dateFormatted := message.CreatedAt.In(loc).Format("2006.01.02")
 
 		messageObjects = append(messageObjects, MessageObject{
 			MessageID: message.MessageID,
