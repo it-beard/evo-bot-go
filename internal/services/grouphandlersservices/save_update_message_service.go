@@ -7,6 +7,7 @@ import (
 	"evo-bot-go/internal/utils"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 )
@@ -96,13 +97,15 @@ func (s *SaveUpdateMessageService) handleSaveOrUpdate(msg *gotgbot.Message, isSa
 		msg.From.Id = s.config.AdminUserID
 	}
 
-	// Save the message
-	_, err = s.groupMessageRepository.Create(
+	// Save the message with original creation time from Telegram
+	createdAt := time.Unix(int64(msg.Date), 0).UTC()
+	_, err = s.groupMessageRepository.CreateWithCreatedAt(
 		msg.MessageId,
 		markdownText,
 		replyToMessageID,
 		msg.From.Id,
 		groupTopicID,
+		createdAt,
 	)
 	if err != nil {
 		return fmt.Errorf("%s: failed to save group message: %w", utils.GetCurrentTypeName(), err)

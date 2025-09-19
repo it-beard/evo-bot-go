@@ -1,6 +1,7 @@
 package grouphandlersservices
 
 import (
+	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/repositories"
 
@@ -11,15 +12,18 @@ import (
 type SaveMessageService struct {
 	groupMessageRepository   *repositories.GroupMessageRepository
 	saveUpdateMessageService *SaveUpdateMessageService
+	config                   *config.Config
 }
 
 func NewSaveMessageService(
 	groupMessageRepository *repositories.GroupMessageRepository,
 	saveUpdateMessageService *SaveUpdateMessageService,
+	config *config.Config,
 ) *SaveMessageService {
 	return &SaveMessageService{
 		groupMessageRepository:   groupMessageRepository,
 		saveUpdateMessageService: saveUpdateMessageService,
+		config:                   config,
 	}
 }
 
@@ -40,6 +44,14 @@ func (s *SaveMessageService) SaveOrUpdateMessage(ctx *ext.Context) error {
 }
 
 func (s *SaveMessageService) IsMessageShouldBeSavedOrUpdated(msg *gotgbot.Message) bool {
+	// If message from Content topic and it is reply - don't save
+	if msg.MessageThreadId == int64(s.config.ContentTopicID) &&
+		msg.ReplyToMessage != nil &&
+		// By default all messages is reply to Topic itself, so check it
+		msg.ReplyToMessage.MessageThreadId != msg.ReplyToMessage.MessageId {
+		return false
+	}
+
 	// Check if this is a regular message with content
 	return msg.Text != "" || msg.Caption != "" || msg.Voice != nil || msg.Audio != nil ||
 		msg.Document != nil || msg.Photo != nil || msg.Video != nil || msg.VideoNote != nil ||
