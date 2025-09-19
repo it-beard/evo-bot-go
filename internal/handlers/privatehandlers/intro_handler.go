@@ -23,20 +23,27 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/callbackquery"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/message"
+	"github.com/openai/openai-go/v2"
 )
 
 const (
 	// Conversation states names
-	introStateProcessQuery = "intro_state_process_query"
+	introStateStartIntroSearch   = "intro_state_start_intro_search"
+	introStateSelectSearchType   = "intro_state_select_search_type"
+	introStateProcessIntroSearch = "intro_state_process_intro_search"
 
 	// UserStore keys
 	introCtxDataKeyProcessing        = "intro_ctx_data_processing"
 	introCtxDataKeyCancelFunc        = "intro_ctx_data_cancel_func"
 	introCtxDataKeyPreviousMessageID = "intro_ctx_data_previous_message_id"
 	introCtxDataKeyPreviousChatID    = "intro_ctx_data_previous_chat_id"
+	introCtxDataKeySearchQuery       = "intro_ctx_data_key_search_query"
+	introCtxDataKeySearchType        = "intro_ctx_data_key_search_type"
 
 	// Callback data
 	introCallbackConfirmCancel = "intro_callback_confirm_cancel"
+	introCallbackFastSearch    = "intro_callback_fast_search"
+	introCallbackDeepSearch    = "intro_callback_deep_search"
 )
 
 type introHandler struct {
@@ -72,8 +79,18 @@ func NewIntroHandler(
 			handlers.NewCommand(constants.IntroCommand, h.startIntroSearch),
 		},
 		map[string][]ext.Handler{
-			introStateProcessQuery: {
-				handlers.NewMessage(message.All, h.processIntroSearch),
+			introStateStartIntroSearch: {
+				handlers.NewMessage(message.All, h.selectSearchType),
+				handlers.NewCallback(callbackquery.Equal(introCallbackConfirmCancel), h.handleCallbackCancel),
+			},
+			introStateSelectSearchType: {
+				handlers.NewCallback(callbackquery.Equal(introCallbackFastSearch), h.handleFastSearchSelection),
+				handlers.NewCallback(callbackquery.Equal(introCallbackDeepSearch), h.handleDeepSearchSelection),
+				handlers.NewCallback(callbackquery.Equal(introCallbackConfirmCancel), h.handleCallbackCancel),
+				handlers.NewMessage(message.All, h.processIntroSearchWithType),
+			},
+			introStateProcessIntroSearch: {
+				handlers.NewMessage(message.All, h.processIntroSearchWithType),
 				handlers.NewCallback(callbackquery.Equal(introCallbackConfirmCancel), h.handleCallbackCancel),
 			},
 		},
@@ -112,11 +129,11 @@ func (h *introHandler) startIntroSearch(b *gotgbot.Bot, ctx *ext.Context) error 
 	)
 
 	h.SavePreviousMessageInfo(userId, sentMsg)
-	return handlers.NextConversationState(introStateProcessQuery)
+	return handlers.NextConversationState(introStateStartIntroSearch)
 }
 
-// processIntroSearch handles the actual intro search
-func (h *introHandler) processIntroSearch(b *gotgbot.Bot, ctx *ext.Context) error {
+// selectSearchType handles query input and asks user to choose search type
+func (h *introHandler) selectSearchType(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	userId := ctx.EffectiveUser.Id
 
@@ -126,34 +143,91 @@ func (h *introHandler) processIntroSearch(b *gotgbot.Bot, ctx *ext.Context) erro
 		return handlers.EndConversation()
 	}
 
-	// Check if we're already processing a request for this user
+	query := strings.TrimSpace(msg.Text)
+	if query == "" {
+		h.messageSenderService.Send(
+			msg.Chat.Id,
+			fmt.Sprintf("Поисковый запрос не может быть пустым. Пожалуйста, введи запрос или используй /%s для отмены.",
+				constants.CancelCommand),
+			nil,
+		)
+		return nil
+	}
+
+	h.userStore.Set(userId, introCtxDataKeySearchQuery, query)
+
+	msg.Delete(b, nil)
+	h.RemovePreviousMessage(b, &userId)
+
+	sentMsg, _ := h.messageSenderService.SendWithReturnMessage(
+		msg.Chat.Id,
+		fmt.Sprintf("Запрос: \"%s\"\n\nВыбери тип поиска:", query),
+		&gotgbot.SendMessageOpts{
+			ReplyMarkup: buttons.SearchTypeSelectionButton(
+				introCallbackFastSearch,
+				introCallbackDeepSearch,
+				introCallbackConfirmCancel,
+			),
+		},
+	)
+
+	h.SavePreviousMessageInfo(userId, sentMsg)
+	return handlers.NextConversationState(introStateSelectSearchType)
+}
+
+// handleFastSearchSelection handles fast search type selection
+func (h *introHandler) handleFastSearchSelection(b *gotgbot.Bot, ctx *ext.Context) error {
+	cb := ctx.Update.CallbackQuery
+	_, _ = cb.Answer(b, nil)
+
+	h.userStore.Set(ctx.EffectiveUser.Id, introCtxDataKeySearchType, constants.SearchTypeFast)
+	return h.processIntroSearchWithType(b, ctx)
+}
+
+// handleDeepSearchSelection handles deep search type selection
+func (h *introHandler) handleDeepSearchSelection(b *gotgbot.Bot, ctx *ext.Context) error {
+	cb := ctx.Update.CallbackQuery
+	_, _ = cb.Answer(b, nil)
+
+	h.userStore.Set(ctx.EffectiveUser.Id, introCtxDataKeySearchType, constants.SearchTypeDeep)
+	return h.processIntroSearchWithType(b, ctx)
+}
+
+// processIntroSearchWithType processes the search with the selected type
+func (h *introHandler) processIntroSearchWithType(b *gotgbot.Bot, ctx *ext.Context) error {
+	msg := ctx.EffectiveMessage
+	userId := ctx.EffectiveUser.Id
+
 	if isProcessing, ok := h.userStore.Get(userId, introCtxDataKeyProcessing); ok && isProcessing.(bool) {
 		h.RemovePreviousMessage(b, &userId)
 		msg.Delete(b, nil)
 		warningMsg, _ := h.messageSenderService.SendWithReturnMessage(
 			msg.Chat.Id,
-			fmt.Sprintf("Пожалуйста, дождись окончания обработки предыдущего запроса, или используй /%s для отмены.", constants.CancelCommand),
+			fmt.Sprintf("Пожалуйста, дождись окончания обработки предыдущего запроса, или используй /%s для отмены.",
+				constants.CancelCommand),
 			&gotgbot.SendMessageOpts{
 				ReplyMarkup: buttons.CancelButton(introCallbackConfirmCancel),
 			},
 		)
 		h.SavePreviousMessageInfo(userId, warningMsg)
-		return nil // Stay in the same state
+		return nil
 	}
 
-	// Get query from user message
-	query := strings.TrimSpace(msg.Text)
+	queryInterface, _ := h.userStore.Get(userId, introCtxDataKeySearchQuery)
+	query, _ := queryInterface.(string)
+	searchTypeInterface, hasSearchType := h.userStore.Get(userId, introCtxDataKeySearchType)
+	searchType, okType := searchTypeInterface.(string)
 
-	// Mark as processing
+	if !hasSearchType || !okType || strings.TrimSpace(searchType) == "" {
+		h.messageSenderService.Send(msg.Chat.Id, "Сначала выбери тип поиска кнопками выше!", nil)
+		return nil
+	}
+
 	h.userStore.Set(userId, introCtxDataKeyProcessing, true)
 
-	// Create a cancellable context for this operation
 	typingCtx, cancelTyping := context.WithCancel(context.Background())
-
-	// Store cancel function in user store so it can be called from handleCancel
 	h.userStore.Set(userId, introCtxDataKeyCancelFunc, cancelTyping)
 
-	// Make sure we clean up the processing flag in all exit paths
 	defer func() {
 		h.userStore.Set(userId, introCtxDataKeyProcessing, false)
 		h.userStore.Set(userId, introCtxDataKeyCancelFunc, nil)
@@ -161,28 +235,22 @@ func (h *introHandler) processIntroSearch(b *gotgbot.Bot, ctx *ext.Context) erro
 
 	h.RemovePreviousMessage(b, &userId)
 
-	var sentMsg *gotgbot.Message
-	if query == "" {
-		return handlers.EndConversation()
+	searchTypeText := "быстрый"
+	if searchType == constants.SearchTypeDeep {
+		searchTypeText = "глубокий"
 	}
 
-	// Inform user that processing has started
-	sentMsg, _ = h.messageSenderService.SendWithReturnMessage(
+	sentMsg, _ := h.messageSenderService.SendWithReturnMessage(
 		msg.Chat.Id,
-		fmt.Sprintf("Ищу информацию по запросу: \"%s\"...", query),
+		fmt.Sprintf("Ищу информацию по запросу: \"%s\" (%s поиск)...", query, searchTypeText),
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: buttons.CancelButton(introCallbackConfirmCancel),
-		})
-
-	// Remove search query message
-	msg.Delete(b, nil)
-
+		},
+	)
 	h.SavePreviousMessageInfo(userId, sentMsg)
 
-	// Send typing action using MessageSender.
 	h.messageSenderService.SendTypingAction(msg.Chat.Id)
 
-	// Get profile data from repository
 	profiles, err := h.prepareProfileData()
 	if err != nil {
 		h.messageSenderService.Send(msg.Chat.Id, "Произошла ошибка при получении данных профилей для обработки.", nil)
@@ -190,7 +258,6 @@ func (h *introHandler) processIntroSearch(b *gotgbot.Bot, ctx *ext.Context) erro
 		return handlers.EndConversation()
 	}
 
-	// Get the prompt template from the database
 	templateText, err := h.promptingTemplateRepository.Get(prompts.GetIntroPromptKey, prompts.GetIntroPromptDefaultValue)
 	if err != nil {
 		h.messageSenderService.Send(msg.Chat.Id, "Произошла ошибка при получении шаблона для вводной информации.", nil)
@@ -207,15 +274,11 @@ func (h *introHandler) processIntroSearch(b *gotgbot.Bot, ctx *ext.Context) erro
 		utils.EscapeMarkdown(query),
 	)
 
-	// Save the prompt into a temporary file for logging purposes.
-	err = os.WriteFile("last-prompt-log.txt", []byte(prompt), 0644)
-	if err != nil {
+	if err = os.WriteFile("last-prompt-log.txt", []byte(prompt), 0644); err != nil {
 		log.Printf("%s: Error writing prompt to file: %v", utils.GetCurrentTypeName(), err)
 	}
 
-	// Start periodic typing action every 5 seconds while waiting for the OpenAI response.
-	defer cancelTyping() // ensure cancellation if function exits early
-
+	defer cancelTyping()
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
@@ -229,28 +292,30 @@ func (h *introHandler) processIntroSearch(b *gotgbot.Bot, ctx *ext.Context) erro
 		}
 	}()
 
-	// Get completion from OpenAI using the new context.
-	responseOpenAi, err := h.openaiClient.GetCompletion(typingCtx, prompt)
-	// Check if context was cancelled
+	var responseOpenAi string
+	if searchType == constants.SearchTypeFast {
+		responseOpenAi, err = h.openaiClient.GetCompletionWithReasoning(typingCtx, prompt, openai.ReasoningEffortMinimal)
+	} else {
+		responseOpenAi, err = h.openaiClient.GetCompletionWithReasoning(typingCtx, prompt, openai.ReasoningEffortMedium)
+	}
+
 	if typingCtx.Err() != nil {
 		log.Printf("%s: Request was cancelled", utils.GetCurrentTypeName())
 		return handlers.EndConversation()
 	}
 
-	// Continue only if no errors
 	if err != nil {
 		h.messageSenderService.Send(msg.Chat.Id, "Произошла ошибка при получении ответа от OpenAI.", nil)
 		log.Printf("%s: Error during OpenAI response retrieval: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 
-	// Send response
-	err = h.messageSenderService.SendHtml(msg.Chat.Id, responseOpenAi, nil)
-	if err != nil {
+	if err = h.messageSenderService.SendHtml(msg.Chat.Id, responseOpenAi, nil); err != nil {
 		h.messageSenderService.Send(msg.Chat.Id, "Произошла ошибка при отправке ответа.", nil)
 		log.Printf("%s: Error during message sending: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
+
 	h.RemovePreviousMessage(b, &userId)
 	h.userStore.Clear(userId)
 

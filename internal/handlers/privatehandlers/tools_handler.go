@@ -44,10 +44,6 @@ const (
 	toolsCallbackConfirmCancel = "tools_callback_confirm_cancel"
 	toolsCallbackFastSearch    = "tools_callback_fast_search"
 	toolsCallbackDeepSearch    = "tools_callback_deep_search"
-
-	// Search types
-	toolsSearchTypeFast = "fast"
-	toolsSearchTypeDeep = "deep"
 )
 
 type toolsHandler struct {
@@ -185,7 +181,7 @@ func (h *toolsHandler) handleFastSearchSelection(b *gotgbot.Bot, ctx *ext.Contex
 	_, _ = cb.Answer(b, nil)
 
 	// Store search type
-	h.userStore.Set(ctx.EffectiveUser.Id, toolsUserCtxDataKeySearchType, toolsSearchTypeFast)
+	h.userStore.Set(ctx.EffectiveUser.Id, toolsUserCtxDataKeySearchType, constants.SearchTypeFast)
 
 	// Proceed to processing
 	return h.processToolSearchWithType(b, ctx)
@@ -198,7 +194,7 @@ func (h *toolsHandler) handleDeepSearchSelection(b *gotgbot.Bot, ctx *ext.Contex
 	_, _ = cb.Answer(b, nil)
 
 	// Store search type
-	h.userStore.Set(ctx.EffectiveUser.Id, toolsUserCtxDataKeySearchType, toolsSearchTypeDeep)
+	h.userStore.Set(ctx.EffectiveUser.Id, toolsUserCtxDataKeySearchType, constants.SearchTypeDeep)
 	// Proceed to processing
 	return h.processToolSearchWithType(b, ctx)
 }
@@ -211,6 +207,7 @@ func (h *toolsHandler) processToolSearchWithType(b *gotgbot.Bot, ctx *ext.Contex
 	// Check if we're already processing a request for this user
 	if isProcessing, ok := h.userStore.Get(userId, toolsUserCtxDataKeyProcessing); ok && isProcessing.(bool) {
 		h.RemovePreviousMessage(b, &userId)
+		msg.Delete(b, nil)
 		warningMsg, _ := h.messageSenderService.SendWithReturnMessage(
 			msg.Chat.Id,
 			fmt.Sprintf("Пожалуйста, дождись окончания обработки предыдущего запроса, или используй /%s для отмены.",
@@ -255,7 +252,7 @@ func (h *toolsHandler) processToolSearchWithType(b *gotgbot.Bot, ctx *ext.Contex
 
 	// Inform user that search has started with search type info
 	searchTypeText := "быстрый"
-	if searchType == toolsSearchTypeDeep {
+	if searchType == constants.SearchTypeDeep {
 		searchTypeText = "глубокий"
 	}
 
@@ -336,7 +333,7 @@ func (h *toolsHandler) processToolSearchWithType(b *gotgbot.Bot, ctx *ext.Contex
 
 	// Get completion from OpenAI using the new context with specified reasoning effort
 	var responseOpenAi string
-	if searchType == toolsSearchTypeFast {
+	if searchType == constants.SearchTypeFast {
 		responseOpenAi, err = h.openaiClient.GetCompletionWithReasoning(typingCtx, prompt, openai.ReasoningEffortMinimal)
 	} else {
 		responseOpenAi, err = h.openaiClient.GetCompletionWithReasoning(typingCtx, prompt, openai.ReasoningEffortMedium)

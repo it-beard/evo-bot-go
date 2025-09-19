@@ -8,3 +8,9 @@ const CancelCommand = "cancel"
 const (
 	ProfileBioLengthLimit = 3900 //max Telegram message length
 )
+
+// Search types
+const (
+	SearchTypeFast = "fast"
+	SearchTypeDeep = "deep"
+)
