@@ -2,14 +2,25 @@
 
 <cite>
 **Referenced Files in This Document**   
-- [bot.go](file://internal/bot/bot.go)
-- [random_coffee_poll_answer_handler.go](file://internal/handlers/grouphandlers/random_coffee_poll_answer_handler.go)
+- [bot.go](file://internal/bot/bot.go) - *Updated in recent commit*
+- [chat_member_handler.go](file://internal/handlers/grouphandlers/chat_member_handler.go) - *New group handler implementation*
+- [message_handler.go](file://internal/handlers/grouphandlers/message_handler.go) - *Refactored message processing*
+- [poll_answer_handler.go](file://internal/handlers/grouphandlers/poll_answer_handler.go) - *New poll answer handler*
 - [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go)
 - [permissions_service.go](file://internal/services/permissions_service.go)
 - [message_sender_service.go](file://internal/services/message_sender_service.go)
 - [handlers_admin_constants.go](file://internal/constants/handlers_admin_constants.go)
 - [handlers_private_constants.go](file://internal/constants/handlers_private_constants.go)
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated Handler Classification section to reflect new service-based architecture
+- Revised Handler Registration Process with new handler implementations
+- Modified Handler Execution Flow to include new group handlers
+- Updated Handler Implementation Examples with new handler patterns
+- Added new diagram for group handler architecture
+- Updated all file references with correct paths and annotations
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -36,7 +47,7 @@ The handler system is divided into three distinct categories based on their oper
 Admin handlers are designed for privileged operations and are accessible only to users with administrative permissions. These handlers are located in the `internal/handlers/adminhandlers` directory and include functionality for event management, profile administration, and testing utilities. Examples include `eventDeleteHandler`, `eventEditHandler`, and `adminProfilesHandler`.
 
 ### Group Handlers
-Group handlers process messages and events within supergroups and are located in the `internal/handlers/grouphandlers` directory. These handlers manage forum topics, message persistence, and poll responses in group contexts. Key handlers include `saveTopicsHandler`, `saveMessagesHandler`, and `randomCoffeePollAnswerHandler`.
+Group handlers process messages and events within supergroups and are located in the `internal/handlers/grouphandlers` directory. These handlers manage forum topics, message persistence, and poll responses in group contexts. The system has been refactored to use a service-based architecture with dedicated handlers for different update types. Key handlers include `ChatMemberHandler`, `PollAnswerHandler`, and `MessageHandler`.
 
 ### Private Handlers
 Private handlers handle direct interactions with users in private chats and are located in the `internal/handlers/privatehandlers` directory. These handlers manage user profiles, content requests, and help information. Examples include `profileHandler`, `contentHandler`, and `helpHandler`.
@@ -49,18 +60,19 @@ A --> D[Private Handlers]
 B --> E[Event Management]
 B --> F[Profile Administration]
 B --> G[Testing Utilities]
-C --> H[Topic Management]
-C --> I[Message Processing]
-C --> J[Poll Responses]
+C --> H[Chat Member Handler]
+C --> I[Poll Answer Handler]
+C --> J[Message Handler]
 D --> K[Profile Management]
 D --> L[Content Requests]
 D --> M[Help Information]
 ```
 
-**Diagram sources **
+**Diagram sources**
 - [bot.go](file://internal/bot/bot.go#L170-L383)
-- [handlers_admin_constants.go](file://internal/constants/handlers_admin_constants.go#L1-L59)
-- [handlers_private_constants.go](file://internal/constants/handlers_private_constants.go#L1-L30)
+- [chat_member_handler.go](file://internal/handlers/grouphandlers/chat_member_handler.go#L1-L28)
+- [poll_answer_handler.go](file://internal/handlers/grouphandlers/poll_answer_handler.go#L1-L33)
+- [message_handler.go](file://internal/handlers/grouphandlers/message_handler.go#L1-L85)
 
 **Section sources**
 - [bot.go](file://internal/bot/bot.go#L170-L383)
@@ -88,7 +100,7 @@ CombineHandlers --> AddToDispatcher["Add handlers to dispatcher"]
 AddToDispatcher --> End([Registration Complete])
 ```
 
-**Diagram sources **
+**Diagram sources**
 - [bot.go](file://internal/bot/bot.go#L170-L383)
 
 **Section sources**
@@ -121,7 +133,7 @@ Handler-->>Dispatcher : Return result
 Dispatcher-->>Telegram : Acknowledge processing
 ```
 
-**Diagram sources **
+**Diagram sources**
 - [bot.go](file://internal/bot/bot.go#L332-L383)
 
 **Section sources**
@@ -159,7 +171,7 @@ C --> N
 M --> N
 ```
 
-**Diagram sources **
+**Diagram sources**
 - [bot.go](file://internal/bot/bot.go#L332-L383)
 - [permissions_service.go](file://internal/services/permissions_service.go#L1-L97)
 
@@ -180,7 +192,7 @@ Key features:
 - Support for both viewing and editing operations
 
 ### NewRandomCoffeePollAnswerHandler
-The `NewRandomCoffeePollAnswerHandler` in `random_coffee_poll_answer_handler.go` processes poll responses in group contexts. This handler specifically handles `poll_answer` updates and validates that the voting user is not a bot.
+The `NewRandomCoffeePollAnswerHandler` in `poll_answer_handler.go` processes poll responses in group contexts. This handler specifically handles `poll_answer` updates and validates that the voting user is not a bot.
 
 Key features:
 - Poll answer filtering
@@ -212,13 +224,13 @@ NewRandomCoffeePollAnswerHandler --> RandomCoffeePollRepository : "uses"
 NewRandomCoffeePollAnswerHandler --> RandomCoffeeParticipantRepository : "uses"
 ```
 
-**Diagram sources **
+**Diagram sources**
 - [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L0-L799)
-- [random_coffee_poll_answer_handler.go](file://internal/handlers/grouphandlers/random_coffee_poll_answer_handler.go#L0-L69)
+- [poll_answer_handler.go](file://internal/handlers/grouphandlers/poll_answer_handler.go#L0-L33)
 
 **Section sources**
 - [profile_handler.go](file://internal/handlers/privatehandlers/profile_handler.go#L0-L799)
-- [random_coffee_poll_answer_handler.go](file://internal/handlers/grouphandlers/random_coffee_poll_answer_handler.go#L0-L69)
+- [poll_answer_handler.go](file://internal/handlers/grouphandlers/poll_answer_handler.go#L0-L33)
 
 ## Cross-Cutting Concerns
 The handler system addresses several cross-cutting concerns through dedicated services and patterns.
@@ -255,7 +267,7 @@ PrivateHandler --> MessageSenderService : "depends on"
 GroupHandler --> MessageSenderService : "depends on"
 ```
 
-**Diagram sources **
+**Diagram sources**
 - [permissions_service.go](file://internal/services/permissions_service.go#L1-L97)
 - [message_sender_service.go](file://internal/services/message_sender_service.go#L1-L481)
 
@@ -278,12 +290,12 @@ This approach enables loose coupling, making the system more maintainable and te
 - [bot.go](file://internal/bot/bot.go#L170-L383)
 
 ## Handler Ordering
-Handler ordering is critical for proper system operation, particularly for group handlers. The `SaveTopicsHandler` must execute first to ensure that forum topics are properly recorded before other handlers process messages within those topics.
+Handler ordering is critical for proper system operation, particularly for group handlers. The `MessageHandler` must execute in the correct sequence to ensure that different types of messages are processed appropriately.
 
 The handler registration process in `registerHandlers` maintains a specific order:
 1. Start handler (available to all users)
 2. Admin handlers
-3. Group handlers (with `SaveTopicsHandler` first)
+3. Group handlers (with proper processing sequence)
 4. Private handlers
 
 This ordering ensures that foundational operations are completed before dependent handlers process updates, preventing race conditions and data inconsistencies.

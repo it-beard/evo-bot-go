@@ -3,7 +3,7 @@
 <cite>
 **Referenced Files in This Document**   
 - [20250519_add_users_and_profiles_tables.go](file://internal/database/migrations/implementations/20250519_add_users_and_profiles_tables.go)
-- [202602_add_random_coffee_poll_tables.go](file://internal/database/migrations/implementations/20250602_add_random_coffee_poll_tables.go)
+- [20250602_add_random_coffee_poll_tables.go](file://internal/database/migrations/implementations/20250602_add_random_coffee_poll_tables.go)
 - [20250609_add_random_coffee_pairs_table.go](file://internal/database/migrations/implementations/20250609_add_random_coffee_pairs_table.go)
 - [20250918_add_group_messages_table.go](file://internal/database/migrations/implementations/20250918_add_group_messages_table.go)
 - [20250403_rename_contents_to_events.go](file://internal/database/migrations/implementations/20250403_rename_contents_to_events.go)
@@ -14,8 +14,19 @@
 - [random_coffee_participant_repository.go](file://internal/database/repositories/random_coffee_participant_repository.go)
 - [random_coffee_pair_repository.go](file://internal/database/repositories/random_coffee_pair_repository.go)
 - [group_message_repository.go](file://internal/database/repositories/group_message_repository.go)
+- [save_message_service.go](file://internal/services/grouphandlersservices/save_message_service.go)
+- [save_update_message_service.go](file://internal/services/grouphandlersservices/save_update_message_service.go)
 - [random_coffee_service.go](file://internal/services/random_coffee_service.go)
 </cite>
+
+## Update Summary
+**Changes Made**   
+- Updated the group_messages table definition to include accurate field descriptions and constraints
+- Added detailed information about the CreateWithCreatedAt method and its purpose
+- Enhanced the Data Access Patterns section with new repository methods
+- Updated the Query Optimization and Performance section with additional index information
+- Added information about message creation time preservation in the Business Rules section
+- Updated section sources to reflect all analyzed files
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -309,7 +320,7 @@ The `random_coffee_pairs` table stores the generated pairs for weekly coffee mee
 - [random_coffee_pair_repository.go](file://internal/database/repositories/random_coffee_pair_repository.go)
 
 ### group_messages Table
-The `group_messages` table stores messages from the community group for analysis and tracking.
+The `group_messages` table stores messages from the community group for analysis and tracking. The table has been enhanced to preserve the original Telegram message creation time through the `created_at` field.
 
 | Field | Type | Constraints | Description |
 |-------|------|-------------|-------------|
@@ -319,12 +330,13 @@ The `group_messages` table stores messages from the community group for analysis
 | reply_to_message_id | BIGINT | | Message ID this message replies to |
 | user_tg_id | BIGINT | NOT NULL | Telegram ID of the sender |
 | group_topic_id | BIGINT | NOT NULL | ID of the group topic |
-| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | Record creation timestamp |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | Record creation timestamp, preserved from original Telegram message time |
 | updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW() | Record update timestamp |
 
 **Section sources**
 - [20250918_add_group_messages_table.go](file://internal/database/migrations/implementations/20250918_add_group_messages_table.go#L1-L51)
 - [group_message_repository.go](file://internal/database/repositories/group_message_repository.go)
+- [save_update_message_service.go](file://internal/services/grouphandlersservices/save_update_message_service.go#L45-L114)
 
 ## Business Rules and Validation
 
@@ -346,6 +358,7 @@ The schema enforces data integrity through various constraints:
 - NOT NULL constraints on critical fields prevent incomplete data
 - Default values for timestamps ensure consistent audit trails
 - The `telegram_poll_id` uniqueness constraint prevents duplicate poll tracking
+- The `created_at` field in the `group_messages` table preserves the original Telegram message creation time, ensuring accurate temporal analysis of group conversations
 
 ```mermaid
 flowchart TD
@@ -388,18 +401,23 @@ The random coffee system uses three interconnected repositories:
 
 These repositories work together to support the weekly cycle, with methods like `GetParticipatingUsers` that join participants with user data to retrieve complete user information for pairing.
 
-### Query Patterns
-Common query patterns include:
-- Finding the latest poll using ORDER BY with LIMIT 1
-- Joining participants with user data to get complete user profiles
-- Using UPSERT (INSERT ... ON CONFLICT) for participation status updates
-- Batch operations for efficient data retrieval
+### Group Message Access
+The `GroupMessageRepository` has been enhanced with additional methods to support the preservation of original message creation times:
+- `CreateWithCreatedAt` - Inserts a new group message with an explicit created_at timestamp, preserving the original Telegram message time
+- `GetByMessageID` - Retrieves a group message by its Telegram message ID
+- `GetByUserTgID` - Retrieves messages by user Telegram ID with pagination support
+- `GetAllByGroupTopicID` - Retrieves all messages within a specific group topic
+- `GetByGroupTopicIdForpreviousTwentyFourHours` - Retrieves messages from the last 24 hours for a specific topic
+
+The `SaveUpdateMessageService` coordinates message saving and updating, using the `CreateWithCreatedAt` method to maintain temporal accuracy by setting the `created_at` field to the original message timestamp from Telegram.
 
 **Section sources**
 - [user_repository.go](file://internal/database/repositories/user_repository.go#L1-L424)
 - [profile_repository.go](file://internal/database/repositories/profile_repository.go#L1-L286)
 - [random_coffee_poll_repository.go](file://internal/database/repositories/random_coffee_poll_repository.go#L1-L97)
 - [random_coffee_participant_repository.go](file://internal/database/repositories/random_coffee_participant_repository.go#L1-L87)
+- [group_message_repository.go](file://internal/database/repositories/group_message_repository.go#L63-L86)
+- [save_update_message_service.go](file://internal/services/grouphandlersservices/save_update_message_service.go#L45-L114)
 
 ## Query Optimization and Performance
 
@@ -410,7 +428,11 @@ The schema includes several indexes to optimize common query patterns:
 - Index on `profiles.user_id` for efficient profile retrieval by user
 - Unique constraint on `random_coffee_polls.telegram_poll_id` for poll lookup
 - Composite unique constraint on `random_coffee_participants(poll_id, user_id)` to prevent duplicates
-- Indexes on `group_messages` fields for efficient message retrieval by various criteria
+- Indexes on `group_messages` fields for efficient message retrieval by various criteria:
+  - `idx_group_messages_user_tg_id` on `user_tg_id` for user message queries
+  - `idx_group_messages_group_topic_id` on `group_topic_id` for topic-based queries
+  - `idx_group_messages_reply_to_message_id` on `reply_to_message_id` for conversation threading
+  - `idx_group_messages_created_at` on `created_at` for time-based queries
 
 ### Performance Considerations
 The application optimizes performance through:
@@ -419,6 +441,7 @@ The application optimizes performance through:
 - Minimizing round trips with batch operations where appropriate
 - Caching frequently accessed data in memory when possible
 - Using efficient JOINs and avoiding N+1 query problems
+- Preserving original message timestamps to avoid post-processing for temporal analysis
 
 ### Query Optimization Examples
 ```sql
@@ -462,62 +485,4 @@ The migration system ensures data integrity by:
 
 **Section sources**
 - [20250519_add_users_and_profiles_tables.go](file://internal/database/migrations/implementations/20250519_add_users_and_profiles_tables.go#L1-L120)
-- [20250403_rename_contents_to_events.go](file://internal/database/migrations/implementations/20250403_rename_contents_to_events.go#L1-L115)
-- [20250602_add_random_coffee_poll_tables.go](file://internal/database/migrations/implementations/20250602_add_random_coffee_poll_tables.go#L1-L110)
-
-## Data Security and Access Control
-
-### Data Protection
-The application implements several data security measures:
-- Storing only necessary user information (no sensitive data)
-- Using Telegram's secure authentication system for user identification
-- Protecting against SQL injection through parameterized queries
-- Implementing proper error handling that doesn't expose database details
-
-### Access Control
-Access control is enforced at multiple levels:
-- Repository methods validate input parameters before database operations
-- Business logic checks user permissions before allowing operations
-- The bot interface restricts certain commands to administrators
-- Database constraints prevent invalid data states
-
-### Privacy Considerations
-Privacy is maintained by:
-- Allowing users to control their profile visibility
-- Providing opt-in/opt-out for the random coffee system
-- Not exposing personal information without user consent
-- Following Telegram's privacy guidelines for data handling
-
-**Section sources**
-- [user_repository.go](file://internal/database/repositories/user_repository.go#L1-L424)
-- [profile_repository.go](file://internal/database/repositories/profile_repository.go#L1-L286)
-- [random_coffee_service.go](file://internal/services/random_coffee_service.go#L1-L52)
-
-## Sample Data Scenarios
-
-### Weekly Random Coffee Flow
-1. **Poll Creation**: On Friday at 2 PM UTC, the system creates a new poll for the following week
-2. **User Participation**: Members respond to the poll indicating their availability
-3. **Status Updates**: Users can change their participation status throughout the week
-4. **Pair Generation**: On Monday at 12 PM UTC, the system generates pairs from participating members
-5. **Announcement**: The bot announces the pairs in the main chat with links to user profiles
-
-### User Profile Lifecycle
-1. **Profile Creation**: User invokes `/profile` command to create or edit their profile
-2. **Publication**: User chooses to publish their profile to the "Intro" topic
-3. **Search**: Other members can search for profiles by name
-4. **Update**: User can edit their profile at any time
-5. **Linking**: Profile mentions in the bot are automatically linked to the published message
-
-### Event Management Workflow
-1. **Event Creation**: Administrator creates a new event using bot commands
-2. **Topic Organization**: The event is associated with a discussion topic
-3. **Status Updates**: Event status is updated as it progresses from planning to completion
-4. **Archiving**: Completed events are marked as archived and moved out of active view
-5. **Cleanup**: When an event is deleted, all associated topics are automatically removed
-
-**Section sources**
-- [README.md](file://README.md#L21-L45)
-- [random_coffee_service.go](file://internal/services/random_coffee_service.go#L1-L52)
-- [profile_repository.go](file://internal/database/repositories/profile_repository.go#L1-L286)
-- [event_repository.go](file://internal/database/repositories/event_repository.go#L1-L253)
+- [2025
