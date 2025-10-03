@@ -288,6 +288,11 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 			deps.MessageSenderService,
 			deps.PermissionsService,
 		),
+		testhandlers.NewTryLinkToLearnHandler(
+			deps.AppConfig,
+			deps.MessageSenderService,
+			deps.PermissionsService,
+		),
 		adminhandlers.NewAdminProfilesHandler(
 			deps.AppConfig,
 			deps.MessageSenderService,
