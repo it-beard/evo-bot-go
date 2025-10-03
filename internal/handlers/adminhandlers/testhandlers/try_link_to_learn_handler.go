@@ -37,8 +37,8 @@ func (h *tryLinkToLearnHandler) handle(b *gotgbot.Bot, ctx *ext.Context) error {
 		return nil
 	}
 
-	return h.messageService.Reply(
-		msg,
+	return h.messageService.Send(
+		msg.Chat.Id,
 		"База знаний Эволюции Кода ➡️",
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: gotgbot.InlineKeyboardMarkup{
