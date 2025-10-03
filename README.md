@@ -20,6 +20,7 @@ A Telegram bot for Evocoders Club management implemented in Go. Helps moderate d
 - 📋 **Chat Summarization**: Creates daily summaries of conversations
   - Auto-posts at configured times
   - Manual trigger with `/trySummarize` (admin-only)
+  - Send a knowledge base link with `/tryLinkToLearn` (admin-only, private)
 
 ### 🎲 Weekly Random Coffee Meetings
 - **Automated Participation Poll**: Every week (configurable day and time in UTC, defaults to Friday at 2 PM UTC), the bot posts a poll asking members if they want to participate in random coffee meetings for the following week.
@@ -49,7 +50,7 @@ A Telegram bot for Evocoders Club management implemented in Go. Helps moderate d
 
 ### Administrative Controls
 - 👥 **Profiles Manager** (`/profilesManager`): Admin tool for managing user profiles
-- 🧪 **Test Handlers**: Manual testing tools for coffee pools (`/tryCreateCoffeePool`) and pair generation (`/tryGenerateCoffeePairs`)
+- 🧪 **Test Handlers**: Manual testing tools for coffee pools (`/tryCreateCoffeePool`), pair generation (`/tryGenerateCoffeePairs`), and sending knowledge base link (`/tryLinkToLearn`)
 - 📊 **Event Management**: Create, edit, start, and delete events (`/eventSetup`, `/eventEdit`, `/eventStart`, `/eventDelete`)
 
 ### Utility

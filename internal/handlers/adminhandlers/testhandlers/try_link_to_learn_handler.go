@@ -39,7 +39,7 @@ func (h *tryLinkToLearnHandler) handle(b *gotgbot.Bot, ctx *ext.Context) error {
 
 	return h.messageService.Reply(
 		msg,
-		"База знаний Эволюции Кода",
+		"База знаний Эволюции Кода ➡️",
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: gotgbot.InlineKeyboardMarkup{
 				InlineKeyboard: [][]gotgbot.InlineKeyboardButton{{
