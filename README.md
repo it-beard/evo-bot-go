@@ -179,6 +179,7 @@ The bot uses environment variables for configuration, make sure to set them all:
 
 ### Random Coffee Feature
 - `TG_EVO_BOT_RANDOM_COFFEE_TOPIC_ID`: Topic ID where random coffee polls and pairs will be posted
+- `TG_EVO_BOT_RANDOM_COFFEE_INTERVAL_WEEKS`: Interval between random coffee rounds in weeks (e.g., `2` for biweekly, defaults to `1` — every week)
 - `TG_EVO_BOT_RANDOM_COFFEE_POLL_TASK_ENABLED`: Enable or disable the weekly coffee poll task (`true` or `false`, defaults to `true` if not specified)
 - `TG_EVO_BOT_RANDOM_COFFEE_POLL_TIME`: Time to send the weekly coffee poll in 24-hour format UTC (e.g., `14:00` for 2 PM UTC, defaults to `14:00` if not specified)
 - `TG_EVO_BOT_RANDOM_COFFEE_POLL_DAY`: Day of the week to send the poll (e.g., `friday`, `monday`, etc., defaults to `friday` if not specified)

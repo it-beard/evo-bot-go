@@ -32,7 +32,8 @@ type Config struct {
 	SummarizationTaskEnabled bool
 
 	// Random Coffee Feature
-	RandomCoffeeTopicID int
+	RandomCoffeeTopicID       int
+	RandomCoffeeIntervalWeeks int
 
 	RandomCoffeePollTaskEnabled bool
 	RandomCoffeePollTime        time.Time
@@ -207,6 +208,19 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("invalid random coffee topic ID: %s", randomCoffeeTopicIDStr)
 	}
 	config.RandomCoffeeTopicID = randomCoffeeTopicID
+
+	// Random coffee interval in weeks
+	randomCoffeeIntervalWeeksStr := os.Getenv("TG_EVO_BOT_RANDOM_COFFEE_INTERVAL_WEEKS")
+	if randomCoffeeIntervalWeeksStr == "" {
+		// Default to every week if not specified
+		config.RandomCoffeeIntervalWeeks = 1
+	} else {
+		randomCoffeeIntervalWeeks, err := strconv.Atoi(randomCoffeeIntervalWeeksStr)
+		if err != nil || randomCoffeeIntervalWeeks < 1 {
+			return nil, fmt.Errorf("invalid random coffee interval weeks: %s (must be a positive integer)", randomCoffeeIntervalWeeksStr)
+		}
+		config.RandomCoffeeIntervalWeeks = randomCoffeeIntervalWeeks
+	}
 
 	// Random Coffee Poll Feature
 	randomCoffeePollTaskEnabledStr := os.Getenv("TG_EVO_BOT_RANDOM_COFFEE_POLL_TASK_ENABLED")

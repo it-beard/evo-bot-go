@@ -59,13 +59,24 @@ func (t *RandomCoffeePairsTask) run() {
 			return
 		case now := <-ticker.C:
 			if now.After(nextRun) {
-				log.Printf("%s: Running scheduled random coffee pairs generation", utils.GetCurrentTypeName())
+				due, err := t.randomCoffeeService.IsPairsDue()
+				if err != nil {
+					log.Printf("%s: Error checking if pairs are due, proceeding anyway: %v", utils.GetCurrentTypeName(), err)
+					due = true
+				}
 
-				go func() {
-					if err := t.randomCoffeeService.GenerateAndSendPairs(); err != nil {
-						log.Printf("%s: Error generating random coffee pairs: %v", utils.GetCurrentTypeName(), err)
-					}
-				}()
+				if due {
+					log.Printf("%s: Running scheduled random coffee pairs generation", utils.GetCurrentTypeName())
+
+					go func() {
+						if err := t.randomCoffeeService.GenerateAndSendPairs(); err != nil {
+							log.Printf("%s: Error generating random coffee pairs: %v", utils.GetCurrentTypeName(), err)
+						}
+					}()
+				} else {
+					log.Printf("%s: Skipping random coffee pairs generation this week (interval is %d weeks)",
+						utils.GetCurrentTypeName(), t.config.RandomCoffeeIntervalWeeks)
+				}
 
 				nextRun = t.calculateNextRun()
 				log.Printf("%s: Next random coffee pairs generation scheduled for: %v", utils.GetCurrentTypeName(), nextRun)

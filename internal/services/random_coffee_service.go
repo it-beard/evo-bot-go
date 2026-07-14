@@ -52,6 +52,59 @@ func NewRandomCoffeeService(
 	}
 }
 
+// nextWeekStartDate returns the Monday (00:00 UTC) following the given time
+func nextWeekStartDate(now time.Time) time.Time {
+	daysUntilMonday := (8 - int(now.Weekday())) % 7
+	if daysUntilMonday == 0 {
+		daysUntilMonday = 7 // Next Monday if today is Monday
+	}
+
+	weekStartDate := now.AddDate(0, 0, daysUntilMonday)
+	return time.Date(
+		weekStartDate.Year(),
+		weekStartDate.Month(),
+		weekStartDate.Day(),
+		0, 0, 0, 0, time.UTC,
+	)
+}
+
+// IsPollDue reports whether a new poll should be sent this week,
+// based on RandomCoffeeIntervalWeeks and the week of the latest poll in DB.
+func (s *RandomCoffeeService) IsPollDue() (bool, error) {
+	if s.config.RandomCoffeeIntervalWeeks <= 1 || s.pollRepo == nil {
+		return true, nil
+	}
+
+	latestPoll, err := s.pollRepo.GetLatestPoll()
+	if err != nil {
+		return false, fmt.Errorf("%s: error getting latest poll: %w", utils.GetCurrentTypeName(), err)
+	}
+	if latestPoll == nil {
+		return true, nil
+	}
+
+	requiredGap := time.Duration(s.config.RandomCoffeeIntervalWeeks) * 7 * 24 * time.Hour
+	return nextWeekStartDate(time.Now().UTC()).Sub(latestPoll.WeekStartDate) >= requiredGap, nil
+}
+
+// IsPairsDue reports whether pairs should be generated this week,
+// i.e. the latest poll belongs to the current coffee week.
+func (s *RandomCoffeeService) IsPairsDue() (bool, error) {
+	if s.config.RandomCoffeeIntervalWeeks <= 1 {
+		return true, nil
+	}
+
+	latestPoll, err := s.pollRepo.GetLatestPoll()
+	if err != nil {
+		return false, fmt.Errorf("%s: error getting latest poll: %w", utils.GetCurrentTypeName(), err)
+	}
+	if latestPoll == nil {
+		return false, nil
+	}
+
+	return time.Now().UTC().Before(latestPoll.WeekStartDate.AddDate(0, 0, 7)), nil
+}
+
 func (s *RandomCoffeeService) SendPoll(ctx context.Context) error {
 	chatID := utils.ChatIdToFullChatId(s.config.SuperGroupChatID)
 	if chatID == 0 {
@@ -117,20 +170,7 @@ func (s *RandomCoffeeService) savePollToDB(sentPollMsg *gotgbot.Message) error {
 	}
 
 	// Calculate next Monday (week start date)
-	now := time.Now().UTC()
-	daysUntilMonday := (8 - int(now.Weekday())) % 7
-	if daysUntilMonday == 0 {
-		daysUntilMonday = 7 // Next Monday if today is Monday
-	}
-
-	weekStartDate := now.AddDate(0, 0, daysUntilMonday)
-	weekStartDate =
-		time.Date(
-			weekStartDate.Year(),
-			weekStartDate.Month(),
-			weekStartDate.Day(),
-			0, 0, 0, 0, time.UTC,
-		)
+	weekStartDate := nextWeekStartDate(time.Now().UTC())
 
 	log.Printf(
 		"%s: Calculated WeekStartDate: %s (UTC)",
