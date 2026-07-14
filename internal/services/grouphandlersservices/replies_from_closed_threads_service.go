@@ -86,7 +86,7 @@ func (h *RepliesFromClosedThreadsService) IsReplyShouldBeForwarded(msg *gotgbot.
 func (h *RepliesFromClosedThreadsService) forwardReplyMessage(ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	replyToMessageUrl := fmt.Sprintf(
-		"https://t.me/c/%s/%d",
+		"https://telegram.me/c/%s/%d",
 		strconv.FormatInt(msg.ReplyToMessage.Chat.Id, 10)[4:],
 		msg.ReplyToMessage.MessageId)
 

@@ -63,7 +63,7 @@ func (h *CleanClosedThreadsService) CleanClosedThreads(msg *gotgbot.Message, b *
 	} else {
 		mainConversationTopicName = mainConversationTopic.Name
 	}
-	threadUrl := fmt.Sprintf("<a href=\"https://t.me/c/%s/%d\">\"%s\"</a>", chatIdStr, msg.MessageThreadId, topicName)
+	threadUrl := fmt.Sprintf("<a href=\"https://telegram.me/c/%s/%d\">\"%s\"</a>", chatIdStr, msg.MessageThreadId, topicName)
 	messageText := fmt.Sprintf(
 		"<b>Приношу свои извинения</b> 🧐\n\n"+
 			"Твоё сообщение в канале %s было удалено, поскольку этот канал предназначен только для чтения. \n\n"+

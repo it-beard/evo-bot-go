@@ -242,7 +242,7 @@ func (h *contentHandler) processContentSearchWithType(b *gotgbot.Bot, ctx *ext.C
 		return handlers.EndConversation()
 	}
 
-	topicLink := fmt.Sprintf("https://t.me/c/%d/%d", h.config.SuperGroupChatID, h.config.ContentTopicID)
+	topicLink := fmt.Sprintf("https://telegram.me/c/%d/%d", h.config.SuperGroupChatID, h.config.ContentTopicID)
 
 	templateText, err := h.promptingTemplateRepository.Get(prompts.GetContentPromptKey, prompts.GetContentPromptDefaultValue)
 	if err != nil {

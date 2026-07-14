@@ -10,10 +10,10 @@ import (
 
 func TestGetIntroMessageLink(t *testing.T) {
 	tests := []struct {
-		name            string
-		config          *config.Config
-		introMessageID  int64
-		expectedURL     string
+		name           string
+		config         *config.Config
+		introMessageID int64
+		expectedURL    string
 	}{
 		{
 			name: "Valid config and positive message ID",
@@ -22,7 +22,7 @@ func TestGetIntroMessageLink(t *testing.T) {
 				IntroTopicID:     123,
 			},
 			introMessageID: 456,
-			expectedURL:    "https://t.me/c/-1001234567890/123/456",
+			expectedURL:    "https://telegram.me/c/-1001234567890/123/456",
 		},
 		{
 			name: "Large message ID",
@@ -31,7 +31,7 @@ func TestGetIntroMessageLink(t *testing.T) {
 				IntroTopicID:     123,
 			},
 			introMessageID: 9223372036854775807, // max int64
-			expectedURL:    "https://t.me/c/-1001234567890/123/9223372036854775807",
+			expectedURL:    "https://telegram.me/c/-1001234567890/123/9223372036854775807",
 		},
 		{
 			name: "Zero message ID",
@@ -40,7 +40,7 @@ func TestGetIntroMessageLink(t *testing.T) {
 				IntroTopicID:     123,
 			},
 			introMessageID: 0,
-			expectedURL:    "https://t.me/c/-1001234567890/123/0",
+			expectedURL:    "https://telegram.me/c/-1001234567890/123/0",
 		},
 		{
 			name: "Negative message ID",
@@ -49,7 +49,7 @@ func TestGetIntroMessageLink(t *testing.T) {
 				IntroTopicID:     123,
 			},
 			introMessageID: -789,
-			expectedURL:    "https://t.me/c/-1001234567890/123/-789",
+			expectedURL:    "https://telegram.me/c/-1001234567890/123/-789",
 		},
 		{
 			name: "Large chat ID and topic ID",
@@ -58,7 +58,7 @@ func TestGetIntroMessageLink(t *testing.T) {
 				IntroTopicID:     999999,
 			},
 			introMessageID: 123456,
-			expectedURL:    "https://t.me/c/-1009999999999/999999/123456",
+			expectedURL:    "https://telegram.me/c/-1009999999999/999999/123456",
 		},
 		{
 			name: "Small positive values",
@@ -67,7 +67,7 @@ func TestGetIntroMessageLink(t *testing.T) {
 				IntroTopicID:     1,
 			},
 			introMessageID: 1,
-			expectedURL:    "https://t.me/c/-1001/1/1",
+			expectedURL:    "https://telegram.me/c/-1001/1/1",
 		},
 	}
 
@@ -91,7 +91,7 @@ func TestGetIntroTopicLink(t *testing.T) {
 				SuperGroupChatID: -1001234567890,
 				IntroTopicID:     123,
 			},
-			expectedURL: "https://t.me/c/-1001234567890/123",
+			expectedURL: "https://telegram.me/c/-1001234567890/123",
 		},
 		{
 			name: "Large chat ID",
@@ -99,7 +99,7 @@ func TestGetIntroTopicLink(t *testing.T) {
 				SuperGroupChatID: -1009999999999,
 				IntroTopicID:     123,
 			},
-			expectedURL: "https://t.me/c/-1009999999999/123",
+			expectedURL: "https://telegram.me/c/-1009999999999/123",
 		},
 		{
 			name: "Large topic ID",
@@ -107,7 +107,7 @@ func TestGetIntroTopicLink(t *testing.T) {
 				SuperGroupChatID: -1001234567890,
 				IntroTopicID:     999999,
 			},
-			expectedURL: "https://t.me/c/-1001234567890/999999",
+			expectedURL: "https://telegram.me/c/-1001234567890/999999",
 		},
 		{
 			name: "Small positive values",
@@ -115,7 +115,7 @@ func TestGetIntroTopicLink(t *testing.T) {
 				SuperGroupChatID: -1001,
 				IntroTopicID:     1,
 			},
-			expectedURL: "https://t.me/c/-1001/1",
+			expectedURL: "https://telegram.me/c/-1001/1",
 		},
 		{
 			name: "Zero topic ID",
@@ -123,7 +123,7 @@ func TestGetIntroTopicLink(t *testing.T) {
 				SuperGroupChatID: -1001234567890,
 				IntroTopicID:     0,
 			},
-			expectedURL: "https://t.me/c/-1001234567890/0",
+			expectedURL: "https://telegram.me/c/-1001234567890/0",
 		},
 		{
 			name: "Negative topic ID",
@@ -131,7 +131,7 @@ func TestGetIntroTopicLink(t *testing.T) {
 				SuperGroupChatID: -1001234567890,
 				IntroTopicID:     -456,
 			},
-			expectedURL: "https://t.me/c/-1001234567890/-456",
+			expectedURL: "https://telegram.me/c/-1001234567890/-456",
 		},
 	}
 

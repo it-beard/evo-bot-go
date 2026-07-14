@@ -284,7 +284,7 @@ func (h *toolsHandler) processToolSearchWithType(b *gotgbot.Bot, ctx *ext.Contex
 		return handlers.EndConversation()
 	}
 
-	topicLink := fmt.Sprintf("https://t.me/c/%d/%d", h.config.SuperGroupChatID, h.config.ToolTopicID)
+	topicLink := fmt.Sprintf("https://telegram.me/c/%d/%d", h.config.SuperGroupChatID, h.config.ToolTopicID)
 	topicName := "Инструменты"
 	topic, err := h.groupTopicRepository.GetGroupTopicByTopicID(int64(h.config.ToolTopicID))
 	if err != nil {

@@ -265,7 +265,7 @@ func (h *introHandler) processIntroSearchWithType(b *gotgbot.Bot, ctx *ext.Conte
 		return handlers.EndConversation()
 	}
 
-	topicLink := fmt.Sprintf("https://t.me/c/%d/%d", h.config.SuperGroupChatID, h.config.IntroTopicID)
+	topicLink := fmt.Sprintf("https://telegram.me/c/%d/%d", h.config.SuperGroupChatID, h.config.IntroTopicID)
 
 	prompt := fmt.Sprintf(
 		templateText,
