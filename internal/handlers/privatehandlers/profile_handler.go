@@ -312,6 +312,10 @@ func (h *profileHandler) handleSearchProfileInput(b *gotgbot.Bot, ctx *ext.Conte
 	h.RemovePreviousMessage(b, &userId)
 	b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
 	profileText := fmt.Sprintf("<b>%s</b>\n\n%s", profileMenuSearchHeader, formatters.FormatProfileView(dbUser, profile, false))
+	if profile != nil && profile.PublishedMessageID.Valid {
+		profileText += fmt.Sprintf("\n👉 <a href='%s'>Ссылка</a> на профиль в канале \"Интро\".",
+			utils.GetIntroMessageLink(h.config, profile.PublishedMessageID.Int64))
+	}
 	editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
 		msg.Chat.Id,
 		profileText,
