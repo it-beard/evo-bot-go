@@ -314,7 +314,7 @@ func (h *eventStartHandler) handleCallbackYes(b *gotgbot.Bot, ctx *ext.Context) 
 	)
 
 	if event.Type == string(constants.EventTypeClubCall) {
-		announcementMsg += fmt.Sprintf("💡 [Про формат и правила клубных созвонов](https://t.me/c/2069889012/127/33823)\n")
+		announcementMsg += fmt.Sprintf("💡 [Про формат и правила клубных созвонов](https://telegram.me/c/2069889012/127/33823)\n")
 	}
 
 	announcementMsg += fmt.Sprintf("\nИспользуй кнопку ниже, чтобы присоединиться ⬇️")

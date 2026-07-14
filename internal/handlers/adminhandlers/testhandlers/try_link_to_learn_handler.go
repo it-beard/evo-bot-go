@@ -45,7 +45,7 @@ func (h *tryLinkToLearnHandler) handle(b *gotgbot.Bot, ctx *ext.Context) error {
 				InlineKeyboard: [][]gotgbot.InlineKeyboardButton{{
 					{
 						Text: "База знаний",
-						Url:  "https://t.me/the_evocoders_learn_bot/base?startapp=app",
+						Url:  "https://telegram.me/the_evocoders_learn_bot/base?startapp=app",
 					},
 				}},
 			},

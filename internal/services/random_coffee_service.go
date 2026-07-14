@@ -65,7 +65,7 @@ func (s *RandomCoffeeService) SendPoll(ctx context.Context) error {
 
 	// Send reqular message with link to rules and new random coffee poll
 	message :=
-		fmt.Sprintf("Привет! Открываю запись на новый <b>Random Coffee</b> <i>(<a href=\"https://t.me/c/%d/%d/%d\">правила участия</a>)</i>.",
+		fmt.Sprintf("Привет! Открываю запись на новый <b>Random Coffee</b> <i>(<a href=\"https://telegram.me/c/%d/%d/%d\">правила участия</a>)</i>.",
 			s.config.SuperGroupChatID,
 			s.config.RandomCoffeeTopicID,
 			s.config.RandomCoffeeTopicID+1, // next message id (small hack)

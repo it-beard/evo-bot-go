@@ -22,7 +22,7 @@ Before setting up the evocoders-bot-go application, ensure you have the followin
 
 - **Go 1.21+**: The application is built using Go version 1.21 or higher. Verify your Go installation with `go version`.
 - **PostgreSQL**: The bot uses PostgreSQL for data persistence. Ensure PostgreSQL is installed and running, and that you have a database created for the application.
-- **Telegram Bot Token**: Obtain a bot token from [@BotFather](https://t.me/BotFather) on Telegram.
+- **Telegram Bot Token**: Obtain a bot token from [@BotFather](https://telegram.me/BotFather) on Telegram.
 - **Telegram API App ID and Hash**: Required for the Telegram User Client. These can be obtained by creating a new application at [my.telegram.org](https://my.telegram.org).
 - **OpenAI API Key**: Required for AI-powered features such as search and summarization.
 

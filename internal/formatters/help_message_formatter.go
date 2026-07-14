@@ -27,13 +27,13 @@ func FormatHelpMessage(isAdmin bool, config *config.Config) string {
 	featuresDescription := "\n\n<b>☕️ Random Coffee</b>\n" +
 		"Я создаю еженедельные опросы для участия в клубных встречах. " +
 		"Используй опрос, чтобы поучаствовать в созвонах и познакомиться с другими клубчанами. " +
-		fmt.Sprintf("Пары для созвонов объявляются в начале недели в канале <a href=\"https://t.me/c/%d/%d\">«Random Coffee»</a>.",
+		fmt.Sprintf("Пары для созвонов объявляются в начале недели в канале <a href=\"https://telegram.me/c/%d/%d\">«Random Coffee»</a>.",
 			config.SuperGroupChatID, config.RandomCoffeeTopicID)
 
 	helpText += featuresDescription
 
 	helpText += "\n\n" + // Add some spacing before the link
-		"<i>💡 <a href=\"https://t.me/c/2069889012/127/9470\">Открыть полное руководство</a></i>"
+		"<i>💡 <a href=\"https://telegram.me/c/2069889012/127/9470\">Открыть полное руководство</a></i>"
 
 	if isAdmin {
 		adminHelpText := "\n\n<b>🔐 Команды администратора</b>\n" +
