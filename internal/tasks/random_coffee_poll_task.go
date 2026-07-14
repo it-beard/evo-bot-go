@@ -60,16 +60,27 @@ func (t *RandomCoffeePollTask) run() {
 			return
 		case now := <-ticker.C:
 			if now.After(nextRun) {
-				log.Printf("%s: Running scheduled random coffee poll", utils.GetCurrentTypeName())
+				due, err := t.randomCoffeeService.IsPollDue()
+				if err != nil {
+					log.Printf("%s: Error checking if poll is due, proceeding anyway: %v", utils.GetCurrentTypeName(), err)
+					due = true
+				}
 
-				go func() {
-					ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-					defer cancel()
+				if due {
+					log.Printf("%s: Running scheduled random coffee poll", utils.GetCurrentTypeName())
 
-					if err := t.randomCoffeeService.SendPoll(ctx); err != nil {
-						log.Printf("%s: Error sending random coffee poll: %v", utils.GetCurrentTypeName(), err)
-					}
-				}()
+					go func() {
+						ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+						defer cancel()
+
+						if err := t.randomCoffeeService.SendPoll(ctx); err != nil {
+							log.Printf("%s: Error sending random coffee poll: %v", utils.GetCurrentTypeName(), err)
+						}
+					}()
+				} else {
+					log.Printf("%s: Skipping random coffee poll this week (interval is %d weeks)",
+						utils.GetCurrentTypeName(), t.config.RandomCoffeeIntervalWeeks)
+				}
 
 				nextRun = t.calculateNextRun()
 				log.Printf("%s: Next random coffee poll scheduled for: %v", utils.GetCurrentTypeName(), nextRun)
