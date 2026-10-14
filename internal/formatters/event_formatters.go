@@ -8,6 +8,7 @@ import (
 
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/repositories"
+	"evo-bot-go/internal/utils"
 )
 
 // topicAuthorUnknown is stored as the author of topics added by members without a username
@@ -194,70 +195,87 @@ func formatTopicListHeader(eventName string, eventType string) string {
 		GetTypeEmoji(typed), html.EscapeString(GetTypeInRussian(typed)), FormatEventName(eventName))
 }
 
+// TopicListChunkLimit keeps every message of a split topic list below Telegram's 4096 characters
+const TopicListChunkLimit = 4000
+
+// FormatHtmlTopicListForUsers renders the /topics list of an event as a single message
 func FormatHtmlTopicListForUsers(topics []repositories.Topic, eventName string, eventType string) string {
-	var response strings.Builder
-
-	response.WriteString(formatTopicListHeader(eventName, eventType))
-
-	if len(topics) == 0 {
-		response.WriteString(
-			fmt.Sprintf("\n🔍 Для этого мероприятия пока нет тем и вопросов.\nИспользуй команду /%s для добавления.", constants.TopicAddCommand))
-	} else {
-		topicCount := len(topics)
-		response.WriteString(fmt.Sprintf("📋 Найдено тем и вопросов: <b>%d</b>\n\n", topicCount))
-
-		for i, topic := range topics {
-			// Format date as DD.MM.YYYY for better readability
-			dateFormatted := topic.CreatedAt.Format("02.01.2006")
-			response.WriteString(fmt.Sprintf(
-				"<i>%s</i> <blockquote expandable>%s</blockquote>\n",
-				dateFormatted,
-				html.EscapeString(topic.Topic),
-			))
-
-			// Don't add separator after the last item
-			if i < topicCount-1 {
-				response.WriteString("\n")
-			}
-		}
-
-		response.WriteString(
-			fmt.Sprintf(
-				"\nИспользуй команду /%s для добавления новых тем и вопросов, либо /%s для просмотра тем и вопросов к другому мероприятию.",
-				constants.TopicAddCommand,
-				constants.TopicsCommand,
-			),
-		)
-	}
-
-	return response.String()
+	return strings.Join(topicListBlocksForUsers(topics, eventName, eventType), "")
 }
 
-func FormatHtmlTopicListForAdmin(topics []repositories.Topic, eventName string, eventType string) string {
-	var response strings.Builder
+// FormatHtmlTopicListForUsersMessages renders the /topics list split into messages that fit Telegram's limit.
+// Topics are never cut in half, so their markup stays balanced.
+func FormatHtmlTopicListForUsersMessages(topics []repositories.Topic, eventName string, eventType string) []string {
+	return utils.JoinBlocksIntoChunks(topicListBlocksForUsers(topics, eventName, eventType), TopicListChunkLimit)
+}
 
-	response.WriteString(formatTopicListHeader(eventName, eventType))
+func topicListBlocksForUsers(topics []repositories.Topic, eventName string, eventType string) []string {
+	header := formatTopicListHeader(eventName, eventType)
 
 	if len(topics) == 0 {
-		response.WriteString("\nДля этого мероприятия пока нет тем и вопросов.")
-	} else {
-		response.WriteString(fmt.Sprintf("📋 Найдено тем и вопросов: <b>%d</b>\n\n", len(topics)))
-		for _, topic := range topics {
-			// Topics of members without a username are stored with this placeholder
-			userNickname := topicAuthorUnknown
-			if topic.UserNickname != nil && *topic.UserNickname != "" && *topic.UserNickname != topicAuthorUnknown {
-				userNickname = "@" + html.EscapeString(*topic.UserNickname)
-			}
-			dateFormatted := topic.CreatedAt.Format("02.01.2006")
-			response.WriteString(fmt.Sprintf(
-				"ID:<code>%d</code> / <i>%s</i> / %s \n",
-				topic.ID,
-				dateFormatted,
-				userNickname,
-			))
-			response.WriteString(fmt.Sprintf("<blockquote expandable>%s</blockquote> \n", html.EscapeString(topic.Topic)))
-		}
+		return []string{header + fmt.Sprintf(
+			"\n🔍 Для этого мероприятия пока нет тем и вопросов.\nИспользуй команду /%s для добавления.", constants.TopicAddCommand)}
 	}
 
-	return response.String()
+	topicCount := len(topics)
+	blocks := []string{header + fmt.Sprintf("📋 Найдено тем и вопросов: <b>%d</b>\n\n", topicCount)}
+
+	for i, topic := range topics {
+		// Format date as DD.MM.YYYY for better readability
+		block := fmt.Sprintf(
+			"<i>%s</i> <blockquote expandable>%s</blockquote>\n",
+			topic.CreatedAt.Format("02.01.2006"),
+			html.EscapeString(topic.Topic),
+		)
+
+		// Don't add separator after the last item
+		if i < topicCount-1 {
+			block += "\n"
+		}
+		blocks = append(blocks, block)
+	}
+
+	blocks = append(blocks, fmt.Sprintf(
+		"\nИспользуй команду /%s для добавления новых тем и вопросов, либо /%s для просмотра тем и вопросов к другому мероприятию.",
+		constants.TopicAddCommand,
+		constants.TopicsCommand,
+	))
+
+	return blocks
+}
+
+// FormatHtmlTopicListForAdmin renders the /showTopics list of an event as a single message
+func FormatHtmlTopicListForAdmin(topics []repositories.Topic, eventName string, eventType string) string {
+	return strings.Join(topicListBlocksForAdmin(topics, eventName, eventType), "")
+}
+
+// FormatHtmlTopicListForAdminMessages renders the /showTopics list split into messages that fit Telegram's limit
+func FormatHtmlTopicListForAdminMessages(topics []repositories.Topic, eventName string, eventType string) []string {
+	return utils.JoinBlocksIntoChunks(topicListBlocksForAdmin(topics, eventName, eventType), TopicListChunkLimit)
+}
+
+func topicListBlocksForAdmin(topics []repositories.Topic, eventName string, eventType string) []string {
+	header := formatTopicListHeader(eventName, eventType)
+
+	if len(topics) == 0 {
+		return []string{header + "\nДля этого мероприятия пока нет тем и вопросов."}
+	}
+
+	blocks := []string{header + fmt.Sprintf("📋 Найдено тем и вопросов: <b>%d</b>\n\n", len(topics))}
+	for _, topic := range topics {
+		// Topics of members without a username are stored with this placeholder
+		userNickname := topicAuthorUnknown
+		if topic.UserNickname != nil && *topic.UserNickname != "" && *topic.UserNickname != topicAuthorUnknown {
+			userNickname = "@" + html.EscapeString(*topic.UserNickname)
+		}
+		blocks = append(blocks, fmt.Sprintf(
+			"ID:<code>%d</code> / <i>%s</i> / %s \n<blockquote expandable>%s</blockquote> \n",
+			topic.ID,
+			topic.CreatedAt.Format("02.01.2006"),
+			userNickname,
+			html.EscapeString(topic.Topic),
+		))
+	}
+
+	return blocks
 }

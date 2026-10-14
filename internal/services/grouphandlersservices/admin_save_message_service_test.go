@@ -51,6 +51,13 @@ func TestAdminSaveMessageService_IsMessageShouldBeSavedOrUpdated(t *testing.T) {
 		{"anonymous admin update", adminCommand(groupAnonymousBot(), testContentTopicID, "update"), true},
 		{"bot with admin rights", adminCommand(&gotgbot.User{Id: testAdminBotID, IsBot: true, Username: "helper_bot"}, testContentTopicID, "delete"), true},
 		{"non-admin bot", adminCommand(&gotgbot.User{Id: testOtherBotID, IsBot: true, Username: "random_bot"}, testContentTopicID, "update"), false},
+		{"regular member update in content topic", adminCommand(humanUser(testUserID), testContentTopicID, "update"), false},
+		{"regular member delete in tool topic", adminCommand(humanUser(testUserID), testToolTopicID, "delete"), false},
+		{"message without sender", func() *gotgbot.Message {
+			msg := adminCommand(humanUser(testTopicAdminID), testContentTopicID, "delete")
+			msg.From = nil
+			return msg
+		}(), false},
 		{"admin reply with another text", adminCommand(humanUser(testTopicAdminID), testContentTopicID, "nice post"), false},
 	}
 
@@ -65,9 +72,7 @@ func TestAdminSaveMessageService_IsMessageShouldBeSavedOrUpdated(t *testing.T) {
 }
 
 func TestAdminSaveMessageService_IsMessageShouldBeSavedOrUpdated_RegularMemberIsRejected(t *testing.T) {
-	t.Skip("BUG (admin_save_message_service.go:67-68): the admin check only rejects non-admin *bots*; " +
-		"a regular human member replying \"delete\"/\"update\" in Content/Tool topics passes the check")
-
+	// A regular member replying "delete"/"update" must not be able to delete or index posts in Content/Tools
 	d := newTestDeps(t)
 	s := newAdminSaveService(d)
 

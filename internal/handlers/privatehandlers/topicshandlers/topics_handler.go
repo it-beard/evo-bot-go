@@ -149,8 +149,10 @@ func (h *topicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Context) e
 
 	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 	// Format and display topics
-	formattedTopics := formatters.FormatHtmlTopicListForUsers(topics, event.Name, event.Type)
-	h.messageSenderService.ReplyHtml(msg, formattedTopics, nil)
+	// Long lists are split into several messages to fit Telegram's message length limit
+	for _, part := range formatters.FormatHtmlTopicListForUsersMessages(topics, event.Name, event.Type) {
+		h.messageSenderService.ReplyHtml(msg, part, nil)
+	}
 
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)

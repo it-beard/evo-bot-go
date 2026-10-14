@@ -2,8 +2,10 @@ package topicshandlers
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"evo-bot-go/internal/database/repositories"
 	"evo-bot-go/internal/formatters"
@@ -408,4 +410,39 @@ func expectTopics(d *deps, eventID int, topics ...repositories.Topic) {
 		rows.AddRow(tp.ID, tp.Topic, tp.UserNickname, tp.EventID, tp.CreatedAt)
 	}
 	d.sql.ExpectQuery(selectTopicsSQL).WithArgs(eventID).WillReturnRows(rows)
+}
+
+func TestTopicsHandler_LongTopicListIsSplitIntoSeveralMessages(t *testing.T) {
+	d := newDeps(t)
+	h := d.newTopicsHandler()
+	openEventList(t, d, h, eventSelectionSpecs()[0])
+	d.client.Reset()
+
+	// 12 topics of ~900 characters do not fit into one Telegram message (4096 characters)
+	var topics []repositories.Topic
+	for i := 1; i <= 12; i++ {
+		topics = append(topics, repositories.Topic{
+			ID: i, Topic: fmt.Sprintf("Тема %02d: %s", i, strings.Repeat("я", 900)), EventID: 7, CreatedAt: testTime,
+		})
+	}
+	d.expectEvent(testEvents[0])
+	expectTopics(d, 7, topics...)
+
+	require.True(t, d.dispatch(t, h, privateText(testUserID, "7")))
+
+	sends := d.client.CallsTo("sendMessage")
+	require.Greater(t, len(sends), 1, "the list is split")
+	var all strings.Builder
+	for _, send := range sends {
+		text := send.Params["text"]
+		assert.Equal(t, "HTML", send.Params["parse_mode"])
+		assert.LessOrEqual(t, utf8.RuneCountInString(text), 4096)
+		assert.Equal(t, strings.Count(text, "<blockquote expandable>"), strings.Count(text, "</blockquote>"),
+			"no topic is cut in half")
+		all.WriteString(text)
+	}
+	for i := 1; i <= 12; i++ {
+		assert.Contains(t, all.String(), fmt.Sprintf("Тема %02d:", i))
+	}
+	assert.False(t, d.dispatch(t, h, privateText(testUserID, "7")), "conversation is ended")
 }

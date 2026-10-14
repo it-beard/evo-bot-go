@@ -99,7 +99,11 @@ func (m *MockBotClient) OnError(method string, description string) {
 	})
 }
 
-// SetMemberStatus sets the getChatMember status for a user ("member", "administrator", "creator", "left", "kicked", "restricted")
+// RestrictedLeftStatus makes getChatMember describe a restricted user who is no longer in the chat
+const RestrictedLeftStatus = "restricted-left"
+
+// SetMemberStatus sets the getChatMember status for a user ("member", "administrator", "creator", "left", "kicked",
+// "restricted" for a restricted user still in the chat, or RestrictedLeftStatus for a restricted user who left it)
 func (m *MockBotClient) SetMemberStatus(userID int64, status string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -221,10 +225,19 @@ func (m *MockBotClient) defaultResponse(call APICall) (json.RawMessage, error) {
 		return json.Marshal(gotgbot.MessageId{MessageId: m.newMessageID()})
 	case "getChatMember":
 		userID := call.Int64("user_id")
-		return json.Marshal(map[string]any{
-			"status": m.memberStatus(userID),
+		status := m.memberStatus(userID)
+		member := map[string]any{
+			"status": status,
 			"user":   map[string]any{"id": userID, "is_bot": false, "first_name": "User"},
-		})
+		}
+		if status == "restricted" {
+			member["is_member"] = true
+		}
+		if status == RestrictedLeftStatus {
+			member["status"] = "restricted"
+			member["is_member"] = false
+		}
+		return json.Marshal(member)
 	case "getChat":
 		return json.Marshal(map[string]any{
 			"id":                 call.Int64("chat_id"),

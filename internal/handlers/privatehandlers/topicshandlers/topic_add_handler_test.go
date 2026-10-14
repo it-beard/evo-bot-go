@@ -3,6 +3,7 @@ package topicshandlers
 import (
 	"errors"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -318,4 +319,24 @@ func TestTopicAddHandler_PastEventCanBeCancelled(t *testing.T) {
 
 	assert.Equal(t, []string{topicAddCancelledText}, d.client.SentTexts())
 	assertKeyboardRemoved(t, d.client, listID)
+}
+
+func TestTopicAddHandler_TooLongTopicIsRejected(t *testing.T) {
+	d := newDeps(t)
+	h := d.newTopicAddHandler()
+	selectEventForTopic(t, d, h)
+	d.client.Reset()
+
+	require.True(t, d.dispatch(t, h, privateText(testUserID, strings.Repeat("я", 1001))))
+
+	assert.Equal(t, []string{
+		"Тема слишком длинная (1001 символов). Пожалуйста, сократи её до 1000 символов и отправь снова или /cancel для отмены.",
+	}, d.client.SentTexts())
+	assert.Empty(t, d.client.CallsTo("editMessageReplyMarkup"), "still waiting for the topic")
+
+	// A topic of exactly the limit is accepted
+	topic := strings.Repeat("я", 1000)
+	d.sql.ExpectQuery(insertTopicSQL).WithArgs(topic, "user501", 7).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
+	require.True(t, d.dispatch(t, h, privateText(testUserID, topic)))
+	assert.Contains(t, lastSend(t, d.client).Params["text"], "Добавлено!")
 }

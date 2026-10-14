@@ -1253,6 +1253,27 @@ func TestProfileHandler_SearchNotFound(t *testing.T) {
 	assert.Contains(t, deletedMessageIDs(d.client), d.lastSentID(t, "не найден"))
 }
 
+func TestProfileHandler_SearchWithEmptyQueryFindsNobody(t *testing.T) {
+	// "@" or blanks used to crash the handler (index out of range), and an empty username
+	// lookup would have matched a random member who has no username
+	for _, input := range []string{"@", "   ", " @ "} {
+		t.Run(fmt.Sprintf("%q", input), func(t *testing.T) {
+			d := newDeps(t)
+			h := d.newProfileHandler()
+			openSearch(t, d, h)
+			d.client.Reset()
+
+			require.True(t, d.dispatch(t, h, privateText(testUserID, input)))
+
+			notFound := lastSend(t, d.client)
+			assert.Equal(t, "<b>Профиль → Поиск</b>\n\nПользователь <b></b> не найден.\n\nПопробуй ещё раз, прислав мне имя пользователя снова:",
+				notFound.Params["text"])
+			assert.Equal(t, profileStateAwaitQueryForSearch, conversationState(t, d, h))
+			require.NoError(t, d.sql.ExpectationsWereMet(), "the database is not queried")
+		})
+	}
+}
+
 func TestProfileHandler_SearchNotFoundEscapesQuery(t *testing.T) {
 	d := newDeps(t)
 	h := d.newProfileHandler()

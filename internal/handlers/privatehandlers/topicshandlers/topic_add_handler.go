@@ -189,6 +189,14 @@ func (h *topicAddHandler) handleTopicEntry(b *gotgbot.Bot, ctx *ext.Context) err
 		return nil // Stay in the same state
 	}
 
+	if length := utils.Utf16CodeUnitCount(topicText); length > constants.TopicTextLengthLimit {
+		h.messageSenderService.Reply(msg, fmt.Sprintf(
+			"Тема слишком длинная (%d символов). Пожалуйста, сократи её до %d символов и отправь снова %s.",
+			length, constants.TopicTextLengthLimit, formatters.CancelHint,
+		), nil)
+		return nil // Stay in the same state
+	}
+
 	// Get the selected event ID from user store
 	eventIDVal, _ := h.userStore.Get(ctx.EffectiveUser.Id, topicAddCtxDataKeySelectedEventID)
 	eventID, ok := eventIDVal.(int)

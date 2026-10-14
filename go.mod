@@ -2,7 +2,7 @@ module evo-bot-go
 
 go 1.23.3
 
-toolchain go1.23.5
+toolchain go1.26.9
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.0

@@ -22,10 +22,9 @@ func (h *JoinLeftService) HandleJoinLeftMember(b *gotgbot.Bot, ctx *ext.Context)
 	chatMember := ctx.ChatMember
 	user := chatMember.NewChatMember.GetUser()
 
-	newStatus := chatMember.NewChatMember.GetStatus()
-
-	isNowMember := newStatus == "member" || newStatus == "administrator" || newStatus == "creator"
-	isNowLeftOrBanned := newStatus == "left" || newStatus == "kicked"
+	// A restricted user who left keeps the "restricted" status, so is_member decides
+	isNowMember := utils.IsChatMemberInClub(chatMember.NewChatMember)
+	isNowLeftOrBanned := !isNowMember
 
 	if isNowMember {
 		dbUser, _, err := h.userRepo.GetOrFullCreate(&user)

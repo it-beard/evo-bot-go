@@ -6,6 +6,7 @@ import (
 	"evo-bot-go/internal/testutils"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -112,4 +113,18 @@ func TestPollAnswerHandler_DoesNotHandleOtherUpdates(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.False(t, handled)
+}
+
+func TestPollAnswerHandler_AnonymousAnswerIsIgnored(t *testing.T) {
+	e := newHandlerEnv(t)
+	update := testutils.PollAnswerUpdate(testUserID, "poll", []int64{0})
+	update.PollAnswer.User = nil
+	update.PollAnswer.VoterChat = &gotgbot.Chat{Id: -100777, Type: "channel"}
+
+	handled, err := testutils.Dispatch(e.bot, e.pollAnswerHandler(), update)
+
+	require.NoError(t, err)
+	assert.True(t, handled)
+	assert.Empty(t, e.client.Calls())
+	require.NoError(t, e.mock.ExpectationsWereMet())
 }

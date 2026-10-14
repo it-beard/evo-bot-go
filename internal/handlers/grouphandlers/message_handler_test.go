@@ -18,6 +18,12 @@ func TestMessageHandler_IgnoresNonSupergroupChats(t *testing.T) {
 	}{
 		{"private chat", testutils.NewPrivateMessage(testUserID, "hello")},
 		{"basic group", testutils.NewMessage(testUserID, -555, "group", "hello")},
+		{"another supergroup", testutils.NewGroupMessage(testUserID, -1009999999999, testOpenTopicID, "hello")},
+		{"admin command in another supergroup", func() *gotgbot.Message {
+			m := testutils.NewGroupMessage(testUserID, -1009999999999, testContentTopicID, "delete")
+			m.ReplyToMessage = &gotgbot.Message{MessageId: 888, Chat: m.Chat, MessageThreadId: testContentTopicID}
+			return m
+		}()},
 		{"private join-like message", func() *gotgbot.Message {
 			m := testutils.NewPrivateMessage(testUserID, "")
 			m.NewChatMembers = []gotgbot.User{*testutils.NewUser(testUserID)}
@@ -34,6 +40,8 @@ func TestMessageHandler_IgnoresNonSupergroupChats(t *testing.T) {
 			require.NoError(t, err)
 			assert.True(t, handled)
 			assert.Empty(t, e.client.Calls())
+			// Nothing from a foreign chat may reach the club's database
+			require.NoError(t, e.mock.ExpectationsWereMet())
 		})
 	}
 }

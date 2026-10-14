@@ -106,6 +106,7 @@ func newHandlerEnv(t *testing.T) *handlerEnv {
 
 func (e *handlerEnv) messageHandler() ext.Handler {
 	return grouphandlers.NewMessageHandler(
+		e.cfg,
 		e.sender,
 		grouphandlersservices.NewCleanClosedThreadsService(e.cfg, e.sender, e.groupTopicRepo),
 		grouphandlersservices.NewRepliesFromClosedThreadsService(e.cfg, e.sender, e.groupTopicRepo, e.saveUpdate),
@@ -127,7 +128,7 @@ func (e *handlerEnv) pollAnswerHandler() ext.Handler {
 }
 
 func (e *handlerEnv) chatMemberHandler() ext.Handler {
-	return grouphandlers.NewChatMemberHandler(grouphandlersservices.NewJoinLeftService(e.userRepo))
+	return grouphandlers.NewChatMemberHandler(e.cfg, grouphandlersservices.NewJoinLeftService(e.userRepo))
 }
 
 func groupAnonymousBot() *gotgbot.User {

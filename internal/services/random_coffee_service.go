@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"html"
 	"log"
 	"math/rand"
 	"strings"
@@ -231,7 +232,9 @@ func (s *RandomCoffeeService) GenerateAndSendPairs() error {
 		return fmt.Errorf("недостаточно участников для создания пар (нужно минимум 2, зарегистрировалось %d)", len(participants))
 	}
 
-	// Update participant info using Telegram Bot API if any field has changed
+	// Update participant info using Telegram Bot API if any field has changed,
+	// and leave out voters who are not (or no longer) in the club
+	notInClub := make(map[int64]bool)
 	for i := range participants {
 		participant := &participants[i]
 		user, err := s.userRepo.GetByTelegramID(participant.TgID)
@@ -244,6 +247,12 @@ func (s *RandomCoffeeService) GenerateAndSendPairs() error {
 		chatMember, err := s.bot.GetChatMember(chatID, participant.TgID, nil)
 		if err != nil {
 			log.Printf("%s: error getting chat member for user ID %d: %v", utils.GetCurrentTypeName(), participant.TgID, err)
+			continue
+		}
+
+		if !utils.IsChatMemberInClub(chatMember) {
+			log.Printf("%s: User %d is not in the club anymore, leaving them out of the pairing", utils.GetCurrentTypeName(), participant.TgID)
+			notInClub[participant.TgID] = true
 			continue
 		}
 
@@ -280,6 +289,20 @@ func (s *RandomCoffeeService) GenerateAndSendPairs() error {
 				log.Printf("%s: Updated lastname for user ID %d from '%s' to '%s'", utils.GetCurrentTypeName(), user.ID, user.Lastname, currentUser.LastName)
 				participant.Lastname = currentUser.LastName
 			}
+		}
+	}
+
+	if len(notInClub) > 0 {
+		members := make([]repositories.User, 0, len(participants))
+		for _, participant := range participants {
+			if !notInClub[participant.TgID] {
+				members = append(members, participant)
+			}
+		}
+		participants = members
+
+		if len(participants) < 2 {
+			return fmt.Errorf("недостаточно участников для создания пар (нужно минимум 2, в клубе осталось %d)", len(participants))
 		}
 	}
 
@@ -340,10 +363,12 @@ func (s *RandomCoffeeService) GenerateAndSendPairs() error {
 }
 
 func (s *RandomCoffeeService) formatUserDisplay(user *repositories.User) string {
-	userDisplay := user.Firstname
+	// Names come straight from Telegram and may contain anything, so they are escaped for HTML.
+	// Without a username the name links to the user, so the pair can still write to them.
+	userDisplay := fmt.Sprintf("<a href=\"tg://user?id=%d\">%s</a>", user.TgID, html.EscapeString(user.Firstname))
 
 	if user.TgUsername != "" {
-		userDisplay = fmt.Sprintf("@%s", user.TgUsername)
+		userDisplay = fmt.Sprintf("@%s", html.EscapeString(user.TgUsername))
 	}
 
 	profile, err := s.profileRepo.GetOrCreate(user.ID)

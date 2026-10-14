@@ -82,6 +82,12 @@ func (s *RandomCoffeePollAnswersService) IsAnswerShouldBeProcessed(pollAnswer *g
 		return false
 	}
 
+	// Anonymous answers (voter_chat) have no user, and the user may be missing after a database error
+	if pollAnswer.User == nil || internalUser == nil {
+		log.Printf("%s: Poll answer without a known user. Ignoring.", utils.GetCurrentTypeName())
+		return false
+	}
+
 	// Do nothing if user is bot and send message to admin
 	if pollAnswer.User.IsBot {
 		if len(pollAnswer.OptionIds) > 0 && pollAnswer.OptionIds[0] == 0 {
@@ -110,7 +116,16 @@ func (s *RandomCoffeePollAnswersService) IsAnswerShouldBeProcessed(pollAnswer *g
 	return true
 }
 
+// GetInternalUser returns the voter's database user, or nil when the answer has no user or it cannot be loaded
 func (s *RandomCoffeePollAnswersService) GetInternalUser(pollAnswer *gotgbot.PollAnswer) *repositories.User {
-	internalUser, _ := s.userRepo.GetOrCreate(pollAnswer.User)
+	if pollAnswer == nil || pollAnswer.User == nil {
+		return nil
+	}
+
+	internalUser, err := s.userRepo.GetOrCreate(pollAnswer.User)
+	if err != nil {
+		log.Printf("%s: Error getting user %d for poll answer: %v", utils.GetCurrentTypeName(), pollAnswer.User.Id, err)
+		return nil
+	}
 	return internalUser
 }

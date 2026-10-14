@@ -666,7 +666,20 @@ func TestRandomCoffeeService_formatUserDisplay(t *testing.T) {
 		user.TgUsername = ""
 		expectProfile(f.mock, 2, 0)
 
-		assert.Equal(t, "Name2", f.svc.formatUserDisplay(&user))
+		assert.Equal(t, `<a href="tg://user?id=1002">Name2</a>`, f.svc.formatUserDisplay(&user))
+	})
+
+	t.Run("first name is HTML-escaped", func(t *testing.T) {
+		f := newCoffeeFixture(t)
+		user := coffeeUser(5)
+		user.TgUsername = ""
+		// A Telegram name like this used to break the whole weekly pairs message
+		user.Firstname = `Anna <3 & </a><a href="https://evil.example">`
+		expectProfile(f.mock, 5, 0)
+
+		assert.Equal(t,
+			`<a href="tg://user?id=1005">Anna &lt;3 &amp; &lt;/a&gt;&lt;a href=&#34;https://evil.example&#34;&gt;</a>`,
+			f.svc.formatUserDisplay(&user))
 	})
 
 	t.Run("published message id zero is ignored", func(t *testing.T) {
@@ -986,4 +999,67 @@ func TestRandomCoffeeService_GenerateAndSendPairs_EarlyFailures(t *testing.T) {
 			assert.Empty(t, f.client.CallsTo("sendMessage"))
 		})
 	}
+}
+
+// setTelegramMembers answers getChatMember with the given membership of each user in the club
+func (f *coffeeFixture) setTelegramMembers(statuses map[int64]map[string]any) {
+	f.client.On("getChatMember", func(call testutils.APICall) (json.RawMessage, error) {
+		userID := call.Int64("user_id")
+		member := map[string]any{"status": "member"}
+		for k, v := range statuses[userID] {
+			member[k] = v
+		}
+		member["user"] = map[string]any{
+			"id": userID, "is_bot": false, "first_name": fmt.Sprintf("Name%d", userID-1000),
+			"last_name": fmt.Sprintf("Last%d", userID-1000), "username": fmt.Sprintf("user%d", userID-1000),
+		}
+		return json.Marshal(member)
+	})
+}
+
+func TestRandomCoffeeService_GenerateAndSendPairs_UsersWhoLeftTheClubAreNotPaired(t *testing.T) {
+	f := newCoffeeFixture(t)
+	f.mock.MatchExpectationsInOrder(false)
+	participants := coffeeUsers(1, 2, 3, 4, 5)
+	f.client.OnJSON("stopPoll", gotgbot.Poll{Id: "tg-7", IsClosed: true, Type: "regular"})
+	f.setTelegramMembers(map[int64]map[string]any{
+		1004: {"status": "left"},
+		1005: {"status": "restricted", "is_member": false}, // restricted user who left the chat
+	})
+	f.expectPollAndParticipants(participants)
+	for _, u := range participants {
+		expectUserByTgID(f.mock, u)
+	}
+	members := coffeeUsers(1, 2, 3)
+	expectPairHistory(f.mock, userIDs(members), nil)
+	expectCreatePairs(f.mock, 7, 1)
+	for _, u := range members {
+		expectProfile(f.mock, u.ID, 0)
+	}
+
+	require.NoError(t, f.svc.GenerateAndSendPairs())
+
+	texts := f.client.SentTexts()
+	require.Len(t, texts, 1)
+	assert.ElementsMatch(t, []int{1, 2, 3}, userIDsInText(t, texts[0]))
+	assert.NotContains(t, texts[0], "@user4")
+	assert.NotContains(t, texts[0], "@user5")
+}
+
+func TestRandomCoffeeService_GenerateAndSendPairs_NotEnoughMembersLeft(t *testing.T) {
+	f := newCoffeeFixture(t)
+	f.mock.MatchExpectationsInOrder(false)
+	participants := coffeeUsers(1, 2)
+	f.client.OnJSON("stopPoll", gotgbot.Poll{Id: "tg-7", IsClosed: true, Type: "regular"})
+	f.setTelegramMembers(map[int64]map[string]any{1002: {"status": "kicked"}})
+	f.expectPollAndParticipants(participants)
+	for _, u := range participants {
+		expectUserByTgID(f.mock, u)
+	}
+
+	err := f.svc.GenerateAndSendPairs()
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "в клубе осталось 1")
+	assert.Empty(t, f.client.CallsTo("sendMessage"))
 }

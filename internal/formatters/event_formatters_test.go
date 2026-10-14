@@ -583,3 +583,40 @@ func TestFormatHtmlTopicListForAdmin_EscapesTopicText(t *testing.T) {
 	assert.Contains(t, result, "<blockquote expandable>"+escapedTrickyTopic+"</blockquote>")
 	assertTelegramHTML(t, result)
 }
+
+func TestFormatHtmlTopicListMessages_SplitLongListsWithoutCuttingTopics(t *testing.T) {
+	nickname := "author"
+	var topics []repositories.Topic
+	for i := 1; i <= 15; i++ {
+		topics = append(topics, repositories.Topic{
+			ID: i, Topic: fmt.Sprintf("Тема %02d %s", i, strings.Repeat("<&>", 300)), UserNickname: &nickname, CreatedAt: fixedStart,
+		})
+	}
+
+	tests := []struct {
+		name     string
+		messages []string
+		single   string
+	}{
+		{"users", FormatHtmlTopicListForUsersMessages(topics, "Go Meetup", "meetup"), FormatHtmlTopicListForUsers(topics, "Go Meetup", "meetup")},
+		{"admin", FormatHtmlTopicListForAdminMessages(topics, "Go Meetup", "meetup"), FormatHtmlTopicListForAdmin(topics, "Go Meetup", "meetup")},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Greater(t, len(tt.messages), 1)
+			assert.Equal(t, tt.single, strings.Join(tt.messages, ""), "splitting loses nothing")
+			for _, message := range tt.messages {
+				assert.LessOrEqual(t, len([]rune(message)), TopicListChunkLimit)
+				assert.Equal(t, strings.Count(message, "<blockquote"), strings.Count(message, "</blockquote>"))
+			}
+		})
+	}
+}
+
+func TestFormatHtmlTopicListMessages_ShortListIsOneMessage(t *testing.T) {
+	topics := []repositories.Topic{{ID: 1, Topic: "Вопрос", CreatedAt: fixedStart}}
+
+	assert.Equal(t, []string{FormatHtmlTopicListForUsers(topics, "Go", "meetup")}, FormatHtmlTopicListForUsersMessages(topics, "Go", "meetup"))
+	assert.Equal(t, []string{FormatHtmlTopicListForAdmin(nil, "Go", "meetup")}, FormatHtmlTopicListForAdminMessages(nil, "Go", "meetup"))
+}

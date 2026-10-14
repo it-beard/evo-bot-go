@@ -262,25 +262,29 @@ func (h *profileHandler) handleSearchProfile(b *gotgbot.Bot, ctx *ext.Context, m
 
 func (h *profileHandler) handleSearchProfileInput(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
-	username := msg.Text
 	userId := ctx.EffectiveMessage.From.Id
 
 	// Remove @ if present
-	username = strings.TrimPrefix(username, "@")
+	username := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(msg.Text), "@"))
 
-	dbUser, err := h.userRepository.GetByTelegramUsername(username)
-	if err != nil && err == sql.ErrNoRows {
-		//try to get user by full name
-		parts := strings.Fields(username)
-		firstname := parts[0]
-		lastname := strings.Join(parts[1:], " ")
+	// An empty query matches nobody: looking it up would return a random member without a username
+	var dbUser *repositories.User
+	err := sql.ErrNoRows
+	if username != "" {
+		dbUser, err = h.userRepository.GetByTelegramUsername(username)
+		if err != nil && err == sql.ErrNoRows {
+			//try to get user by full name
+			parts := strings.Fields(username)
+			firstname := parts[0]
+			lastname := strings.Join(parts[1:], " ")
 
-		dbUser, err = h.userRepository.SearchByName(firstname, lastname)
-		if err != nil && err != sql.ErrNoRows {
-			return fmt.Errorf("%s: failed to search user in handleUsernameInput by full name: %w", utils.GetCurrentTypeName(), err)
+			dbUser, err = h.userRepository.SearchByName(firstname, lastname)
+			if err != nil && err != sql.ErrNoRows {
+				return fmt.Errorf("%s: failed to search user in handleUsernameInput by full name: %w", utils.GetCurrentTypeName(), err)
+			}
+		} else if err != nil && err != sql.ErrNoRows {
+			return fmt.Errorf("%s: failed to get user in handleUsernameInput by username: %w", utils.GetCurrentTypeName(), err)
 		}
-	} else if err != nil && err != sql.ErrNoRows {
-		return fmt.Errorf("%s: failed to get user in handleUsernameInput by username: %w", utils.GetCurrentTypeName(), err)
 	}
 
 	// If user not found, show search again

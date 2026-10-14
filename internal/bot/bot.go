@@ -66,7 +66,10 @@ type TgBotClient struct {
 func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config) (*TgBotClient, error) {
 
 	// Initialize bot
-	bot, err := gotgbot.NewBot(appConfig.BotToken, nil)
+	// The redacting client keeps the token out of logged network errors
+	bot, err := gotgbot.NewBot(appConfig.BotToken, &gotgbot.BotOpts{
+		BotClient: clients.NewRedactingBotClient(),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -317,11 +320,12 @@ func (b *TgBotClient) registerHandlers(deps *HandlerDependencies) {
 
 	// Register group chat handlers
 	groupHandlers := []ext.Handler{
-		grouphandlers.NewChatMemberHandler(deps.JoinLeftService),
+		grouphandlers.NewChatMemberHandler(deps.AppConfig, deps.JoinLeftService),
 		grouphandlers.NewPollAnswerHandler(
 			deps.RandomCoffeePollAnswersService,
 		),
 		grouphandlers.NewMessageHandler(
+			deps.AppConfig,
 			deps.MessageSenderService,
 			deps.CleanClosedThreadsService,
 			deps.RepliesFromClosedThreadsService,

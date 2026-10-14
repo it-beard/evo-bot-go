@@ -23,7 +23,8 @@ const (
 		SELECT u.id, u.tg_id, u.firstname, u.lastname, u.tg_username
 		FROM users u
 		JOIN random_coffee_participants rpc ON u.id = rpc.user_id
-		WHERE rpc.poll_id = $1 AND rpc.is_participating = TRUE`
+		WHERE rpc.poll_id = $1 AND rpc.is_participating = TRUE
+			AND u.has_coffee_ban = FALSE AND u.is_club_member IS NOT FALSE`
 )
 
 var (

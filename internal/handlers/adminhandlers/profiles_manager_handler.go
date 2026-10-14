@@ -474,10 +474,15 @@ func (h *adminProfilesHandler) handleSearchByUsernameInput(b *gotgbot.Bot, ctx *
 func (h *adminProfilesHandler) handleCreateByForwardedMessageInput(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	userId := ctx.EffectiveUser.Id
-	msgType := msg.ForwardOrigin.GetType()
+
+	// A message that was not forwarded has no origin at all
+	msgType := ""
+	if msg.ForwardOrigin != nil {
+		msgType = msg.ForwardOrigin.GetType()
+	}
 
 	// Check if this is a forwarded message with user origin
-	if msg.ForwardOrigin == nil || msgType != "user" {
+	if msgType != "user" {
 		h.RemovePreviousMessage(b, &userId)
 		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
 		msgText := fmt.Sprintf("<b>%s</b>", adminProfilesMenuCreateByForwardHdr) +

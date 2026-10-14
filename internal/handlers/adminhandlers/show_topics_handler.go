@@ -157,8 +157,7 @@ func (h *showTopicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Contex
 	h.userStore.Set(ctx.EffectiveUser.Id, showTopicsCtxDataKeyEventID, eventID)
 
 	// Format and display topics for admin
-	formattedTopics := formatters.FormatHtmlTopicListForAdmin(topics, event.Name, event.Type)
-	h.messageSenderService.ReplyHtml(msg, formattedTopics, nil)
+	h.replyTopicList(msg, topics, event)
 	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 
 	// If there are topics, suggest deletion option
@@ -262,8 +261,7 @@ func (h *showTopicsHandler) handleTopicDeletion(b *gotgbot.Bot, ctx *ext.Context
 	}
 
 	// Show updated list of topics
-	formattedTopics := formatters.FormatHtmlTopicListForAdmin(topics, event.Name, event.Type)
-	h.messageSenderService.ReplyHtml(msg, formattedTopics, nil)
+	h.replyTopicList(msg, topics, event)
 
 	// If there are still topics, allow for more deletions
 	if len(topics) > 0 {
@@ -282,6 +280,13 @@ func (h *showTopicsHandler) handleTopicDeletion(b *gotgbot.Bot, ctx *ext.Context
 	h.messageSenderService.Reply(msg, "✅ Все темы этого мероприятия удалены.", nil)
 	h.userStore.Clear(ctx.EffectiveUser.Id)
 	return handlers.EndConversation()
+}
+
+// replyTopicList sends the topics of the event, split into several messages when the list is long
+func (h *showTopicsHandler) replyTopicList(msg *gotgbot.Message, topics []repositories.Topic, event *repositories.Event) {
+	for _, part := range formatters.FormatHtmlTopicListForAdminMessages(topics, event.Name, event.Type) {
+		h.messageSenderService.ReplyHtml(msg, part, nil)
+	}
 }
 
 // handleCallbackCancel processes the cancel button click

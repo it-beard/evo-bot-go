@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 	"time"
 
@@ -310,7 +309,7 @@ func (h *toolsHandler) processToolSearchWithType(b *gotgbot.Bot, ctx *ext.Contex
 	)
 
 	// Save the prompt into a temporary file for logging purposes.
-	err = os.WriteFile("last-prompt-log.txt", []byte(prompt), 0644)
+	err = utils.WritePromptLog(prompt)
 	if err != nil {
 		log.Printf("%s: Error writing prompt to file: %v", utils.GetCurrentTypeName(), err)
 	}

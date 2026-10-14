@@ -1,6 +1,7 @@
 package grouphandlers
 
 import (
+	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/services/grouphandlersservices"
 	"evo-bot-go/internal/utils"
@@ -12,6 +13,7 @@ import (
 )
 
 type MessageHandler struct {
+	config                          *config.Config
 	messageSenderService            *services.MessageSenderService
 	cleanClosedThreadsService       *grouphandlersservices.CleanClosedThreadsService
 	repliesFromClosedThreadsService *grouphandlersservices.RepliesFromClosedThreadsService
@@ -22,6 +24,7 @@ type MessageHandler struct {
 }
 
 func NewMessageHandler(
+	config *config.Config,
 	messageSenderService *services.MessageSenderService,
 	cleanClosedThreadsService *grouphandlersservices.CleanClosedThreadsService,
 	repliesFromClosedThreadsService *grouphandlersservices.RepliesFromClosedThreadsService,
@@ -31,6 +34,7 @@ func NewMessageHandler(
 	saveMessageService *grouphandlersservices.SaveMessageService,
 ) ext.Handler {
 	h := &MessageHandler{
+		config:                          config,
 		messageSenderService:            messageSenderService,
 		cleanClosedThreadsService:       cleanClosedThreadsService,
 		repliesFromClosedThreadsService: repliesFromClosedThreadsService,
@@ -44,11 +48,12 @@ func NewMessageHandler(
 }
 
 func (h *MessageHandler) handle(b *gotgbot.Bot, ctx *ext.Context) error {
-	if !utils.IsMessageFromSuperGroupChat(ctx.EffectiveMessage.Chat) {
+	msg := ctx.EffectiveMessage
+
+	// Only the club's own supergroup is moderated and stored
+	if msg == nil || !utils.IsClubSuperGroupChat(msg.Chat, h.config) {
 		return nil
 	}
-
-	msg := ctx.EffectiveMessage
 
 	// Delete join left messages and finish processing
 	if h.deleteJoinLeftMessagesService.IsMessageShouldBeDeleted(msg) {

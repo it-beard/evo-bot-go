@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 	"time"
 
@@ -274,7 +273,7 @@ func (h *introHandler) processIntroSearchWithType(b *gotgbot.Bot, ctx *ext.Conte
 		utils.EscapeMarkdown(query),
 	)
 
-	if err = os.WriteFile("last-prompt-log.txt", []byte(prompt), 0644); err != nil {
+	if err = utils.WritePromptLog(prompt); err != nil {
 		log.Printf("%s: Error writing prompt to file: %v", utils.GetCurrentTypeName(), err)
 	}
 

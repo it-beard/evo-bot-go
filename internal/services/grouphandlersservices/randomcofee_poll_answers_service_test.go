@@ -53,6 +53,26 @@ func TestRandomCoffeePollAnswersService_GetInternalUser(t *testing.T) {
 	assert.True(t, user.HasCoffeeBan)
 }
 
+func TestRandomCoffeePollAnswersService_GetInternalUser_MissingOrFailing(t *testing.T) {
+	t.Run("anonymous answer", func(t *testing.T) {
+		d := newTestDeps(t)
+		s := newPollAnswersService(d)
+		answer := pollAnswer(testUserID, 0)
+		answer.User = nil
+
+		assert.Nil(t, s.GetInternalUser(answer))
+		assert.Nil(t, s.GetInternalUser(nil))
+	})
+
+	t.Run("database error", func(t *testing.T) {
+		d := newTestDeps(t)
+		s := newPollAnswersService(d)
+		d.mock.ExpectQuery(sqlSelectUserByTgID).WithArgs(testUserID).WillReturnError(sqlmock.ErrCancelled)
+
+		assert.Nil(t, s.GetInternalUser(pollAnswer(testUserID, 0)))
+	})
+}
+
 func TestRandomCoffeePollAnswersService_IsAnswerShouldBeProcessed(t *testing.T) {
 	regularUser := &repositories.User{ID: 7, TgID: testUserID}
 	bannedUser := &repositories.User{ID: 7, TgID: testUserID, HasCoffeeBan: true}
@@ -66,6 +86,13 @@ func TestRandomCoffeePollAnswersService_IsAnswerShouldBeProcessed(t *testing.T) 
 		notifyText string
 	}{
 		{name: "nil answer", answer: nil, user: regularUser, expected: false},
+		{name: "anonymous answer without user", answer: func() *gotgbot.PollAnswer {
+			answer := pollAnswer(testUserID, 0)
+			answer.User = nil
+			answer.VoterChat = &gotgbot.Chat{Id: -100777, Type: "channel"}
+			return answer
+		}(), user: nil, expected: false},
+		{name: "user could not be loaded", answer: pollAnswer(testUserID, 0), user: nil, expected: false},
 		{name: "bot votes yes", answer: botPollAnswer(0), user: regularUser, expected: false,
 			notifyChat: testAdminUserID, notifyText: "для ботов недоступно"},
 		{name: "bot votes no", answer: botPollAnswer(1), user: regularUser, expected: false},

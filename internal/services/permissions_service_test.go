@@ -94,6 +94,7 @@ func TestPermissionsService_CheckClubMemberPermissions(t *testing.T) {
 		{status: "administrator", want: true},
 		{status: "creator", want: true},
 		{status: "restricted", want: true},
+		{status: testutils.RestrictedLeftStatus, want: false},
 		{status: "left", want: false},
 		{status: "kicked", want: false},
 	}

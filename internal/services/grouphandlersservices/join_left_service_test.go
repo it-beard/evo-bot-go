@@ -42,6 +42,8 @@ func memberWithStatus(status string) gotgbot.ChatMember {
 		return gotgbot.ChatMemberBanned{User: user}
 	case "restricted":
 		return gotgbot.ChatMemberRestricted{User: user, IsMember: true}
+	case "restricted-left":
+		return gotgbot.ChatMemberRestricted{User: user, IsMember: false}
 	}
 	panic("unknown status " + status)
 }
@@ -52,7 +54,7 @@ func expectExistingUserWithMembership(mock sqlmock.Sqlmock, dbID int, isClubMemb
 }
 
 func TestJoinLeftService_HandleJoinLeftMember_BecameMemberSetsClubMember(t *testing.T) {
-	for _, status := range []string{"member", "administrator", "creator"} {
+	for _, status := range []string{"member", "administrator", "creator", "restricted"} {
 		t.Run(status, func(t *testing.T) {
 			d := newTestDeps(t)
 			s := NewJoinLeftService(d.userRepo)
@@ -88,7 +90,8 @@ func TestJoinLeftService_HandleJoinLeftMember_NewUserIsCreatedWithProfile(t *tes
 }
 
 func TestJoinLeftService_HandleJoinLeftMember_LeftOrKickedClubMemberIsUnset(t *testing.T) {
-	for _, status := range []string{"left", "kicked"} {
+	// A restricted user who leaves the chat keeps the "restricted" status with is_member = false
+	for _, status := range []string{"left", "kicked", "restricted-left"} {
 		t.Run(status, func(t *testing.T) {
 			d := newTestDeps(t)
 			s := NewJoinLeftService(d.userRepo)
@@ -108,13 +111,6 @@ func TestJoinLeftService_HandleJoinLeftMember_LeftNonClubMemberIsNotUpdated(t *t
 	expectExistingUserWithMembership(d.mock, 7, false)
 
 	require.NoError(t, s.HandleJoinLeftMember(d.bot, chatMemberCtx(d.bot, memberWithStatus("left"))))
-}
-
-func TestJoinLeftService_HandleJoinLeftMember_RestrictedStatusIsIgnored(t *testing.T) {
-	d := newTestDeps(t)
-	s := NewJoinLeftService(d.userRepo)
-
-	require.NoError(t, s.HandleJoinLeftMember(d.bot, chatMemberCtx(d.bot, memberWithStatus("restricted"))))
 }
 
 func TestJoinLeftService_HandleJoinLeftMember_Errors(t *testing.T) {

@@ -873,6 +873,23 @@ func TestAdminProfilesHandler_CreateByForwardedMessage_RejectsNonUserOrigin(t *t
 	}
 }
 
+func TestAdminProfilesHandler_CreateByForwardedMessage_PlainMessageIsRejected(t *testing.T) {
+	// A message that was not forwarded has no origin; it used to crash the handler with a nil dereference
+	e := newProfilesEnv(t)
+	e.openMainMenu()
+	e.mustClick(constants.AdminProfilesCreateByForwardedMessageCallback)
+	promptID := e.lastSentID()
+	e.client.Reset()
+
+	msg := testutils.NewPrivateMessage(testAdminID, "just a message")
+	require.NoError(t, e.dispatch(testutils.MessageUpdate(msg)))
+
+	assert.Equal(t, []int64{promptID, msg.MessageId}, e.deletedMessageIDs())
+	call := e.lastSendMessage()
+	assert.Contains(t, call.Params["text"], "Это не пересланное сообщение от пользователя.")
+	assert.NotContains(t, call.Params["text"], "скрытого пользователя")
+}
+
 func TestAdminProfilesHandler_CreateByForwardedMessage_CreatesUserAndProfile(t *testing.T) {
 	e := newProfilesEnv(t)
 	forwardedUser := gotgbot.User{Id: 777002, FirstName: "Anna", LastName: "Smirnova", Username: "annas"}
