@@ -10,6 +10,7 @@ import (
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 	"fmt"
+	"html"
 	"log"
 	"strconv"
 	"strings"
@@ -53,6 +54,8 @@ const (
 	adminProfilesMenuEditHeader          = "Менеджер профилей → Редактирование"
 	adminProfilesMenuCreateByIDHeader    = "Менеджер профилей → Создание по ID"
 	adminProfilesMenuSearchByIDHeader    = "Менеджер профилей → Поиск по ID"
+	adminProfilesMenuSearchByUsernameHdr = "Менеджер профилей → Поиск по username"
+	adminProfilesMenuCreateByForwardHdr  = "Менеджер профилей → Создание через пересланное сообщение"
 	adminProfilesMenuSearchByNameHeader  = "Менеджер профилей → Поиск по имени"
 	adminProfilesMenuEditFirstnameHeader = "Менеджер профилей → Редактирование → Имя"
 	adminProfilesMenuEditLastnameHeader  = "Менеджер профилей → Редактирование → Фамилия"
@@ -96,74 +99,74 @@ func NewAdminProfilesHandler(
 		},
 		map[string][]ext.Handler{
 			adminProfilesStateStart: {
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesSearchByUsernameCallback), h.handleSearchByUsernameCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCreateByForwardedMessageCallback), h.handleCreateByForwardedMessageCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCreateByTelegramIDCallback), h.handleCreateByTelegramIDCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesSearchByTelegramIDCallback), h.handleSearchByTelegramIDCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesSearchByFullNameCallback), h.handleSearchByFullNameCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), h.handleCancelCallback),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesSearchByUsernameCallback), answerCallback(h.handleSearchByUsernameCallback)),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCreateByForwardedMessageCallback), answerCallback(h.handleCreateByForwardedMessageCallback)),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCreateByTelegramIDCallback), answerCallback(h.handleCreateByTelegramIDCallback)),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesSearchByTelegramIDCallback), answerCallback(h.handleSearchByTelegramIDCallback)),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesSearchByFullNameCallback), answerCallback(h.handleSearchByFullNameCallback)),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), answerCallback(h.handleCancelCallback)),
 			},
 			adminProfilesStateAwaitSearchByUsername: {
 				handlers.NewMessage(message.Text, h.handleSearchByUsernameInput),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesStartCallback), h.handleStartCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), h.handleCancelCallback),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesStartCallback), answerCallback(h.handleStartCallback)),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), answerCallback(h.handleCancelCallback)),
 			},
 			adminProfilesStateAwaitSearchUserID: {
 				handlers.NewMessage(message.Text, h.handleSearchUserIDInput),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesStartCallback), h.handleStartCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), h.handleCancelCallback),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesStartCallback), answerCallback(h.handleStartCallback)),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), answerCallback(h.handleCancelCallback)),
 			},
 			adminProfilesStateAwaitSearchByFullName: {
 				handlers.NewMessage(message.Text, h.handleSearchByFullNameInput),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesStartCallback), h.handleStartCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), h.handleCancelCallback),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesStartCallback), answerCallback(h.handleStartCallback)),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), answerCallback(h.handleCancelCallback)),
 			},
 			adminProfilesStateAwaitCreateByForwardedMessage: {
 				handlers.NewMessage(message.All, h.handleCreateByForwardedMessageInput),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesStartCallback), h.handleStartCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), h.handleCancelCallback),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesStartCallback), answerCallback(h.handleStartCallback)),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), answerCallback(h.handleCancelCallback)),
 			},
 			adminProfilesStateAwaitCreateByTelegramID: {
 				handlers.NewMessage(message.Text, h.handleCreateByTelegramIDInput),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesStartCallback), h.handleStartCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), h.handleCancelCallback),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesStartCallback), answerCallback(h.handleStartCallback)),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), answerCallback(h.handleCancelCallback)),
 			},
 			adminProfilesStateEditProfile: {
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditBioCallback), h.handleEditFieldCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditFirstnameCallback), h.handleEditFieldCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditLastnameCallback), h.handleEditFieldCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditUsernameCallback), h.handleEditFieldCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditCoffeeBanCallback), h.handleEditFieldCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditMenuCallback), h.handleEditMenuCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesPublishCallback), h.handlePublishCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesPublishNoPreviewCallback), h.handlePublishNoPreviewCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesStartCallback), h.handleStartCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), h.handleCancelCallback),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditBioCallback), answerCallback(h.handleEditFieldCallback)),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditFirstnameCallback), answerCallback(h.handleEditFieldCallback)),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditLastnameCallback), answerCallback(h.handleEditFieldCallback)),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditUsernameCallback), answerCallback(h.handleEditFieldCallback)),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditCoffeeBanCallback), answerCallback(h.handleEditFieldCallback)),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditMenuCallback), answerCallback(h.handleEditMenuCallback)),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesPublishCallback), answerCallback(h.handlePublishCallback)),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesPublishNoPreviewCallback), answerCallback(h.handlePublishNoPreviewCallback)),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesStartCallback), answerCallback(h.handleStartCallback)),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), answerCallback(h.handleCancelCallback)),
 			},
 			adminProfilesStateAwaitBio: {
 				handlers.NewMessage(message.Text, h.handleBioInput),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditMenuCallback), h.handleEditMenuCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), h.handleCancelCallback),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditMenuCallback), answerCallback(h.handleEditMenuCallback)),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), answerCallback(h.handleCancelCallback)),
 			},
 			adminProfilesStateAwaitFirstname: {
 				handlers.NewMessage(message.Text, h.handleFirstnameInput),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditMenuCallback), h.handleEditMenuCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), h.handleCancelCallback),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditMenuCallback), answerCallback(h.handleEditMenuCallback)),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), answerCallback(h.handleCancelCallback)),
 			},
 			adminProfilesStateAwaitLastname: {
 				handlers.NewMessage(message.Text, h.handleLastnameInput),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditMenuCallback), h.handleEditMenuCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), h.handleCancelCallback),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditMenuCallback), answerCallback(h.handleEditMenuCallback)),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), answerCallback(h.handleCancelCallback)),
 			},
 			adminProfilesStateAwaitUsername: {
 				handlers.NewMessage(message.Text, h.handleUsernameInput),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditMenuCallback), h.handleEditMenuCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), h.handleCancelCallback),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditMenuCallback), answerCallback(h.handleEditMenuCallback)),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), answerCallback(h.handleCancelCallback)),
 			},
 			adminProfilesStateAwaitCoffeeBan: {
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesToggleCoffeeBanCallback), h.handleToggleCoffeeBanCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditMenuCallback), h.handleEditMenuCallback),
-				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), h.handleCancelCallback),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesToggleCoffeeBanCallback), answerCallback(h.handleToggleCoffeeBanCallback)),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesEditMenuCallback), answerCallback(h.handleEditMenuCallback)),
+				handlers.NewCallback(callbackquery.Equal(constants.AdminProfilesCancelCallback), answerCallback(h.handleCancelCallback)),
 			},
 		},
 		&handlers.ConversationOpts{
@@ -179,7 +182,17 @@ func NewAdminProfilesHandler(
 	)
 }
 
-// Entry point for the /profiles command
+// answerCallback wraps a button handler so the button's loading spinner is always dismissed
+func answerCallback(next handlers.Response) handlers.Response {
+	return func(b *gotgbot.Bot, ctx *ext.Context) error {
+		if ctx.CallbackQuery != nil {
+			_, _ = ctx.CallbackQuery.Answer(b, nil)
+		}
+		return next(b, ctx)
+	}
+}
+
+// Entry point for the /profilesManager command
 func (h *adminProfilesHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
@@ -230,8 +243,8 @@ func (h *adminProfilesHandler) handleSearchByUsernameCallback(b *gotgbot.Bot, ct
 	h.RemovePreviousMessage(b, &userId)
 	editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
 		msg.Chat.Id,
-		fmt.Sprintf("<b>%s</b>", adminProfilesMenuHeader)+
-			"\n\nВведи имя пользователя (с @ или без) для поиска:",
+		fmt.Sprintf("<b>%s</b>", adminProfilesMenuSearchByUsernameHdr)+
+			"\n\nВведи username пользователя (с @ или без) для поиска профиля:",
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
 		})
@@ -296,7 +309,7 @@ func (h *adminProfilesHandler) handleCreateByForwardedMessageCallback(b *gotgbot
 	h.RemovePreviousMessage(b, &userId)
 	editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
 		msg.Chat.Id,
-		fmt.Sprintf("<b>%s</b>", adminProfilesMenuHeader)+
+		fmt.Sprintf("<b>%s</b>", adminProfilesMenuCreateByForwardHdr)+
 			"\n\nПерешли мне сообщение от пользователя, для которого нужно создать профиль:",
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
@@ -346,7 +359,7 @@ func (h *adminProfilesHandler) handleCreateByTelegramIDInput(b *gotgbot.Bot, ctx
 		editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
 			msg.Chat.Id,
 			fmt.Sprintf("<b>%s</b>", adminProfilesMenuCreateByIDHeader)+
-				fmt.Sprintf("\n\nНекорректный формат ID: <b>%s</b>. Введи числовой ID пользователя Telegram:", userIDStr),
+				fmt.Sprintf("\n\nНекорректный формат ID: <b>%s</b>. Введи числовой ID пользователя Telegram:", html.EscapeString(userIDStr)),
 			&gotgbot.SendMessageOpts{
 				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
 			})
@@ -420,8 +433,8 @@ func (h *adminProfilesHandler) handleSearchByUsernameInput(b *gotgbot.Bot, ctx *
 		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
 		editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
 			msg.Chat.Id,
-			fmt.Sprintf("<b>%s</b>", adminProfilesMenuHeader)+
-				fmt.Sprintf("\n\nПользователь <b>%s</b> не найден.", username)+
+			fmt.Sprintf("<b>%s</b>", adminProfilesMenuSearchByUsernameHdr)+
+				fmt.Sprintf("\n\nПользователь <b>%s</b> не найден.", html.EscapeString(username))+
 				"\n\nПопробуй ещё раз, или вернись назад:",
 			&gotgbot.SendMessageOpts{
 				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
@@ -467,7 +480,7 @@ func (h *adminProfilesHandler) handleCreateByForwardedMessageInput(b *gotgbot.Bo
 	if msg.ForwardOrigin == nil || msgType != "user" {
 		h.RemovePreviousMessage(b, &userId)
 		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
-		msgText := fmt.Sprintf("<b>%s</b>", adminProfilesMenuHeader) +
+		msgText := fmt.Sprintf("<b>%s</b>", adminProfilesMenuCreateByForwardHdr) +
 			"\n\nЭто не пересланное сообщение от пользователя. Пожалуйста, перешли сообщение от пользователя, для которого нужно создать профиль:"
 		if msgType == "hidden_user" {
 			msgText += "\n\n<i>Сообщение от скрытого пользователя не может быть использовано для создания профиля.</i>"
@@ -560,7 +573,7 @@ func (h *adminProfilesHandler) handleSearchUserIDInput(b *gotgbot.Bot, ctx *ext.
 		editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
 			msg.Chat.Id,
 			fmt.Sprintf("<b>%s</b>", adminProfilesMenuSearchByIDHeader)+
-				fmt.Sprintf("\n\nНекорректный формат ID: <b>%s</b>. Введи числовой ID пользователя Telegram:", userIDStr),
+				fmt.Sprintf("\n\nНекорректный формат ID: <b>%s</b>. Введи числовой ID пользователя Telegram:", html.EscapeString(userIDStr)),
 			&gotgbot.SendMessageOpts{
 				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
 			})
@@ -635,7 +648,7 @@ func (h *adminProfilesHandler) handleSearchByFullNameInput(b *gotgbot.Bot, ctx *
 		editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
 			msg.Chat.Id,
 			fmt.Sprintf("<b>%s</b>", adminProfilesMenuSearchByNameHeader)+
-				fmt.Sprintf("\n\nНекорректный формат имени: <b>%s</b>.", fullName)+
+				fmt.Sprintf("\n\nНекорректный формат имени: <b>%s</b>.", html.EscapeString(fullName))+
 				"\n\nПожалуйста, введи имя и фамилию пользователя через пробел:",
 			&gotgbot.SendMessageOpts{
 				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
@@ -664,7 +677,7 @@ func (h *adminProfilesHandler) handleSearchByFullNameInput(b *gotgbot.Bot, ctx *
 		editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
 			msg.Chat.Id,
 			fmt.Sprintf("<b>%s</b>", adminProfilesMenuSearchByNameHeader)+
-				fmt.Sprintf("\n\nПользователь с именем <b>%s %s</b> не найден.", firstname, lastname)+
+				fmt.Sprintf("\n\nПользователь с именем <b>%s %s</b> не найден.", html.EscapeString(firstname), html.EscapeString(lastname))+
 				"\n\nПопробуй ещё раз, или вернись назад:",
 			&gotgbot.SendMessageOpts{
 				ReplyMarkup: buttons.ProfilesBackCancelButtons(constants.AdminProfilesStartCallback),
@@ -759,29 +772,27 @@ func (h *adminProfilesHandler) handleEditFieldCallback(b *gotgbot.Bot, ctx *ext.
 	// Determine which field is being edited
 	switch data {
 	case constants.AdminProfilesEditFirstnameCallback:
-		callToAction = "Введи новое значение для поля <b>имя</b>"
+		callToAction = "Введи новое имя:"
 		menuHeader = adminProfilesMenuEditFirstnameHeader
 		nextState = adminProfilesStateAwaitFirstname
-		oldField = "Текущее значение: <code>" + dbUser.Firstname + "</code>"
+		oldField = "Текущее значение: <code>" + html.EscapeString(dbUser.Firstname) + "</code>"
 	case constants.AdminProfilesEditLastnameCallback:
-		callToAction = "Введи новое значение для поля <b>фамилия</b>"
+		callToAction = "Введи новую фамилию:"
 		menuHeader = adminProfilesMenuEditLastnameHeader
 		nextState = adminProfilesStateAwaitLastname
-		oldField = "Текущее значение: <code>" + dbUser.Lastname + "</code>"
+		oldField = "Текущее значение: <code>" + html.EscapeString(dbUser.Lastname) + "</code>"
 	case constants.AdminProfilesEditUsernameCallback:
-		callToAction = "Введи новое значение для поля <b>username</b> (без @)"
+		callToAction = "Введи новый username (можно с @):"
 		menuHeader = adminProfilesMenuEditUsernameHeader
 		nextState = adminProfilesStateAwaitUsername
-		oldField = "Текущее значение: <code>" + dbUser.TgUsername + "</code>"
+		oldField = "Текущее значение: <code>" + html.EscapeString(dbUser.TgUsername) + "</code>"
 	case constants.AdminProfilesEditBioCallback:
-		callToAction = fmt.Sprintf("Введи новое значение для поля <b>биографию</b> (до %d символов)", constants.ProfileBioLengthLimit)
+		callToAction = fmt.Sprintf("Введи новую биографию (до %d символов):", constants.ProfileBioLengthLimit)
 		menuHeader = adminProfilesMenuEditBioHeader
 		nextState = adminProfilesStateAwaitBio
-		profile.Bio = strings.ReplaceAll(profile.Bio, "<", "&lt;")
-		profile.Bio = strings.ReplaceAll(profile.Bio, ">", "&gt;")
-		oldField = "Текущее значение: <pre>" + profile.Bio + "</pre>"
+		oldField = "Текущее значение: <pre>" + html.EscapeString(profile.Bio) + "</pre>"
 	case constants.AdminProfilesEditCoffeeBanCallback:
-		callToAction = "Нажмите на кнопку, чтобы изменить статус кофейных встреч"
+		callToAction = "Нажми на кнопку ниже, чтобы изменить статус кофейных встреч."
 		menuHeader = adminProfilesMenuCoffeeBanHeader
 		nextState = adminProfilesStateAwaitCoffeeBan
 		if dbUser.HasCoffeeBan {
@@ -970,7 +981,7 @@ func (h *adminProfilesHandler) handlePublishProfile(b *gotgbot.Bot, ctx *ext.Con
 	editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
 		msg.Chat.Id,
 		fmt.Sprintf("<b>%s</b>", adminProfilesMenuPublishHeader)+
-			fmt.Sprintf("\n\n✅ Профиль пользователя успешно опубликован в канале \"<a href='%s'>Интро</a>\"!", utils.GetIntroMessageLink(h.config, profile.PublishedMessageID.Int64)),
+			fmt.Sprintf("\n\n✅ Профиль пользователя успешно опубликован в канале \"<a href='%s'>Интро</a>\"!", utils.GetIntroMessageLink(h.config, publishedMsg.MessageId)),
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: buttons.ProfilesBackStartCancelButtons(constants.AdminProfilesEditMenuCallback),
 		})
@@ -1236,18 +1247,16 @@ func (h *adminProfilesHandler) handleToggleCoffeeBanCallback(b *gotgbot.Bot, ctx
 	// Update the message with new buttons
 	h.RemovePreviousMessage(b, &userId)
 
-	var statusText string
+	statusText := "✅ Разрешено"
 	if newStatus {
-		statusText = "❌ Запретить"
-	} else {
-		statusText = "✅ Разрешить"
+		statusText = "❌ Запрещено"
 	}
 
 	editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
 		msg.Chat.Id,
 		fmt.Sprintf("<b>%s</b>", adminProfilesMenuCoffeeBanHeader)+
 			fmt.Sprintf("\n\nТекущее значение: %s", statusText)+
-			"\n\nВведи новое значение для поля <b>статус кофейных встреч</b>:",
+			"\n\nНажми на кнопку ниже, чтобы изменить статус кофейных встреч.",
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: buttons.ProfilesCoffeeBanButtons(constants.AdminProfilesEditMenuCallback, newStatus),
 		})

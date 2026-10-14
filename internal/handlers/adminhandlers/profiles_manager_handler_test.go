@@ -20,9 +20,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const profilesSessionEndedText = "Админ-сессия работы с профилями завершена."
+const (
+	profilesSessionEndedText = "Админ-сессия работы с профилями завершена."
+	coffeeAllowedText        = "✅ Разрешено"
+	coffeeBannedText         = "❌ Запрещено"
+)
 
 var errDB = errors.New("db is down")
+
+// coffeeBanPromptText is the coffee ban menu text for the given current status
+func coffeeBanPromptText(status string) string {
+	return "<b>" + adminProfilesMenuCoffeeBanHeader + "</b>\n\nТекущее значение: " + status +
+		"\n\nНажми на кнопку ниже, чтобы изменить статус кофейных встреч."
+}
 
 func sampleUser() repositories.User {
 	return repositories.User{
@@ -118,24 +128,29 @@ func TestAdminProfilesHandler_RejectsNonAdmin(t *testing.T) {
 }
 
 func TestAdminProfilesHandler_RejectsGroupChat(t *testing.T) {
-	e := newProfilesEnv(t)
-	const groupChatID int64 = -100500
-	msg := testutils.NewGroupMessage(testAdminID, groupChatID, 0, profilesCommand())
-
-	require.NoError(t, e.dispatch(testutils.MessageUpdate(msg)))
-
-	sends := e.client.CallsTo("sendMessage")
-	require.Len(t, sends, 2)
-	assert.Equal(t, groupChatID, sends[0].Int64("chat_id"))
-	assert.Equal(t, "Markdown", sends[0].Params["parse_mode"])
-	assert.Contains(t, sends[0].Params["text"], "Эта команда работает только в _личной беседе_ со мной")
-	// The user gets pinged in private
-	assert.Equal(t, testAdminID, sends[1].Int64("chat_id"))
-	for _, text := range e.client.SentTexts() {
-		assert.NotContains(t, text, adminProfilesMenuHeader)
+	tests := []struct {
+		name   string
+		userID int64
+	}{
+		{name: "admin", userID: testAdminID},
+		{name: "member gets the same notice instead of the admin-only reply", userID: testMemberID},
 	}
 
-	e.notHandled(callbackUpdate(testAdminID, constants.AdminProfilesSearchByUsernameCallback))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := newProfilesEnv(t)
+			const groupChatID int64 = -100500
+			msg := testutils.NewGroupMessage(tt.userID, groupChatID, 0, profilesCommand())
+
+			require.NoError(t, e.dispatch(testutils.MessageUpdate(msg)))
+
+			e.assertPrivateOnlyNotice(msg)
+			for _, text := range e.client.SentTexts() {
+				assert.NotContains(t, text, adminProfilesMenuHeader)
+			}
+			e.notHandled(callbackUpdate(tt.userID, constants.AdminProfilesSearchByUsernameCallback))
+		})
+	}
 }
 
 func TestAdminProfilesHandler_CommandShowsMainMenu(t *testing.T) {
@@ -160,8 +175,8 @@ func TestAdminProfilesHandler_MainMenuNavigation(t *testing.T) {
 		{
 			name:     "search by username",
 			callback: constants.AdminProfilesSearchByUsernameCallback,
-			header:   adminProfilesMenuHeader,
-			prompt:   "Введи имя пользователя (с @ или без) для поиска:",
+			header:   "Менеджер профилей → Поиск по username",
+			prompt:   "Введи username пользователя (с @ или без) для поиска профиля:",
 		},
 		{
 			name:     "search by telegram id",
@@ -178,7 +193,7 @@ func TestAdminProfilesHandler_MainMenuNavigation(t *testing.T) {
 		{
 			name:     "create by forwarded message",
 			callback: constants.AdminProfilesCreateByForwardedMessageCallback,
-			header:   adminProfilesMenuHeader,
+			header:   "Менеджер профилей → Создание через пересланное сообщение",
 			prompt:   "Перешли мне сообщение от пользователя, для которого нужно создать профиль:",
 		},
 		{
@@ -219,6 +234,138 @@ func TestAdminProfilesHandler_MainMenuNavigation(t *testing.T) {
 			assert.Equal(t, []int64{promptID}, e.deletedMessageIDs())
 			assert.Equal(t, []string{profilesSessionEndedText}, e.client.SentTexts())
 			e.notHandled(callbackUpdate(testAdminID, constants.AdminProfilesStartCallback))
+		})
+	}
+}
+
+func TestAdminProfilesHandler_EveryButtonPressIsAnsweredOnce(t *testing.T) {
+	user, profile := sampleUser(), sampleProfile()
+
+	type scenario struct {
+		name     string
+		open     func(e *testEnv)
+		setup    func(e *testEnv)
+		callback string
+		wantErr  bool
+	}
+
+	noSetup := func(e *testEnv) {}
+	openMainMenu := func(e *testEnv) { e.openMainMenu() }
+	openSubMenu := func(callback string) func(e *testEnv) {
+		return func(e *testEnv) {
+			e.openMainMenu()
+			e.mustClick(callback)
+		}
+	}
+	openProfile := func(e *testEnv) { e.openProfile(user, profile) }
+	openField := func(callback string) func(e *testEnv) {
+		return func(e *testEnv) { e.openField(user, profile, callback) }
+	}
+	expectFieldPrompt := func(e *testEnv) {
+		e.expectUserByID(user)
+		e.expectProfileByID(profile)
+	}
+	expectBackToProfile := func(e *testEnv) {
+		e.expectUserByID(user)
+		e.expectProfileByUserID(profile)
+	}
+	expectPublish := func(e *testEnv) {
+		e.expectUserByID(user)
+		e.expectProfileByID(profile)
+		e.mock.ExpectExec(sqlUpdatePublishedMsg).WithArgs(sqlmock.AnyArg(), profile.ID).WillReturnResult(sqlmock.NewResult(0, 1))
+	}
+	short := func(callback string) string {
+		return strings.TrimPrefix(callback, constants.AdminProfilesPrefix)
+	}
+
+	subMenus := []string{
+		constants.AdminProfilesSearchByUsernameCallback,
+		constants.AdminProfilesSearchByTelegramIDCallback,
+		constants.AdminProfilesSearchByFullNameCallback,
+		constants.AdminProfilesCreateByForwardedMessageCallback,
+		constants.AdminProfilesCreateByTelegramIDCallback,
+	}
+	fields := []string{
+		constants.AdminProfilesEditFirstnameCallback,
+		constants.AdminProfilesEditLastnameCallback,
+		constants.AdminProfilesEditUsernameCallback,
+		constants.AdminProfilesEditBioCallback,
+		constants.AdminProfilesEditCoffeeBanCallback,
+	}
+
+	var tests []scenario
+	// Main menu
+	for _, cb := range append(append([]string{}, subMenus...), constants.AdminProfilesCancelCallback) {
+		tests = append(tests, scenario{name: "main menu: " + short(cb), open: openMainMenu, setup: noSetup, callback: cb})
+	}
+	// Search and create prompts
+	for _, sub := range subMenus {
+		tests = append(tests,
+			scenario{name: short(sub) + ": back", open: openSubMenu(sub), setup: noSetup, callback: constants.AdminProfilesStartCallback},
+			scenario{name: short(sub) + ": cancel", open: openSubMenu(sub), setup: noSetup, callback: constants.AdminProfilesCancelCallback},
+		)
+	}
+	// Profile edit menu
+	for _, field := range fields {
+		tests = append(tests, scenario{name: "edit menu: " + short(field), open: openProfile, setup: expectFieldPrompt, callback: field})
+	}
+	tests = append(tests,
+		scenario{name: "edit menu: publish", open: openProfile, setup: expectPublish, callback: constants.AdminProfilesPublishCallback},
+		scenario{name: "edit menu: publish without preview", open: openProfile, setup: expectPublish, callback: constants.AdminProfilesPublishNoPreviewCallback},
+		scenario{name: "edit menu: back", open: openProfile, setup: expectBackToProfile, callback: constants.AdminProfilesEditMenuCallback},
+		scenario{name: "edit menu: start", open: openProfile, setup: noSetup, callback: constants.AdminProfilesStartCallback},
+		scenario{name: "edit menu: cancel", open: openProfile, setup: noSetup, callback: constants.AdminProfilesCancelCallback},
+	)
+	// Field prompts and the coffee ban menu
+	for _, field := range fields {
+		tests = append(tests,
+			scenario{name: short(field) + ": back", open: openField(field), setup: expectBackToProfile, callback: constants.AdminProfilesEditMenuCallback},
+			scenario{name: short(field) + ": cancel", open: openField(field), setup: noSetup, callback: constants.AdminProfilesCancelCallback},
+		)
+	}
+	tests = append(tests,
+		scenario{
+			name: "edit_coffee_ban: toggle",
+			open: openField(constants.AdminProfilesEditCoffeeBanCallback),
+			setup: func(e *testEnv) {
+				e.expectUserByID(user)
+				e.mock.ExpectExec(sqlSetCoffeeBan).WithArgs(true, user.ID).WillReturnResult(sqlmock.NewResult(0, 1))
+			},
+			callback: constants.AdminProfilesToggleCoffeeBanCallback,
+		},
+		// The button is answered even when the handler fails
+		scenario{
+			name:     "edit menu: edit_bio when the database fails",
+			open:     openProfile,
+			setup:    func(e *testEnv) { e.mock.ExpectQuery(sqlUserByID).WillReturnError(errDB) },
+			callback: constants.AdminProfilesEditBioCallback,
+			wantErr:  true,
+		},
+		scenario{
+			name:     "edit_coffee_ban: toggle when the database fails",
+			open:     openField(constants.AdminProfilesEditCoffeeBanCallback),
+			setup:    func(e *testEnv) { e.mock.ExpectQuery(sqlUserByID).WillReturnError(errDB) },
+			callback: constants.AdminProfilesToggleCoffeeBanCallback,
+			wantErr:  true,
+		},
+	)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := newProfilesEnv(t)
+			tt.open(e)
+			e.client.Reset()
+			tt.setup(e)
+			u := callbackUpdate(testAdminID, tt.callback)
+
+			err := e.dispatch(u)
+
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, []string{u.CallbackQuery.Id}, e.answeredCallbackIDs())
 		})
 	}
 }
@@ -304,7 +451,7 @@ func TestAdminProfilesHandler_FallbackDeletesUnexpectedText(t *testing.T) {
 
 	// Still in the main menu state
 	e.mustClick(constants.AdminProfilesSearchByUsernameCallback)
-	assert.Contains(t, e.lastSendMessage().Params["text"], "Введи имя пользователя")
+	assert.Contains(t, e.lastSendMessage().Params["text"], "Введи username пользователя")
 }
 
 func TestAdminProfilesHandler_FindProfile(t *testing.T) {
@@ -467,7 +614,7 @@ func TestAdminProfilesHandler_InvalidOrUnknownSearchInput(t *testing.T) {
 			setup: func(e *testEnv) {
 				e.mock.ExpectQuery(sqlUserByUsername).WithArgs("ghost").WillReturnError(sql.ErrNoRows)
 			},
-			wantText: "<b>" + adminProfilesMenuHeader + "</b>\n\nПользователь <b>ghost</b> не найден.\n\nПопробуй ещё раз, или вернись назад:",
+			wantText: "<b>" + adminProfilesMenuSearchByUsernameHdr + "</b>\n\nПользователь <b>ghost</b> не найден.\n\nПопробуй ещё раз, или вернись назад:",
 		},
 		{
 			name:     "non numeric telegram id in search",
@@ -715,7 +862,7 @@ func TestAdminProfilesHandler_CreateByForwardedMessage_RejectsNonUserOrigin(t *t
 
 			assert.Equal(t, []int64{promptID, msg.MessageId}, e.deletedMessageIDs())
 			call := e.lastSendMessage()
-			assert.True(t, strings.HasPrefix(call.Params["text"], "<b>"+adminProfilesMenuHeader+"</b>\n\n"+notForwardedText))
+			assert.True(t, strings.HasPrefix(call.Params["text"], "<b>"+adminProfilesMenuCreateByForwardHdr+"</b>\n\n"+notForwardedText), call.Params["text"])
 			if tt.wantHidden {
 				assert.Contains(t, call.Params["text"], hiddenUserNote)
 			} else {
@@ -756,14 +903,14 @@ func TestAdminProfilesHandler_CreateByForwardedMessage_CreatesUserAndProfile(t *
 	call := e.lastSendMessage()
 	assertEditMenu(t, call, dbUser)
 	assert.Contains(t, call.Params["text"], "(@annas)")
-	assert.Contains(t, call.Params["text"], "Hi, I'm Anna, a &lt;Go&gt; developer")
+	assert.Contains(t, call.Params["text"], "Hi, I&#39;m Anna, a &lt;Go&gt; developer")
 
 	// The new profile can be edited right away
 	e.client.Reset()
 	e.expectUserByID(dbUser)
 	e.expectProfileByID(dbProfile)
 	e.mustClick(constants.AdminProfilesEditBioCallback)
-	assert.Contains(t, e.lastSendMessage().Params["text"], "<pre>Hi, I'm Anna, a &lt;Go&gt; developer</pre>")
+	assert.Contains(t, e.lastSendMessage().Params["text"], "<pre>Hi, I&#39;m Anna, a &lt;Go&gt; developer</pre>")
 }
 
 func TestAdminProfilesHandler_CreateByForwardedMessage_DBErrors(t *testing.T) {
@@ -834,7 +981,7 @@ func TestAdminProfilesHandler_EditFieldPrompts(t *testing.T) {
 			callback:   constants.AdminProfilesEditFirstnameCallback,
 			user:       sampleUser(),
 			profile:    sampleProfile(),
-			wantText:   "<b>" + adminProfilesMenuEditFirstnameHeader + "</b>\n\nТекущее значение: <code>Ivan</code>\n\nВведи новое значение для поля <b>имя</b>",
+			wantText:   "<b>" + adminProfilesMenuEditFirstnameHeader + "</b>\n\nТекущее значение: <code>Ivan</code>\n\nВведи новое имя:",
 			wantMarkup: backCancel,
 		},
 		{
@@ -842,7 +989,7 @@ func TestAdminProfilesHandler_EditFieldPrompts(t *testing.T) {
 			callback:   constants.AdminProfilesEditLastnameCallback,
 			user:       sampleUser(),
 			profile:    sampleProfile(),
-			wantText:   "<b>" + adminProfilesMenuEditLastnameHeader + "</b>\n\nТекущее значение: <code>Petrov</code>\n\nВведи новое значение для поля <b>фамилия</b>",
+			wantText:   "<b>" + adminProfilesMenuEditLastnameHeader + "</b>\n\nТекущее значение: <code>Petrov</code>\n\nВведи новую фамилию:",
 			wantMarkup: backCancel,
 		},
 		{
@@ -850,7 +997,7 @@ func TestAdminProfilesHandler_EditFieldPrompts(t *testing.T) {
 			callback:   constants.AdminProfilesEditUsernameCallback,
 			user:       sampleUser(),
 			profile:    sampleProfile(),
-			wantText:   "<b>" + adminProfilesMenuEditUsernameHeader + "</b>\n\nТекущее значение: <code>ivanp</code>\n\nВведи новое значение для поля <b>username</b> (без @)",
+			wantText:   "<b>" + adminProfilesMenuEditUsernameHeader + "</b>\n\nТекущее значение: <code>ivanp</code>\n\nВведи новый username (можно с @):",
 			wantMarkup: backCancel,
 		},
 		{
@@ -858,8 +1005,8 @@ func TestAdminProfilesHandler_EditFieldPrompts(t *testing.T) {
 			callback: constants.AdminProfilesEditBioCallback,
 			user:     sampleUser(),
 			profile:  htmlProfile,
-			wantText: "<b>" + adminProfilesMenuEditBioHeader + "</b>\n\nТекущее значение: <pre>Loves &lt;Go&gt; & Rust</pre>\n\n" +
-				fmt.Sprintf("Введи новое значение для поля <b>биографию</b> (до %d символов)", constants.ProfileBioLengthLimit),
+			wantText: "<b>" + adminProfilesMenuEditBioHeader + "</b>\n\nТекущее значение: <pre>Loves &lt;Go&gt; &amp; Rust</pre>\n\n" +
+				fmt.Sprintf("Введи новую биографию (до %d символов):", constants.ProfileBioLengthLimit),
 			wantMarkup: backCancel,
 		},
 		{
@@ -867,7 +1014,7 @@ func TestAdminProfilesHandler_EditFieldPrompts(t *testing.T) {
 			callback:   constants.AdminProfilesEditCoffeeBanCallback,
 			user:       sampleUser(),
 			profile:    sampleProfile(),
-			wantText:   "<b>" + adminProfilesMenuCoffeeBanHeader + "</b>\n\nТекущее значение: ✅ Разрешено\n\nНажмите на кнопку, чтобы изменить статус кофейных встреч",
+			wantText:   coffeeBanPromptText(coffeeAllowedText),
 			wantMarkup: buttons.ProfilesCoffeeBanButtons(constants.AdminProfilesEditMenuCallback, false),
 		},
 		{
@@ -875,7 +1022,7 @@ func TestAdminProfilesHandler_EditFieldPrompts(t *testing.T) {
 			callback:   constants.AdminProfilesEditCoffeeBanCallback,
 			user:       bannedUser,
 			profile:    sampleProfile(),
-			wantText:   "<b>" + adminProfilesMenuCoffeeBanHeader + "</b>\n\nТекущее значение: ❌ Запрещено\n\nНажмите на кнопку, чтобы изменить статус кофейных встреч",
+			wantText:   coffeeBanPromptText(coffeeBannedText),
 			wantMarkup: buttons.ProfilesCoffeeBanButtons(constants.AdminProfilesEditMenuCallback, true),
 		},
 	}
@@ -1257,14 +1404,15 @@ func TestAdminProfilesHandler_ToggleCoffeeBan(t *testing.T) {
 	user, profile := sampleUser(), sampleProfile()
 	promptID := e.openField(user, profile, constants.AdminProfilesEditCoffeeBanCallback)
 
-	// Allowed -> banned
+	// Allowed -> banned: the new status is shown, the button now offers to allow
 	e.expectUserByID(user)
 	e.mock.ExpectExec(sqlSetCoffeeBan).WithArgs(true, 11).WillReturnResult(sqlmock.NewResult(0, 1))
 	e.mustClick(constants.AdminProfilesToggleCoffeeBanCallback)
 
 	assert.Equal(t, []int64{promptID}, e.deletedMessageIDs())
 	call := e.lastSendMessage()
-	assert.True(t, strings.HasPrefix(call.Params["text"], "<b>"+adminProfilesMenuCoffeeBanHeader+"</b>"))
+	assert.Equal(t, "HTML", call.Params["parse_mode"])
+	assert.Equal(t, coffeeBanPromptText(coffeeBannedText), call.Params["text"])
 	assert.Equal(t, buttons.ProfilesCoffeeBanButtons(constants.AdminProfilesEditMenuCallback, true), markup(t, call))
 	promptID = e.lastSentID()
 
@@ -1277,7 +1425,9 @@ func TestAdminProfilesHandler_ToggleCoffeeBan(t *testing.T) {
 	e.mustClick(constants.AdminProfilesToggleCoffeeBanCallback)
 
 	assert.Equal(t, []int64{promptID}, e.deletedMessageIDs())
-	assert.Equal(t, buttons.ProfilesCoffeeBanButtons(constants.AdminProfilesEditMenuCallback, false), markup(t, e.lastSendMessage()))
+	call = e.lastSendMessage()
+	assert.Equal(t, coffeeBanPromptText(coffeeAllowedText), call.Params["text"])
+	assert.Equal(t, buttons.ProfilesCoffeeBanButtons(constants.AdminProfilesEditMenuCallback, false), markup(t, call))
 
 	// Still in the coffee ban menu: "Back" returns to the profile
 	e.client.Reset()
@@ -1408,10 +1558,12 @@ func TestAdminProfilesHandler_PublishNewMessage(t *testing.T) {
 			assert.Contains(t, published.Params["text"], "🖐 <b><a href=\"tg://user?id=777001\">Ivan Petrov</a></b> (@ivanp)")
 			assert.Contains(t, published.Params["text"], "<blockquote>О себе</blockquote>\nGo developer")
 
+			// The success message links to the message that was just published (the stored ID was empty)
 			success := sends[1]
 			assert.Equal(t, testAdminID, success.Int64("chat_id"))
-			assert.True(t, strings.HasPrefix(success.Params["text"],
-				"<b>"+adminProfilesMenuPublishHeader+"</b>\n\n✅ Профиль пользователя успешно опубликован в канале"))
+			assert.Equal(t, "<b>"+adminProfilesMenuPublishHeader+"</b>\n\n✅ Профиль пользователя успешно опубликован в канале "+
+				fmt.Sprintf("\"<a href='%s'>Интро</a>\"!", utils.GetIntroMessageLink(e.cfg, publishedID)),
+				success.Params["text"])
 			assert.Equal(t, buttons.ProfilesBackStartCancelButtons(constants.AdminProfilesEditMenuCallback), markup(t, success))
 			assert.Equal(t, []int64{menuID}, e.deletedMessageIDs())
 			assert.Empty(t, e.client.CallsTo("editMessageText"))
@@ -1486,9 +1638,14 @@ func TestAdminProfilesHandler_PublishExistingMessage(t *testing.T) {
 				assert.Equal(t, edit.Params["text"], groupSends[0].Params["text"])
 			} else {
 				assert.Empty(t, groupSends)
-				assert.Contains(t, e.lastSendMessage().Params["text"], utils.GetIntroMessageLink(e.cfg, oldMessageID))
 			}
-			assert.Contains(t, e.lastSendMessage().Params["text"], "успешно опубликован")
+			// The success message links to the message that is published now: the re-sent one if the old one is gone
+			successText := e.lastSendMessage().Params["text"]
+			assert.Contains(t, successText, "успешно опубликован")
+			assert.Contains(t, successText, fmt.Sprintf("<a href='%s'>Интро</a>", utils.GetIntroMessageLink(e.cfg, wantID)))
+			if tt.wantRepublish {
+				assert.NotContains(t, successText, utils.GetIntroMessageLink(e.cfg, oldMessageID))
+			}
 		})
 	}
 }
@@ -1808,4 +1965,43 @@ func TestAdminProfilesHandler_TooLongInputWhenTelegramFails(t *testing.T) {
 	_, err = e.text(strings.Repeat("a", 31))
 	require.NoError(t, err)
 	assert.Contains(t, e.lastSendMessage().Params["text"], "Имя слишком длинное")
+}
+
+// BUG: user names come from Telegram (e.g. via a forwarded message) but are put into HTML messages unescaped
+// (formatters.FormatProfileManagerView / FormatPublicProfileForMessage and the edit prompt of the profiles manager),
+// so for a user named "Anna <3" Telegram rejects the edit menu, the edit prompt and the intro publication.
+func TestAdminProfilesHandler_BUG_UserNamesNotHTMLEscaped(t *testing.T) {
+	user := sampleUser()
+	user.Firstname = "Anna <3"
+	profile := sampleProfile()
+	const escapedName = "Anna &lt;3"
+
+	t.Run("edit menu", func(t *testing.T) {
+		e := newProfilesEnv(t)
+		e.openProfile(user, profile)
+
+		assert.Contains(t, e.lastSentText(), ">"+escapedName+" Petrov</a>")
+	})
+
+	t.Run("first name prompt", func(t *testing.T) {
+		e := newProfilesEnv(t)
+		e.openField(user, profile, constants.AdminProfilesEditFirstnameCallback)
+
+		assert.Contains(t, e.lastSentText(), "Текущее значение: <code>"+escapedName+"</code>")
+	})
+
+	t.Run("published intro", func(t *testing.T) {
+		e := newProfilesEnv(t)
+		e.openProfile(user, profile)
+		e.expectUserByID(user)
+		e.expectProfileByID(profile)
+		e.mock.ExpectExec(sqlUpdatePublishedMsg).WithArgs(sqlmock.AnyArg(), profile.ID).WillReturnResult(sqlmock.NewResult(0, 1))
+
+		e.mustClick(constants.AdminProfilesPublishCallback)
+
+		sends := e.client.CallsTo("sendMessage")
+		require.NotEmpty(t, sends)
+		assert.Equal(t, fullGroupChatID(), sends[0].Int64("chat_id"))
+		assert.Contains(t, sends[0].Params["text"], ">"+escapedName+" Petrov</a>")
+	})
 }

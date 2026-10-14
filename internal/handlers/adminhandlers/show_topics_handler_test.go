@@ -1,23 +1,33 @@
 package adminhandlers
 
 import (
+	"errors"
+	"strings"
 	"testing"
 
 	"evo-bot-go/internal/buttons"
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/repositories"
+	"evo-bot-go/internal/formatters"
 	"evo-bot-go/internal/testutils"
+	"evo-bot-go/internal/utils"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 const (
-	topicsCancelledText = "Операция просмотра/удаления тем отменена."
-	deleteTopicPrompt   = "\nДля удаления темы отправь ID темы, которую нужно удалить:"
-	deleteMorePrompt    = "\nДля удаления еще одной темы отправь ID темы:"
+	topicsCancelledText = "Операция просмотра и удаления тем отменена."
+	deleteTopicPrompt   = "Чтобы удалить тему, отправь её ID или /cancel для отмены."
+	deleteMorePrompt    = "Чтобы удалить ещё одну тему, отправь её ID или /cancel для отмены."
+	adminEventListTitle = "📋 Последние мероприятия"
+	showTopicsAction    = "для которого ты хочешь увидеть темы и вопросы"
+	// sampleEventHeader is the escaped topic list header of sampleEvent
+	sampleEventHeader = "🎙 <i>митап</i>: <b>Go Meetup</b>\n"
 )
 
 func showTopicsCommand() string {
@@ -41,10 +51,15 @@ func cancelMarkup() gotgbot.InlineKeyboardMarkup {
 	return buttons.CancelButton(showTopicsCallbackConfirmCancel)
 }
 
+// expectLastEvents expects the query for the events list of /showTopics
+func (e *testEnv) expectLastEvents() *sqlmock.ExpectedQuery {
+	return e.mock.ExpectQuery(sqlLastEvents).WithArgs(constants.EventEditGetLastLimit)
+}
+
 // openEventList starts the conversation with one event in the list and returns the list message ID
 func (e *testEnv) openEventList() int64 {
 	e.t.Helper()
-	e.mock.ExpectQuery(sqlLastEvents).WithArgs(10).WillReturnRows(eventRows(sampleEvent()))
+	e.expectLastEvents().WillReturnRows(eventRows(sampleEvent()))
 	e.mustText(showTopicsCommand())
 	e.client.Reset()
 	return e.lastSentID()
@@ -71,6 +86,37 @@ func (e *testEnv) keyboardRemovedFrom() []int64 {
 	return ids
 }
 
+// newBareShowTopicsHandler builds the handler without the conversation wrapper, so its stored state can be inspected
+func (e *testEnv) newBareShowTopicsHandler() *showTopicsHandler {
+	return &showTopicsHandler{
+		config:               e.cfg,
+		topicRepository:      repositories.NewTopicRepository(e.db),
+		eventRepository:      repositories.NewEventRepository(e.db),
+		messageSenderService: e.sender,
+		userStore:            utils.NewUserDataStore(),
+		permissionsService:   e.permissions,
+	}
+}
+
+// assertShowTopicsStateCleared checks that nothing is left in the handler's store for the admin
+func assertShowTopicsStateCleared(t *testing.T, h *showTopicsHandler) {
+	t.Helper()
+	_, ok := h.userStore.Get(testAdminID, showTopicsCtxDataKeyEventID)
+	assert.False(t, ok, "the selected event must be forgotten")
+	msgID, chatID := h.userStore.GetPreviousMessageInfo(testAdminID,
+		showTopicsCtxDataKeyPreviousMessageID, showTopicsCtxDataKeyPreviousChatID)
+	assert.Zero(t, msgID, "the previous message must be forgotten")
+	assert.Zero(t, chatID, "the previous message must be forgotten")
+}
+
+// assertConversationEnded checks that a handler returned handlers.EndConversation()
+func assertConversationEnded(t *testing.T, err error) {
+	t.Helper()
+	var change *handlers.ConversationStateChange
+	require.True(t, errors.As(err, &change), "expected a conversation state change, got %v", err)
+	assert.True(t, change.End, "the conversation must end")
+}
+
 func TestShowTopicsHandler_RejectsNonAdmin(t *testing.T) {
 	e := newShowTopicsEnv(t)
 
@@ -84,17 +130,26 @@ func TestShowTopicsHandler_RejectsNonAdmin(t *testing.T) {
 }
 
 func TestShowTopicsHandler_RejectsGroupChat(t *testing.T) {
-	e := newShowTopicsEnv(t)
-	const groupChatID int64 = -100600
+	tests := []struct {
+		name   string
+		userID int64
+	}{
+		{name: "admin", userID: testAdminID},
+		{name: "member gets the same notice instead of the admin-only reply", userID: testMemberID},
+	}
 
-	require.NoError(t, e.dispatch(testutils.MessageUpdate(testutils.NewGroupMessage(testAdminID, groupChatID, 0, showTopicsCommand()))))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := newShowTopicsEnv(t)
+			const groupChatID int64 = -100600
+			cmd := testutils.NewGroupMessage(tt.userID, groupChatID, 0, showTopicsCommand())
 
-	sends := e.client.CallsTo("sendMessage")
-	require.Len(t, sends, 2)
-	assert.Equal(t, groupChatID, sends[0].Int64("chat_id"))
-	assert.Contains(t, sends[0].Params["text"], "Эта команда работает только в _личной беседе_ со мной")
-	assert.Equal(t, testAdminID, sends[1].Int64("chat_id"))
-	e.notHandled(testutils.MessageUpdate(testutils.NewGroupMessage(testAdminID, groupChatID, 0, "5")))
+			require.NoError(t, e.dispatch(testutils.MessageUpdate(cmd)))
+
+			e.assertPrivateOnlyNotice(cmd)
+			e.notHandled(testutils.MessageUpdate(testutils.NewGroupMessage(tt.userID, groupChatID, 0, "5")))
+		})
+	}
 }
 
 func TestShowTopicsHandler_StartWithoutEvents(t *testing.T) {
@@ -106,16 +161,16 @@ func TestShowTopicsHandler_StartWithoutEvents(t *testing.T) {
 		{
 			name: "events query fails",
 			setup: func(e *testEnv) {
-				e.mock.ExpectQuery(sqlLastEvents).WithArgs(10).WillReturnError(errDB)
+				e.expectLastEvents().WillReturnError(errDB)
 			},
-			wantReply: "Ошибка при получении списка мероприятий.",
+			wantReply: formatters.EventListErrorText,
 		},
 		{
 			name: "no events",
 			setup: func(e *testEnv) {
-				e.mock.ExpectQuery(sqlLastEvents).WithArgs(10).WillReturnRows(eventRows())
+				e.expectLastEvents().WillReturnRows(eventRows())
 			},
-			wantReply: "Нет доступных мероприятий для просмотра тем и вопросов.",
+			wantReply: "Пока нет ни одного мероприятия. Создать новое можно командой /eventSetup.",
 		},
 	}
 
@@ -138,22 +193,98 @@ func TestShowTopicsHandler_StartWithoutEvents(t *testing.T) {
 func TestShowTopicsHandler_StartListsEvents(t *testing.T) {
 	e := newShowTopicsEnv(t)
 	other := repositories.Event{ID: 6, Name: "Club call", Type: "club-call", Status: "actual"}
-	e.mock.ExpectQuery(sqlLastEvents).WithArgs(10).WillReturnRows(eventRows(sampleEvent(), other))
+	e.expectLastEvents().WillReturnRows(eventRows(sampleEvent(), other))
 
 	cmd := e.mustText(showTopicsCommand())
 
 	call := e.lastSendMessage()
 	assert.Equal(t, testAdminID, call.Int64("chat_id"))
-	assert.Equal(t, "Markdown", call.Params["parse_mode"])
+	assert.Equal(t, "HTML", call.Params["parse_mode"])
 	text := call.Params["text"]
-	assert.Contains(t, text, "*Список мероприятий*")
-	assert.Contains(t, text, "🎙 ID /5: *Go Meetup*\n└ ✅ _когда_: *14.03.2025 в 18:30 UTC*")
-	assert.Contains(t, text, "💬 ID /6: *Club call*\n└ 🔄 _когда_: *не указано*")
-	assert.Contains(t, text, "Пожалуйста, отправь ID мероприятия, для которого ты хочешь увидеть темы и вопросы.")
+	// The shared admin event list layout is used
+	assert.Equal(t, formatters.FormatEventListForAdmin(
+		[]repositories.Event{sampleEvent(), other}, adminEventListTitle, showTopicsAction,
+	), text)
+	assert.True(t, strings.HasPrefix(text, "<b>"+adminEventListTitle+"</b>\n"), text)
+	assert.Contains(t, text, "\n✅ 🎙 <i>митап</i>: <b>Go Meetup</b>\n└ <i>ID</i> /5, <i>когда</i>: 14.03.2025 в 18:30 UTC\n")
+	assert.Contains(t, text, "\n🔄 💬 <i>клубный созвон</i>: <b>Club call</b>\n└ <i>ID</i> /6, <i>когда</i>: не указано\n")
+	assert.Contains(t, text, "<i>🔄 — актуальное, ✅ — завершено</i>")
+	assert.True(t, strings.HasSuffix(text, "\n\n👉 Нажми на ID мероприятия, для которого ты хочешь увидеть темы и вопросы."), text)
 	assert.Equal(t, cancelMarkup(), markup(t, call))
 	var reply gotgbot.ReplyParameters
 	require.NoError(t, call.DecodeJSON("reply_parameters", &reply))
 	assert.Equal(t, cmd.MessageId, reply.MessageId)
+}
+
+func TestShowTopicsHandler_EventNamesAreHTMLEscaped(t *testing.T) {
+	e := newShowTopicsEnv(t)
+	event := sampleEvent()
+	event.Name = "C++ <templates> & Go"
+	const escapedName = "<b>C++ &lt;templates&gt; &amp; Go</b>"
+	topics := sampleTopics()
+
+	// The event list
+	e.expectLastEvents().WillReturnRows(eventRows(event))
+	e.mustText(showTopicsCommand())
+	listText := e.lastSendMessage().Params["text"]
+	assert.Contains(t, listText, escapedName)
+	assert.NotContains(t, listText, "<templates>")
+
+	// The topic list header after the event is selected
+	e.client.Reset()
+	e.mock.ExpectQuery(sqlEventByID).WithArgs(5).WillReturnRows(eventRows(event))
+	e.mock.ExpectQuery(sqlTopicsByEventID).WithArgs(5).WillReturnRows(topicRows(topics...))
+	e.mustText("/5")
+	texts := e.client.SentTexts()
+	require.Len(t, texts, 2)
+	assert.True(t, strings.HasPrefix(texts[0], "🎙 <i>митап</i>: "+escapedName+"\n"), texts[0])
+
+	// The updated topic list header after a deletion
+	e.client.Reset()
+	e.mock.ExpectQuery(sqlTopicByID).WithArgs(7).WillReturnRows(topicRows(topics[0]))
+	e.mock.ExpectExec(sqlDeleteTopic).WithArgs(7).WillReturnResult(sqlmock.NewResult(0, 1))
+	e.mock.ExpectQuery(sqlTopicsByEventID).WithArgs(5).WillReturnRows(topicRows(topics[1]))
+	e.mock.ExpectQuery(sqlEventByID).WithArgs(5).WillReturnRows(eventRows(event))
+	e.mustText("7")
+	texts = e.client.SentTexts()
+	require.Len(t, texts, 3)
+	assert.True(t, strings.HasPrefix(texts[1], "🎙 <i>митап</i>: "+escapedName+"\n"), texts[1])
+}
+
+// BUG: topic texts come from club members (/topicAdd) but FormatHtmlTopicListForAdmin puts them into the HTML
+// message unescaped, so a topic like "Generics <T>" makes Telegram reject the whole topic list.
+func TestShowTopicsHandler_BUG_TopicTextIsNotHTMLEscaped(t *testing.T) {
+	e := newShowTopicsEnv(t)
+	e.openEventList()
+	topic := repositories.Topic{ID: 7, Topic: "Generics <T> & constraints", EventID: 5}
+	e.mock.ExpectQuery(sqlEventByID).WithArgs(5).WillReturnRows(eventRows(sampleEvent()))
+	e.mock.ExpectQuery(sqlTopicsByEventID).WithArgs(5).WillReturnRows(topicRows(topic))
+
+	e.mustText("/5")
+
+	texts := e.client.SentTexts()
+	require.NotEmpty(t, texts)
+	assert.Contains(t, texts[0], "<blockquote expandable>Generics &lt;T&gt; &amp; constraints</blockquote>")
+	assert.NotContains(t, texts[0], "<T>")
+}
+
+func TestShowTopicsHandler_EventListNotSentStillWaitsForEventID(t *testing.T) {
+	e := newShowTopicsEnv(t)
+	e.setFailSend(failAdminSends)
+	e.expectLastEvents().WillReturnRows(eventRows(sampleEvent()))
+
+	// The list cannot be sent: no panic, nothing is remembered as the previous message
+	e.mustText(showTopicsCommand())
+
+	// Telegram is back: the admin can still pick an event
+	e.setFailSend(nil)
+	e.client.Reset()
+	e.mock.ExpectQuery(sqlEventByID).WithArgs(5).WillReturnRows(eventRows(sampleEvent()))
+	e.mock.ExpectQuery(sqlTopicsByEventID).WithArgs(5).WillReturnRows(topicRows())
+	e.mustText("/5")
+
+	assert.Contains(t, e.lastSentText(), "Для этого мероприятия пока нет тем и вопросов.")
+	assert.Empty(t, e.keyboardRemovedFrom())
 }
 
 func TestShowTopicsHandler_EventSelectionInvalidInput(t *testing.T) {
@@ -167,7 +298,7 @@ func TestShowTopicsHandler_EventSelectionInvalidInput(t *testing.T) {
 			name:      "not a number",
 			input:     "abc",
 			setup:     func(e *testEnv) {},
-			wantReply: "Пожалуйста, отправь корректный ID мероприятия или используй /cancel для отмены.",
+			wantReply: formatters.InvalidEventIDText,
 		},
 		{
 			name:  "unknown event",
@@ -175,7 +306,7 @@ func TestShowTopicsHandler_EventSelectionInvalidInput(t *testing.T) {
 			setup: func(e *testEnv) {
 				e.mock.ExpectQuery(sqlEventByID).WithArgs(42).WillReturnRows(eventRows())
 			},
-			wantReply: "Не удалось найти мероприятие с ID 42. Пожалуйста, проверь ID.",
+			wantReply: formatters.EventNotFoundText(42),
 		},
 	}
 
@@ -209,7 +340,7 @@ func TestShowTopicsHandler_EventSelectionTopicsQueryFails(t *testing.T) {
 
 	e.mustText("5")
 
-	assert.Equal(t, []string{"Ошибка при получении тем для выбранного мероприятия."}, e.client.SentTexts())
+	assert.Equal(t, []string{"Произошла ошибка при получении тем и вопросов для выбранного мероприятия."}, e.client.SentTexts())
 	e.notHandled(testutils.MessageUpdate(testutils.NewPrivateMessage(testAdminID, "5")))
 }
 
@@ -224,10 +355,55 @@ func TestShowTopicsHandler_EventWithoutTopics(t *testing.T) {
 	sends := e.client.CallsTo("sendMessage")
 	require.Len(t, sends, 1)
 	assert.Equal(t, "HTML", sends[0].Params["parse_mode"])
-	assert.Contains(t, sends[0].Params["text"], "🎙 <i>Мероприятие (митап):</i> Go Meetup")
-	assert.Contains(t, sends[0].Params["text"], "Для этого мероприятия пока нет тем и вопросов.")
+	assert.Equal(t, sampleEventHeader+"\nДля этого мероприятия пока нет тем и вопросов.", sends[0].Params["text"])
 	assert.Equal(t, []int64{listID}, e.keyboardRemovedFrom())
 	e.notHandled(testutils.MessageUpdate(testutils.NewPrivateMessage(testAdminID, "7")))
+}
+
+func TestShowTopicsHandler_EventWithoutTopicsClearsState(t *testing.T) {
+	e := newShowTopicsEnv(t)
+	h := e.newBareShowTopicsHandler()
+	// State left by the event list step
+	h.SavePreviousMessageInfo(testAdminID, &gotgbot.Message{MessageId: 4242, Chat: gotgbot.Chat{Id: testAdminID}})
+	e.mock.ExpectQuery(sqlEventByID).WithArgs(5).WillReturnRows(eventRows(sampleEvent()))
+	e.mock.ExpectQuery(sqlTopicsByEventID).WithArgs(5).WillReturnRows(topicRows())
+	msg := testutils.NewPrivateMessage(testAdminID, "/5")
+
+	err := h.handleEventSelection(e.bot, ext.NewContext(e.bot, testutils.MessageUpdate(msg), nil))
+
+	assertConversationEnded(t, err)
+	assertShowTopicsStateCleared(t, h)
+	assert.Equal(t, []int64{4242}, e.keyboardRemovedFrom())
+}
+
+func TestShowTopicsHandler_TopicDeletionWithoutSelectedEvent(t *testing.T) {
+	tests := []struct {
+		name    string
+		eventID any // nil: nothing stored
+	}{
+		{name: "no event stored"},
+		{name: "event stored with a wrong type", eventID: "5"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := newShowTopicsEnv(t)
+			h := e.newBareShowTopicsHandler()
+			h.SavePreviousMessageInfo(testAdminID, &gotgbot.Message{MessageId: 4242, Chat: gotgbot.Chat{Id: testAdminID}})
+			if tt.eventID != nil {
+				h.userStore.Set(testAdminID, showTopicsCtxDataKeyEventID, tt.eventID)
+			}
+			msg := testutils.NewPrivateMessage(testAdminID, "7")
+
+			err := h.handleTopicDeletion(e.bot, ext.NewContext(e.bot, testutils.MessageUpdate(msg), nil))
+
+			assertConversationEnded(t, err)
+			assert.Equal(t, []string{formatters.LostEventText(constants.ShowTopicsCommand)}, e.client.SentTexts())
+			assert.Equal(t, "Произошла ошибка: не удалось найти выбранное мероприятие. Пожалуйста, начни заново с /showTopics.",
+				e.lastSentText())
+			assertShowTopicsStateCleared(t, h)
+		})
+	}
 }
 
 func TestShowTopicsHandler_DeleteTopicsUntilNoneLeft(t *testing.T) {
@@ -243,6 +419,7 @@ func TestShowTopicsHandler_DeleteTopicsUntilNoneLeft(t *testing.T) {
 	sends := e.client.CallsTo("sendMessage")
 	require.Len(t, sends, 2)
 	assert.Equal(t, "HTML", sends[0].Params["parse_mode"])
+	assert.True(t, strings.HasPrefix(sends[0].Params["text"], sampleEventHeader+"📋 Найдено тем и вопросов: <b>2</b>\n\n"), sends[0].Params["text"])
 	assert.Contains(t, sends[0].Params["text"], "ID:<code>7</code> / <i>14.03.2025</i> / @alice \n<blockquote expandable>How to test Go?</blockquote>")
 	assert.Contains(t, sends[0].Params["text"], "ID:<code>8</code> / <i>14.03.2025</i> / не указано \n<blockquote expandable>Generics in practice</blockquote>")
 	assert.Equal(t, deleteTopicPrompt, sends[1].Params["text"])
@@ -261,7 +438,8 @@ func TestShowTopicsHandler_DeleteTopicsUntilNoneLeft(t *testing.T) {
 
 	texts := e.client.SentTexts()
 	require.Len(t, texts, 3)
-	assert.Equal(t, "✅ Тема с ID 7 успешно удалена.", texts[0])
+	assert.Equal(t, "✅ Тема с ID 7 удалена.", texts[0])
+	assert.True(t, strings.HasPrefix(texts[1], sampleEventHeader+"📋 Найдено тем и вопросов: <b>1</b>\n\n"), texts[1])
 	assert.NotContains(t, texts[1], "ID:<code>7</code>")
 	assert.Contains(t, texts[1], "ID:<code>8</code>")
 	assert.Equal(t, deleteMorePrompt, texts[2])
@@ -279,9 +457,9 @@ func TestShowTopicsHandler_DeleteTopicsUntilNoneLeft(t *testing.T) {
 
 	texts = e.client.SentTexts()
 	require.Len(t, texts, 3)
-	assert.Equal(t, "✅ Тема с ID 8 успешно удалена.", texts[0])
-	assert.Contains(t, texts[1], "Для этого мероприятия пока нет тем и вопросов.")
-	assert.Equal(t, "Все темы удалены.", texts[2])
+	assert.Equal(t, "✅ Тема с ID 8 удалена.", texts[0])
+	assert.Equal(t, sampleEventHeader+"\nДля этого мероприятия пока нет тем и вопросов.", texts[1])
+	assert.Equal(t, "✅ Все темы этого мероприятия удалены.", texts[2])
 	assert.Equal(t, []int64{promptID}, e.keyboardRemovedFrom())
 	e.notHandled(testutils.MessageUpdate(testutils.NewPrivateMessage(testAdminID, "8")))
 }
@@ -299,7 +477,7 @@ func TestShowTopicsHandler_TopicDeletionInvalidInput(t *testing.T) {
 			name:      "not a number",
 			input:     "seven",
 			setup:     func(e *testEnv) {},
-			wantReply: "Пожалуйста, отправь корректный ID темы или используй /cancel для отмены.",
+			wantReply: "Неверный ID темы. Пожалуйста, отправь числовой ID темы из списка выше или /cancel для отмены.",
 		},
 		{
 			name:  "unknown topic",
@@ -307,7 +485,7 @@ func TestShowTopicsHandler_TopicDeletionInvalidInput(t *testing.T) {
 			setup: func(e *testEnv) {
 				e.mock.ExpectQuery(sqlTopicByID).WithArgs(99).WillReturnRows(topicRows())
 			},
-			wantReply: "Не удалось найти тему с ID 99. Пожалуйста, проверь ID.",
+			wantReply: "Тема с ID 99 не найдена. Пожалуйста, отправь ID темы из списка выше или /cancel для отмены.",
 		},
 		{
 			name:  "topic of another event",
@@ -315,13 +493,15 @@ func TestShowTopicsHandler_TopicDeletionInvalidInput(t *testing.T) {
 			setup: func(e *testEnv) {
 				e.mock.ExpectQuery(sqlTopicByID).WithArgs(9).WillReturnRows(topicRows(foreignTopic))
 			},
-			wantReply: "Тема с ID 9 относится к другому мероприятию (ID: 6), а не к выбранному (ID: 5).\n" +
-				"Пожалуйста, выбери корректный ID темы или используй /cancel для отмены.",
+			wantReply: "Тема с ID 9 относится к другому мероприятию (ID 6), а не к выбранному (ID 5). " +
+				"Пожалуйста, отправь ID темы из списка выше или /cancel для отмены.",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Every "try again" message ends with the shared cancel hint
+			require.True(t, strings.HasSuffix(tt.wantReply, " "+formatters.CancelHint+"."))
 			e := newShowTopicsEnv(t)
 			e.openTopicDeletion(sampleTopics()...)
 
@@ -352,14 +532,14 @@ func TestShowTopicsHandler_TopicDeletionErrors(t *testing.T) {
 			setup: func(e *testEnv) {
 				e.mock.ExpectExec(sqlDeleteTopic).WithArgs(7).WillReturnError(errDB)
 			},
-			wantReplies: []string{"Ошибка при удалении темы с ID 7."},
+			wantReplies: []string{"Произошла ошибка при удалении темы с ID 7."},
 		},
 		{
 			name: "topic disappeared before delete",
 			setup: func(e *testEnv) {
 				e.mock.ExpectExec(sqlDeleteTopic).WithArgs(7).WillReturnResult(sqlmock.NewResult(0, 0))
 			},
-			wantReplies: []string{"Ошибка при удалении темы с ID 7."},
+			wantReplies: []string{"Произошла ошибка при удалении темы с ID 7."},
 		},
 		{
 			name: "reloading topics fails",
@@ -367,7 +547,7 @@ func TestShowTopicsHandler_TopicDeletionErrors(t *testing.T) {
 				e.mock.ExpectExec(sqlDeleteTopic).WithArgs(7).WillReturnResult(sqlmock.NewResult(0, 1))
 				e.mock.ExpectQuery(sqlTopicsByEventID).WithArgs(5).WillReturnError(errDB)
 			},
-			wantReplies: []string{"✅ Тема с ID 7 успешно удалена.", "Ошибка при получении обновленного списка тем."},
+			wantReplies: []string{"✅ Тема с ID 7 удалена.", "Произошла ошибка при получении обновлённого списка тем."},
 		},
 		{
 			name: "reloading event fails",
@@ -376,7 +556,7 @@ func TestShowTopicsHandler_TopicDeletionErrors(t *testing.T) {
 				e.mock.ExpectQuery(sqlTopicsByEventID).WithArgs(5).WillReturnRows(topicRows())
 				e.mock.ExpectQuery(sqlEventByID).WithArgs(5).WillReturnError(errDB)
 			},
-			wantReplies: []string{"✅ Тема с ID 7 успешно удалена.", "Ошибка при получении информации о мероприятии."},
+			wantReplies: []string{"✅ Тема с ID 7 удалена.", "Произошла ошибка при получении информации о мероприятии."},
 		},
 	}
 
@@ -443,12 +623,10 @@ func TestShowTopicsHandler_Cancel(t *testing.T) {
 			assert.Equal(t, []string{topicsCancelledText}, e.client.SentTexts())
 			assert.Equal(t, testAdminID, e.lastSendMessage().Int64("chat_id"))
 			assert.Equal(t, []int64{prevID}, e.keyboardRemovedFrom())
-			answers := e.client.CallsTo("answerCallbackQuery")
 			if u.CallbackQuery != nil {
-				require.Len(t, answers, 1)
-				assert.Equal(t, u.CallbackQuery.Id, answers[0].Params["callback_query_id"])
+				assert.Equal(t, []string{u.CallbackQuery.Id}, e.answeredCallbackIDs())
 			} else {
-				assert.Empty(t, answers)
+				assert.Empty(t, e.answeredCallbackIDs())
 			}
 			e.notHandled(testutils.MessageUpdate(testutils.NewPrivateMessage(testAdminID, "7")))
 		})

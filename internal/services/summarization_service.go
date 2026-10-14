@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -51,16 +52,18 @@ func (s *SummarizationService) RunDailySummarization(ctx context.Context, sendTo
 	log.Printf("%s: Starting daily summarization process", utils.GetCurrentTypeName())
 
 	// Process each monitored topic
+	var errs []error
 	for _, topicID := range s.config.MonitoredTopicsIDs {
 		if err := s.summarizeTopicMessages(ctx, topicID, sendToDM); err != nil {
 			log.Printf("%s: Error summarizing topic %d: %v", utils.GetCurrentTypeName(), topicID, err)
-			// Continue with other chats even if one fails
+			// Continue with other chats even if one fails, but report the failure to the caller
+			errs = append(errs, fmt.Errorf("topic %d: %w", topicID, err))
 			continue
 		}
 	}
 
 	log.Printf("%s: Daily summarization process completed", utils.GetCurrentTypeName())
-	return nil
+	return errors.Join(errs...)
 }
 
 // summarizeTopicMessages summarizes a single topic
@@ -162,7 +165,9 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 	}
 
 	// Send the summary to the target chat
-	s.messageSenderService.SendHtml(targetChatID, finalSummary, opts)
+	if err := s.messageSenderService.SendHtml(targetChatID, finalSummary, opts); err != nil {
+		return fmt.Errorf("%s: failed to send summary: %w", utils.GetCurrentTypeName(), err)
+	}
 
 	log.Printf("%s: Summary sent successfully", utils.GetCurrentTypeName())
 	return nil

@@ -33,16 +33,24 @@ func TestEventsHandler_DatabaseError(t *testing.T) {
 
 	require.True(t, d.dispatch(t, d.newEventsHandler(), privateText(testUserID, "/events")))
 
-	assert.Equal(t, []string{"Ошибка при получении списка мероприятий."}, d.client.SentTexts())
+	assert.Equal(t, []string{"Произошла ошибка при получении списка мероприятий."}, d.client.SentTexts())
 }
 
-func TestEventsHandler_NoUpcomingEvents(t *testing.T) {
+func TestEventsHandler_NoUpcomingEventsPointsToCalendar(t *testing.T) {
 	d := newDeps(t)
 	d.sql.ExpectQuery(selectActiveEvents).WithArgs("actual", 10).WillReturnRows(sqlmock.NewRows(eventColumns))
 
 	require.True(t, d.dispatch(t, d.newEventsHandler(), privateText(testUserID, "/events")))
 
-	assert.Equal(t, []string{"На данный момент нет актуальных мероприятий."}, d.client.SentTexts())
+	sends := d.client.CallsTo("sendMessage")
+	require.Len(t, sends, 1)
+	reply := sends[0]
+	assert.Equal(t, testUserID, reply.Int64("chat_id"))
+	assert.Equal(t, "HTML", reply.Params["parse_mode"])
+	assert.Contains(t, reply.Params["reply_parameters"], `"message_id":`)
+	assert.Equal(t,
+		"Ближайших мероприятий пока нет. Следи за анонсами в <a href=\"https://itbeard.com/s/evo-calendar\">клубном календаре</a>.",
+		reply.Params["text"])
 }
 
 func TestEventsHandler_ListsUpcomingEvents(t *testing.T) {
@@ -59,17 +67,48 @@ func TestEventsHandler_ListsUpcomingEvents(t *testing.T) {
 	sends := d.client.CallsTo("sendMessage")
 	require.Len(t, sends, 1)
 	reply := sends[0]
-	text := reply.Params["text"]
 	assert.Equal(t, testUserID, reply.Int64("chat_id"))
-	assert.Equal(t, "Markdown", reply.Params["parse_mode"])
+	assert.Equal(t, "HTML", reply.Params["parse_mode"])
 	assert.Contains(t, reply.Params["reply_parameters"], `"message_id":`)
 
-	assert.Contains(t, text, "📋 Список ближайших мероприятий:")
-	assert.Contains(t, text, "🎙 _митап_: *Go Meetup*")
-	assert.Contains(t, text, "_когда_: 04.03.2030 в 18:30 UTC")
-	assert.Contains(t, text, "📚 _книжный клуб_: *Book Club*")
-	assert.Contains(t, text, "_когда_: не указано")
-	assert.Contains(t, text, "Добавить темы и вопросы /topicAdd.")
-	assert.Contains(t, text, "Просмотреть темы и вопросы /topics.")
-	assert.Contains(t, text, "[клубном календаре](https://itbeard.com/s/evo-calendar)")
+	// Members see neither event IDs nor statuses
+	assert.Equal(t, "<b>📋 Ближайшие мероприятия</b>\n"+
+		"\n🎙 <i>митап</i>: <b>Go Meetup</b>\n"+
+		"└ <i>когда</i>: 04.03.2030 в 18:30 UTC\n"+
+		"\n📚 <i>книжный клуб</i>: <b>Book Club</b>\n"+
+		"└ <i>когда</i>: не указано\n"+
+		"\nДобавить темы и вопросы — /topicAdd, посмотреть их — /topics."+
+		"\nБольше информации о мероприятиях — в <a href=\"https://itbeard.com/s/evo-calendar\">клубном календаре</a>.",
+		reply.Params["text"])
+}
+
+func TestEventsHandler_EventNamesAreEscaped(t *testing.T) {
+	d := newDeps(t)
+	d.sql.ExpectQuery(selectActiveEvents).WithArgs("actual", 10).WillReturnRows(
+		sqlmock.NewRows(eventColumns).
+			AddRow(1, "Generics <T> & snake_case_names", "meetup", "actual", nil, testTime, testTime),
+	)
+
+	require.True(t, d.dispatch(t, d.newEventsHandler(), privateText(testUserID, "/events")))
+
+	reply := lastSend(t, d.client)
+	text := reply.Params["text"]
+	assert.Equal(t, "HTML", reply.Params["parse_mode"])
+	assert.Contains(t, text, "🎙 <i>митап</i>: <b>Generics &lt;T&gt; &amp; snake_case_names</b>\n")
+	assert.NotContains(t, text, "<T>")
+}
+
+func TestEventsHandler_ShowsCountdownForEventsWithinAWeek(t *testing.T) {
+	d := newDeps(t)
+	// 2 days and 30 minutes ahead, so the countdown is "2д 0ч" even if the test runs slowly
+	startedAt := time.Now().UTC().Add(48*time.Hour + 30*time.Minute)
+	d.sql.ExpectQuery(selectActiveEvents).WithArgs("actual", 10).WillReturnRows(
+		sqlmock.NewRows(eventColumns).
+			AddRow(1, "Club Call", "club-call", "actual", startedAt, testTime, testTime),
+	)
+
+	require.True(t, d.dispatch(t, d.newEventsHandler(), privateText(testUserID, "/events")))
+
+	assert.Contains(t, lastSend(t, d.client).Params["text"],
+		"└ <i>когда</i>: "+startedAt.Format("02.01.2006 в 15:04 UTC")+" <i>(через 2д 0ч)</i>\n")
 }

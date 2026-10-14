@@ -8,6 +8,7 @@ import (
 	"evo-bot-go/internal/buttons"
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
+	"evo-bot-go/internal/formatters"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 
@@ -75,28 +76,16 @@ func (h *trySummarizeHandler) startSummarizeConversation(b *gotgbot.Bot, ctx *ex
 	msg := ctx.EffectiveMessage
 
 	// Check if user has admin permissions and is in a private chat
-	if !h.permissionsService.CheckAdminAndPrivateChat(msg, constants.ShowTopicsCommand) {
-		log.Printf("%s: User %d (%s) tried to use /%s without admin permissions.",
-			utils.GetCurrentTypeName(),
-			ctx.EffectiveUser.Id,
-			ctx.EffectiveUser.Username,
-			constants.ShowTopicsCommand,
-		)
+	if !h.permissionsService.CheckAdminAndPrivateChat(msg, constants.TrySummarizeCommand) {
 		return handlers.EndConversation()
 	}
 
 	log.Printf("%s: User %d initiated summarization", utils.GetCurrentTypeName(), msg.From.Id)
 
-	// Check if the user is an admin
-	if !utils.IsUserAdminOrCreator(b, msg.From.Id, h.config) {
-		msg.Reply(b, "Эта команда доступна только администраторам.", nil)
-		return handlers.EndConversation()
-	}
-
 	// Ask user to confirm with inline keyboard
 	sentMsg, _ := h.messageSenderService.ReplyWithReturnMessage(
 		msg,
-		"Вы собираетесь запустить процесс тестирования саммаризации общения в клубе. Саммаризация будет отправлена в личные сообщения.\n\nПодтвердите действие, нажав одну из кнопок ниже:",
+		"Ты собираешься запустить тестовую саммаризацию общения в клубе. Результат придёт в личные сообщения.\n\nПодтверди действие кнопкой ниже:",
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: buttons.ConfirmAndCancelButton(trySummarizeCallbackConfirmYes, trySummarizeCallbackConfirmCancel),
 		},
@@ -172,12 +161,12 @@ func (h *trySummarizeHandler) startSummarization(b *gotgbot.Bot, ctx *ext.Contex
 		// Run the summarization with sendToDM=true as default
 		err := h.summarizationService.RunDailySummarization(ctxTimeout, true)
 		if err != nil {
-			h.messageSenderService.Reply(ctx.EffectiveMessage, "Ошибка при создании саммаризации.", nil)
+			h.messageSenderService.Reply(ctx.EffectiveMessage, "Произошла ошибка при создании саммаризации.", nil)
 			log.Printf("%s: Error during summarization: %v", utils.GetCurrentTypeName(), err)
+		} else {
+			h.messageSenderService.Reply(ctx.EffectiveMessage, "✅ Саммаризация успешно создана.", nil)
+			log.Printf("%s: Summarization created successfully", utils.GetCurrentTypeName())
 		}
-
-		h.messageSenderService.Reply(ctx.EffectiveMessage, "Саммаризация успешно создана.", nil)
-		log.Printf("%s: Summarization created successfully", utils.GetCurrentTypeName())
 
 		// Cancel the periodic typing action immediately after getting the response.
 		cancelTyping()
@@ -210,11 +199,7 @@ func (h *trySummarizeHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) err
 func (h *trySummarizeHandler) handleTextDuringConfirmation(b *gotgbot.Bot, ctx *ext.Context) error {
 	log.Printf("%s: User %d sent text during confirmation", utils.GetCurrentTypeName(), ctx.EffectiveUser.Id)
 
-	h.messageSenderService.Reply(
-		ctx.EffectiveMessage,
-		"Пожалуйста, нажмите на одну из кнопок выше, или используйте кнопку отмены.",
-		nil,
-	)
+	h.messageSenderService.Reply(ctx.EffectiveMessage, formatters.UseButtonsText, nil)
 	return nil // Stay in the same state
 }
 
@@ -240,6 +225,9 @@ func (h *trySummarizeHandler) MessageRemoveInlineKeyboard(b *gotgbot.Bot, userID
 }
 
 func (h *trySummarizeHandler) SavePreviousMessageInfo(userID int64, sentMsg *gotgbot.Message) {
+	if sentMsg == nil {
+		return
+	}
 	h.userStore.SetPreviousMessageInfo(userID, sentMsg.MessageId, sentMsg.Chat.Id,
 		trySummarizeCtxDataKeyPreviousMessageID, trySummarizeCtxDataKeyPreviousChatID)
 }

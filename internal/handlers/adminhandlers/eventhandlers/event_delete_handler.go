@@ -3,8 +3,6 @@ package eventhandlers
 import (
 	"fmt"
 	"log"
-	"strconv"
-	"strings"
 
 	"evo-bot-go/internal/buttons"
 	"evo-bot-go/internal/config"
@@ -85,40 +83,15 @@ func (h *eventDeleteHandler) startDelete(b *gotgbot.Bot, ctx *ext.Context) error
 	msg := ctx.EffectiveMessage
 
 	// Check if user has admin permissions and is in a private chat
-	if !h.permissionsService.CheckAdminAndPrivateChat(msg, constants.ShowTopicsCommand) {
-		log.Printf("%s: User %d (%s) tried to use /%s without admin permissions.",
-			utils.GetCurrentTypeName(),
-			ctx.EffectiveUser.Id,
-			ctx.EffectiveUser.Username,
-			constants.ShowTopicsCommand,
-		)
+	if !h.permissionsService.CheckAdminAndPrivateChat(msg, constants.EventDeleteCommand) {
 		return handlers.EndConversation()
 	}
 
-	// Get a list of the last N events
-	events, err := h.eventRepository.GetLastEvents(constants.EventEditGetLastLimit)
-	if err != nil {
-		h.messageSenderService.Reply(msg, "Произошла ошибка при получении списка мероприятий.", nil)
-		log.Printf("%s: Error during event retrieval: %v", utils.GetCurrentTypeName(), err)
+	sentMsg, ok := sendAdminEventList(h.eventRepository, h.messageSenderService, msg,
+		"которое ты хочешь удалить", eventDeleteCallbackConfirmCancel)
+	if !ok {
 		return handlers.EndConversation()
 	}
-
-	if len(events) == 0 {
-		h.messageSenderService.Reply(msg, "Нет созданных мероприятий для удаления.", nil)
-		return handlers.EndConversation()
-	}
-
-	title := fmt.Sprintf("Последние %d мероприятия:", len(events))
-	actionDescription := "которое ты хочешь удалить"
-	formattedResponse := formatters.FormatEventListForAdmin(events, title, constants.CancelCommand, actionDescription)
-
-	sentMsg, _ := h.messageSenderService.ReplyMarkdownWithReturnMessage(
-		msg,
-		formattedResponse,
-		&gotgbot.SendMessageOpts{
-			ReplyMarkup: buttons.CancelButton(eventDeleteCallbackConfirmCancel),
-		},
-	)
 
 	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
 	return handlers.NextConversationState(eventDeleteStateSelectEvent)
@@ -127,57 +100,26 @@ func (h *eventDeleteHandler) startDelete(b *gotgbot.Bot, ctx *ext.Context) error
 // 2. handleSelectEvent processes the user's selection of an event to delete
 func (h *eventDeleteHandler) handleSelectEvent(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
-	eventIDStr := strings.TrimSpace(strings.Replace(msg.Text, "/", "", 1))
-	eventID, err := strconv.Atoi(eventIDStr)
-	if err != nil {
-		h.messageSenderService.Reply(msg, "Некорректный ID. Пожалуйста, введи числовой ID или используй кнопку для отмены.", nil)
-		return nil // Stay in the same state
-	}
 
-	// Get the last N events
-	events, err := h.eventRepository.GetLastEvents(constants.EventEditGetLastLimit)
-	if err != nil {
-		h.messageSenderService.Reply(msg, "Произошла ошибка при получении списка мероприятий.", nil)
-		log.Printf("%s: Error during event retrieval: %v", utils.GetCurrentTypeName(), err)
-		return handlers.EndConversation()
-	}
-
-	// Find the event with the given ID
-	var found bool
-	var eventName string
-	for _, event := range events {
-		if event.ID == eventID {
-			found = true
-			eventName = event.Name
-			break
-		}
-	}
-
-	if !found {
-		h.messageSenderService.Reply(
-			msg,
-			fmt.Sprintf("Мероприятие с ID %d не найдено. Пожалуйста, введи корректный ID или используй кнопку для отмены.", eventID),
-			nil,
-		)
+	event, ok := findSelectedEvent(h.eventRepository, h.messageSenderService, msg)
+	if !ok {
 		return nil // Stay in the same state
 	}
 
 	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 
 	// Store event ID and name for confirmation
-	h.userStore.Set(ctx.EffectiveUser.Id, eventDeleteCtxDataKeySelectedEventID, eventID)
-	h.userStore.Set(ctx.EffectiveUser.Id, eventDeleteCtxDataKeySelectedEventName, eventName)
+	h.userStore.Set(ctx.EffectiveUser.Id, eventDeleteCtxDataKeySelectedEventID, event.ID)
+	h.userStore.Set(ctx.EffectiveUser.Id, eventDeleteCtxDataKeySelectedEventName, event.Name)
 
 	// Ask for confirmation
-	confirmMessage := fmt.Sprintf(
-		"Ты действительно хочешь удалить мероприятие '*%s*' (ID: %d)?\n\nЭто также удалит все связанные с ним темы и вопросы.",
-		eventName, eventID)
-
-	sentMsg, _ := h.messageSenderService.ReplyMarkdownWithReturnMessage(
+	sentMsg, _ := h.messageSenderService.ReplyHtmlWithReturnMessage(
 		msg,
-		confirmMessage,
+		fmt.Sprintf(
+			"🗑 <b>Удалить мероприятие?</b>\n\n%s\n\n⚠️ Вместе с ним будут удалены все его темы и вопросы. Это действие нельзя отменить.",
+			formatters.FormatEventSummary(*event),
+		),
 		&gotgbot.SendMessageOpts{
-			ParseMode:   "Markdown",
 			ReplyMarkup: buttons.ConfirmAndCancelButton(eventDeleteCallbackConfirmYes, eventDeleteCallbackConfirmCancel),
 		},
 	)
@@ -188,11 +130,7 @@ func (h *eventDeleteHandler) handleSelectEvent(b *gotgbot.Bot, ctx *ext.Context)
 
 // handleMessageDuringConfirmation handles text messages during the confirmation state
 func (h *eventDeleteHandler) handleMessageDuringConfirmation(b *gotgbot.Bot, ctx *ext.Context) error {
-	h.messageSenderService.Reply(
-		ctx.EffectiveMessage,
-		"Пожалуйста, используй кнопки выше для подтверждения или отмены.",
-		nil,
-	)
+	h.messageSenderService.Reply(ctx.EffectiveMessage, formatters.UseButtonsText, nil)
 	return nil // Stay in the same state
 }
 
@@ -205,41 +143,17 @@ func (h *eventDeleteHandler) handleCallbackConfirmYes(b *gotgbot.Bot, ctx *ext.C
 	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 
 	// Get the selected event ID
-	eventIDVal, ok := h.userStore.Get(ctx.EffectiveUser.Id, eventDeleteCtxDataKeySelectedEventID)
-	if !ok {
-		h.messageSenderService.Reply(
-			ctx.EffectiveMessage,
-			fmt.Sprintf(
-				"Произошла ошибка при получении выбранного мероприятия. Пожалуйста, начни заново с /%s",
-				constants.EventDeleteCommand,
-			),
-			nil,
-		)
-		log.Printf("%s: Error during event retrieval.", utils.GetCurrentTypeName())
-		return handlers.EndConversation()
-	}
-
+	eventIDVal, _ := h.userStore.Get(ctx.EffectiveUser.Id, eventDeleteCtxDataKeySelectedEventID)
 	eventID, ok := eventIDVal.(int)
 	if !ok {
-		log.Println("Invalid event ID type:", eventIDVal)
-		h.messageSenderService.Reply(
-			ctx.EffectiveMessage,
-			fmt.Sprintf(
-				"Произошла внутренняя ошибка (неверный тип ID). Пожалуйста, начни заново с /%s",
-				constants.EventDeleteCommand,
-			),
-			nil,
-		)
-		log.Printf("%s: Invalid event ID type: %v", utils.GetCurrentTypeName(), eventIDVal)
+		log.Printf("%s: Selected event ID is missing or invalid: %v", utils.GetCurrentTypeName(), eventIDVal)
+		h.messageSenderService.Reply(ctx.EffectiveMessage, formatters.LostEventText(constants.EventDeleteCommand), nil)
+		h.userStore.Clear(ctx.EffectiveUser.Id)
 		return handlers.EndConversation()
 	}
 
-	// Get the event details for the success message
-	eventNameVal, ok := h.userStore.Get(ctx.EffectiveUser.Id, eventDeleteCtxDataKeySelectedEventName)
-	if !ok {
-		// Not critical, we can proceed without the name
-		eventNameVal = "неизвестно"
-	}
+	// The name is only needed for the success message
+	eventNameVal, _ := h.userStore.Get(ctx.EffectiveUser.Id, eventDeleteCtxDataKeySelectedEventName)
 	eventName, _ := eventNameVal.(string)
 
 	// Delete the event
@@ -247,16 +161,16 @@ func (h *eventDeleteHandler) handleCallbackConfirmYes(b *gotgbot.Bot, ctx *ext.C
 	if err != nil {
 		h.messageSenderService.Reply(ctx.EffectiveMessage, "Произошла ошибка при удалении мероприятия.", nil)
 		log.Printf("%s: Error during event deletion: %v", utils.GetCurrentTypeName(), err)
+		h.userStore.Clear(ctx.EffectiveUser.Id)
 		return handlers.EndConversation()
 	}
 
 	// Confirmation message
-	h.messageSenderService.ReplyMarkdown(
+	h.messageSenderService.ReplyHtml(
 		ctx.EffectiveMessage,
-		fmt.Sprintf("Мероприятие '*%s*' успешно удалено. \n\nДля просмотра всех команд используй команду /%s", eventName, constants.HelpCommand),
-		&gotgbot.SendMessageOpts{
-			ParseMode: "Markdown",
-		},
+		fmt.Sprintf("✅ Мероприятие %s (ID %d) удалено.\n\nСписок всех команд — /%s.",
+			formatters.FormatEventName(eventName), eventID, constants.HelpCommand),
+		nil,
 	)
 
 	// Clean up user data
@@ -309,6 +223,9 @@ func (h *eventDeleteHandler) MessageRemoveInlineKeyboard(b *gotgbot.Bot, userID 
 }
 
 func (h *eventDeleteHandler) SavePreviousMessageInfo(userID int64, sentMsg *gotgbot.Message) {
+	if sentMsg == nil {
+		return
+	}
 	h.userStore.SetPreviousMessageInfo(userID, sentMsg.MessageId, sentMsg.Chat.Id,
 		eventDeleteCtxDataKeyPreviousMessageID, eventDeleteCtxDataKeyPreviousChatID)
 }

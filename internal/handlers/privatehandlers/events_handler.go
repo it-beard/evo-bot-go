@@ -15,6 +15,8 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 )
 
+const clubCalendarURL = "https://itbeard.com/s/evo-calendar"
+
 type eventsHandler struct {
 	config               *config.Config
 	eventRepository      *repositories.EventRepository
@@ -54,25 +56,27 @@ func (h *eventsHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 	// Get upcoming events to show
 	events, err := h.eventRepository.GetUpcomingEvents(10) // Fetch the 10 nearest upcoming events
 	if err != nil {
-		h.messageSenderService.Reply(msg, "Ошибка при получении списка мероприятий.", nil)
+		h.messageSenderService.Reply(msg, formatters.EventListErrorText, nil)
 		log.Printf("%s: Error during events retrieval: %v", utils.GetCurrentTypeName(), err)
 		return nil
 	}
 
+	calendarLink := fmt.Sprintf("<a href=\"%s\">клубном календаре</a>", clubCalendarURL)
+
 	if len(events) == 0 {
-		h.messageSenderService.Reply(msg, "На данный момент нет актуальных мероприятий.", nil)
+		h.messageSenderService.ReplyHtml(msg, fmt.Sprintf(
+			"Ближайших мероприятий пока нет. Следи за анонсами в %s.", calendarLink,
+		), nil)
 		return nil
 	}
 
 	// Format and display event list
-	formattedEvents := formatters.FormatEventListForEventsView(
-		events,
-		"📋 Список ближайших мероприятий",
+	formattedEvents := formatters.FormatEventListForEventsView(events, "📋 Ближайшие мероприятия")
+	formattedEvents += fmt.Sprintf(
+		"\nДобавить темы и вопросы — /%s, посмотреть их — /%s.\nБольше информации о мероприятиях — в %s.",
+		constants.TopicAddCommand, constants.TopicsCommand, calendarLink,
 	)
-	formattedEvents += fmt.Sprintf("\nДобавить темы и вопросы /%s. ", constants.TopicAddCommand)
-	formattedEvents += fmt.Sprintf("Просмотреть темы и вопросы /%s. ", constants.TopicsCommand)
-	formattedEvents += "Больше информации о мероприятиях смотри в [клубном календаре](https://itbeard.com/s/evo-calendar)."
-	h.messageSenderService.ReplyMarkdown(msg, formattedEvents, nil)
+	h.messageSenderService.ReplyHtml(msg, formattedEvents, nil)
 
 	return nil
 }

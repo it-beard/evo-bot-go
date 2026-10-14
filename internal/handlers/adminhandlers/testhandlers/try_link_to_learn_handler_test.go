@@ -44,19 +44,20 @@ func TestTryLinkToLearnHandler_NonAdminIsRejected(t *testing.T) {
 
 	assert.Equal(t, []string{adminOnlyText}, env.texts())
 	assert.Equal(t, testUserID, env.lastSent().Msg.Chat.Id)
+	assert.Len(t, env.client.CallsTo("getChatMember"), 1)
 }
 
 func TestTryLinkToLearnHandler_GroupChatIsRejected(t *testing.T) {
-	env := newLinkToLearnEnv(t)
+	for _, sender := range groupChatSenders {
+		t.Run(sender.name, func(t *testing.T) {
+			env := newLinkToLearnEnv(t)
 
-	require.True(t, env.sendGroupText(testAdminID, "/tryLinkToLearn"))
+			require.True(t, env.sendGroupText(sender.id, "/tryLinkToLearn"))
 
-	sent := env.sentMessages()
-	require.Len(t, sent, 2)
-	assert.Equal(t, fullChatID(), sent[0].Msg.Chat.Id)
-	assert.Contains(t, sent[0].Msg.Text, "Эта команда работает только в _личной беседе_ со мной")
-	assert.Equal(t, testAdminID, sent[1].Msg.Chat.Id, "admin is pinged in private messages")
-	assert.NotContains(t, env.texts(), "База знаний Эволюции Кода ➡️")
+			env.requirePrivateOnlyNotice(sender.id)
+			assert.NotContains(t, env.texts(), "База знаний Эволюции Кода ➡️")
+		})
+	}
 }
 
 func TestTryLinkToLearnHandler_SendFailureIsReturned(t *testing.T) {

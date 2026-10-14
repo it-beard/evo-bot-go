@@ -15,7 +15,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const editCanceledText = "Операция редактирования мероприятия отменена."
+const (
+	editCanceledText = "Операция редактирования мероприятия отменена."
+	// editNextStepsHint ends every successful edit
+	editNextStepsHint = "\n\nПродолжить редактирование — /eventEdit, список всех команд — /help."
+	// editTestEventSummary is how editTestEvent is shown in prompts
+	editTestEventSummary = "🎙 <i>митап</i>: <b>Go Meetup</b>\n└ <i>ID</i> 7, <i>когда</i>: 05.03.2025 в 18:00 UTC"
+)
 
 func editTestEvent() repositories.Event {
 	return repositories.Event{
@@ -62,12 +68,12 @@ func TestEventEditHandler_StartFailures(t *testing.T) {
 			setup: func(env *testEnv) {
 				env.mock.ExpectQuery(regexp.QuoteMeta(sqlGetLastEvents)).WillReturnError(errors.New("db down"))
 			},
-			wantText: "Произошла ошибка при получении списка мероприятий.",
+			wantText: eventListErrorText,
 		},
 		{
 			name:     "no events",
 			setup:    func(env *testEnv) { env.expectGetLastEvents() },
-			wantText: "Нет созданных мероприятий для редактирования.",
+			wantText: noEventsText,
 		},
 	}
 
@@ -89,24 +95,25 @@ func TestEventEditHandler_SelectEvent(t *testing.T) {
 
 	listMsg := startEdit(t, env)
 	listCall := env.lastSent().Call
-	assert.Equal(t, "Markdown", listCall.Params["parse_mode"])
-	assert.Contains(t, listMsg.Text, "*Последние 1 мероприятия:*")
-	assert.Contains(t, listMsg.Text, "ID /7: *Go Meetup*")
-	assert.Contains(t, listMsg.Text, "которое ты хочешь отредактировать")
+	assert.Equal(t, "HTML", listCall.Params["parse_mode"])
+	assert.Equal(t,
+		adminListTitle+
+			"\n🔄 🎙 <i>митап</i>: <b>Go Meetup</b>\n└ <i>ID</i> /7, <i>когда</i>: 05.03.2025 в 18:00 UTC\n"+
+			adminListLegend+
+			"\n\n👉 Нажми на ID мероприятия, которое ты хочешь отредактировать.",
+		listMsg.Text)
 	assert.Equal(t, []string{eventEditCallbackConfirmCancel}, callbackData(t, listCall))
 
 	// Non-numeric id keeps the state
 	env.reset()
 	require.True(t, env.sendText(testAdminID, "abc"))
-	assert.Equal(t, []string{"Неверный ID. Пожалуйста, введи числовой ID или используй кнопку для отмены."}, env.texts())
+	assert.Equal(t, []string{invalidEventIDText}, env.texts())
 
 	// Unknown id keeps the state
 	env.reset()
 	env.expectGetEventByID(42, nil)
 	require.True(t, env.sendText(testAdminID, "/42"))
-	assert.Equal(t, []string{
-		"Мероприятие с ID 42 не найдено. Пожалуйста, введи существующий ID или используй кнопку для отмены.",
-	}, env.texts())
+	assert.Equal(t, []string{eventNotFoundText(42)}, env.texts())
 	assert.Empty(t, env.client.CallsTo("editMessageReplyMarkup"))
 
 	// Existing id asks what to edit
@@ -117,8 +124,12 @@ func TestEventEditHandler_SelectEvent(t *testing.T) {
 
 	env.requireKeyboardRemoved(listMsg)
 	prompt := env.lastSent()
-	assert.Equal(t, "Что ты хочешь отредактировать?\n/1. Название\n/2. Дату начала\n/3. Тип\n/4. Завершить ✅\n\nВведи номер:", prompt.Msg.Text)
-	assert.Empty(t, prompt.Call.Params["parse_mode"])
+	assert.Equal(t,
+		"✏️ <b>Редактирование мероприятия</b>\n\n"+editTestEventSummary+"\n\n"+
+			"Что ты хочешь изменить?\n/1. Название\n/2. Дату начала\n/3. Тип\n/4. Завершить ✅\n\n"+
+			"👉 Нажми на номер пункта.",
+		prompt.Msg.Text)
+	assert.Equal(t, "HTML", prompt.Call.Params["parse_mode"])
 	assert.Equal(t, []string{eventEditCallbackConfirmCancel}, callbackData(t, prompt.Call))
 }
 
@@ -132,7 +143,7 @@ func TestEventEditHandler_SelectEditTypeValidation(t *testing.T) {
 		env.expectGetEventByID(7, &ev)
 		require.True(t, env.sendText(testAdminID, input))
 		assert.Equal(t, []string{
-			"Неверный выбор. Пожалуйста, введи число от 1 до 4, или используй кнопку для отмены",
+			"Неверный выбор. Пожалуйста, нажми на номер пункта от 1 до 4 или /cancel для отмены.",
 		}, env.texts(), "input %q", input)
 		assert.Empty(t, env.client.CallsTo("editMessageReplyMarkup"))
 	}
@@ -141,7 +152,7 @@ func TestEventEditHandler_SelectEditTypeValidation(t *testing.T) {
 	env.reset()
 	env.mock.ExpectQuery(regexp.QuoteMeta(sqlGetEventByID)).WithArgs(7).WillReturnError(errors.New("db down"))
 	require.True(t, env.sendText(testAdminID, "/1"))
-	assert.Equal(t, []string{"Ошибка при получении мероприятия с ID 7"}, env.texts())
+	assert.Equal(t, []string{"Произошла ошибка при получении мероприятия с ID 7."}, env.texts())
 	assert.False(t, env.sendText(testAdminID, "/1"))
 }
 
@@ -156,15 +167,15 @@ func TestEventEditHandler_EditName(t *testing.T) {
 
 	env.requireKeyboardRemoved(selectPrompt)
 	namePrompt := env.lastSent()
-	assert.Equal(t, "Текущее название: *Go Meetup*\n\nВведи новое название:", namePrompt.Msg.Text)
-	assert.Equal(t, "Markdown", namePrompt.Call.Params["parse_mode"])
+	assert.Equal(t, "Текущее название: <b>Go Meetup</b>\n\nВведи новое название:", namePrompt.Msg.Text)
+	assert.Equal(t, "HTML", namePrompt.Call.Params["parse_mode"])
 	assert.Equal(t, []string{eventEditCallbackConfirmCancel}, callbackData(t, namePrompt.Call))
 
 	// Blank name keeps the state
 	env.reset()
 	require.True(t, env.sendText(testAdminID, "   "))
 	assert.Equal(t, []string{
-		"Название не может быть пустым. Пожалуйста, введи новое название или используй кнопку для отмены:",
+		"Название не может быть пустым. Пожалуйста, введи новое название или /cancel для отмены.",
 	}, env.texts())
 
 	// New name is trimmed and saved
@@ -174,11 +185,9 @@ func TestEventEditHandler_EditName(t *testing.T) {
 
 	env.requireKeyboardRemoved(namePrompt.Msg)
 	assert.Equal(t, []string{
-		"Название мероприятия с ID `7` успешно обновлено на *\"Rust Meetup\"* \n\n" +
-			"Для продолжения редактирования мероприятия используй команду /eventEdit.\n" +
-			"Для просмотра всех команд используй команду /help",
+		"✅ Название мероприятия (ID 7) изменено на <b>Rust Meetup</b>." + editNextStepsHint,
 	}, env.texts())
-	assert.Equal(t, "Markdown", env.lastSent().Call.Params["parse_mode"])
+	assert.Equal(t, "HTML", env.lastSent().Call.Params["parse_mode"])
 	assert.False(t, env.sendText(testAdminID, "Another"), "conversation must be over")
 }
 
@@ -188,8 +197,8 @@ func TestEventEditHandler_EditStartDate(t *testing.T) {
 		startedAt   *time.Time
 		wantCurrent string
 	}{
-		{"event with start date", timePtr(time.Date(2025, 3, 5, 18, 0, 0, 0, time.UTC)), "`05.03.2025 18:00`"},
-		{"event without start date", nil, "`не задана`"},
+		{"event with start date", timePtr(time.Date(2025, 3, 5, 18, 0, 0, 0, time.UTC)), "<b>05.03.2025 в 18:00 UTC</b>"},
+		{"event without start date", nil, "<b>не указано</b>"},
 	}
 
 	for _, tc := range tests {
@@ -200,16 +209,15 @@ func TestEventEditHandler_EditStartDate(t *testing.T) {
 
 			datePrompt := chooseEditOption(t, env, "/2", ev)
 			assert.Equal(t,
-				"Текущая дата старта: "+tc.wantCurrent+" (UTC)\nВведи новую дату и время в формате DD.MM.YYYY HH:MM (UTC):",
+				"Текущая дата начала: "+tc.wantCurrent+"\n\nВведи новую дату и время в формате "+dateInputHint+":",
 				datePrompt.Text)
+			assert.Equal(t, "HTML", env.lastSent().Call.Params["parse_mode"])
 
 			// Wrong format keeps the state
 			env.reset()
 			require.True(t, env.sendText(testAdminID, "2025-04-10 19:30"))
-			assert.Equal(t, []string{
-				"Неверный формат даты. Пожалуйста, введи дату и время в формате *DD.MM.YYYY HH:MM* (UTC) или используй кнопку для отмены.",
-			}, env.texts())
-			assert.Equal(t, "Markdown", env.lastSent().Call.Params["parse_mode"])
+			assert.Equal(t, []string{invalidDateText}, env.texts())
+			assert.Equal(t, "HTML", env.lastSent().Call.Params["parse_mode"])
 
 			// Valid date is saved as UTC
 			env.reset()
@@ -219,10 +227,9 @@ func TestEventEditHandler_EditStartDate(t *testing.T) {
 
 			env.requireKeyboardRemoved(datePrompt)
 			assert.Equal(t, []string{
-				"Дата начала мероприятия с ID 7 успешно обновлена на *10.04.2030 19:30 UTC* \n\n" +
-					"Для продолжения редактирования мероприятия используй команду /eventEdit.\n" +
-					"Для просмотра всех команд используй команду /help",
+				"✅ Дата начала мероприятия (ID 7) изменена на <b>10.04.2030 в 19:30 UTC</b>." + editNextStepsHint,
 			}, env.texts())
+			assert.Equal(t, "HTML", env.lastSent().Call.Params["parse_mode"])
 			assert.False(t, env.sendText(testAdminID, "10.04.2030 19:30"), "conversation must be over")
 		})
 	}
@@ -238,10 +245,12 @@ func TestEventEditHandler_EditStartDateInPastWarns(t *testing.T) {
 	require.True(t, env.sendText(testAdminID, "10.04.2025 19:30"))
 
 	assert.Equal(t, []string{
-		"Дата начала мероприятия с ID 7 успешно обновлена на *10.04.2025 19:30 UTC* \n" + pastStartDateWarning + "\n\n" +
-			"Для продолжения редактирования мероприятия используй команду /eventEdit.\n" +
-			"Для просмотра всех команд используй команду /help",
+		"✅ Дата начала мероприятия (ID 7) изменена на <b>10.04.2025 в 19:30 UTC</b>.\n" +
+			pastStartDateWarning + editNextStepsHint,
 	}, env.texts())
+	assert.Equal(t,
+		"⚠️ Дата начала уже прошла, поэтому мероприятие не показывается в /events. Если это ошибка, исправь дату через /eventEdit.",
+		pastStartDateWarning)
 }
 
 func TestEventEditHandler_FinishActualEvent(t *testing.T) {
@@ -258,12 +267,10 @@ func TestEventEditHandler_FinishActualEvent(t *testing.T) {
 
 	env.requireKeyboardRemoved(selectPrompt)
 	assert.Equal(t, []string{
-		"Мероприятие *Go Meetup* (ID 7) завершено ✅\n" +
-			"Оно больше не показывается в /events, /topics и /topicAdd.\n\n" +
-			"Для продолжения редактирования мероприятия используй команду /eventEdit.\n" +
-			"Для просмотра всех команд используй команду /help",
+		"✅ Мероприятие <b>Go Meetup</b> (ID 7) завершено.\n" +
+			"Оно больше не показывается в /events, /topics и /topicAdd." + editNextStepsHint,
 	}, env.texts())
-	assert.Equal(t, "Markdown", env.lastSent().Call.Params["parse_mode"])
+	assert.Equal(t, "HTML", env.lastSent().Call.Params["parse_mode"])
 	assert.False(t, env.sendText(testAdminID, "/4"), "conversation must be over")
 }
 
@@ -297,13 +304,13 @@ func TestEventEditHandler_ReopenFinishedEvent(t *testing.T) {
 				WillReturnResult(sqlmock.NewResult(0, 1))
 			require.True(t, env.sendText(testAdminID, "/4"))
 
-			want := "Мероприятие *Go Meetup* (ID 7) снова актуально 🔄"
+			want := "🔄 Мероприятие <b>Go Meetup</b> (ID 7) снова актуально."
 			if tc.wantWarning {
 				want += "\n" + pastStartDateWarning
 			}
-			want += "\n\nДля продолжения редактирования мероприятия используй команду /eventEdit.\n" +
-				"Для просмотра всех команд используй команду /help"
+			want += editNextStepsHint
 			assert.Equal(t, []string{want}, env.texts())
+			assert.Equal(t, "HTML", env.lastSent().Call.Params["parse_mode"])
 			assert.False(t, env.sendText(testAdminID, "/4"), "conversation must be over")
 		})
 	}
@@ -328,27 +335,15 @@ func TestEventEditHandler_EditTypePromptAndValidation(t *testing.T) {
 
 	typePrompt := chooseEditOption(t, env, "/3", editTestEvent())
 	assert.Equal(t,
-		"Текущий тип: *meetup*\n\nДоступные типы:\n"+
-			"/1. 💬 club-call\n/2. 🎙 meetup\n/3. ⚙️ workshop\n/4. 📚 reading-club\n/5. 👥 conference\n"+
-			"\nВведи новый тип или его номер:",
+		"Текущий тип: 🎙 митап\n\nВыбери новый тип:\n"+typeOptionsText+"\n\n👉 Нажми на номер типа.",
 		typePrompt.Text)
+	assert.Equal(t, "HTML", env.lastSent().Call.Params["parse_mode"])
 
-	invalidTypeText := "Неверный тип мероприятия. Допустимые типы: club-call, meetup, workshop, reading-club, conference"
-	tests := []struct {
-		input    string
-		wantText string
-	}{
-		{"/", "Тип не может быть пустым. Пожалуйста, введи новый тип или его номер, или используй кнопку для отмены:"},
-		{"party", invalidTypeText},
-		{"/0", invalidTypeText},
-		{"/6", invalidTypeText},
-		{"Meetup", invalidTypeText},
-	}
-	for _, tc := range tests {
+	for _, input := range []string{"/", "party", "/0", "/6", "Meetup", "митап"} {
 		env.reset()
-		require.True(t, env.sendText(testAdminID, tc.input))
-		assert.Equal(t, []string{tc.wantText}, env.texts(), "input %q", tc.input)
-		assert.Empty(t, env.client.CallsTo("editMessageReplyMarkup"), "input %q", tc.input)
+		require.True(t, env.sendText(testAdminID, input))
+		assert.Equal(t, []string{invalidTypeText}, env.texts(), "input %q", input)
+		assert.Empty(t, env.client.CallsTo("editMessageReplyMarkup"), "input %q", input)
 	}
 }
 
@@ -359,8 +354,9 @@ func TestEventEditHandler_EditTypeSaves(t *testing.T) {
 		wantType constants.EventType
 		wantText string
 	}{
-		{"by number", "/3", constants.EventTypeWorkshop, "⚙️ *'workshop'*"},
-		{"by name", "reading-club", constants.EventTypeReadingClub, "📚 *'reading-club'*"},
+		{"by number", "/3", constants.EventTypeWorkshop, "⚙️ воркшоп"},
+		{"by id", "reading-club", constants.EventTypeReadingClub, "📚 книжный клуб"},
+		{"by id with slash", "/conference", constants.EventTypeConference, "👥 конфа"},
 	}
 
 	for _, tc := range tests {
@@ -375,11 +371,9 @@ func TestEventEditHandler_EditTypeSaves(t *testing.T) {
 
 			env.requireKeyboardRemoved(typePrompt)
 			assert.Equal(t, []string{
-				"Тип мероприятия с ID 7 успешно обновлен на " + tc.wantText + " \n\n" +
-					"Для продолжения редактирования мероприятия используй команду /eventEdit.\n" +
-					"Для просмотра всех команд используй команду /help",
+				"✅ Тип мероприятия (ID 7) изменён на " + tc.wantText + "." + editNextStepsHint,
 			}, env.texts())
-			assert.Equal(t, "Markdown", env.lastSent().Call.Params["parse_mode"])
+			assert.Equal(t, "HTML", env.lastSent().Call.Params["parse_mode"])
 			assert.False(t, env.sendText(testAdminID, "/2"), "conversation must be over")
 		})
 	}
@@ -487,5 +481,82 @@ func TestEventEditHandler_Cancel(t *testing.T) {
 				assert.False(t, env.sendText(testAdminID, "/1"), "conversation must be over")
 			})
 		}
+	}
+}
+
+func TestEventEditHandler_EscapesEventNames(t *testing.T) {
+	env := newTestEnv(t, NewEventEditHandler)
+	ev := editTestEvent()
+	ev.Name = htmlEventName
+
+	// The list, the edit menu and the name prompt show the escaped name
+	env.expectGetLastEvents(ev)
+	require.True(t, env.sendText(testAdminID, "/eventEdit"))
+	assert.Contains(t, env.lastSent().Msg.Text, "🔄 🎙 <i>митап</i>: "+escapedEventName+"\n")
+	assert.NotContains(t, env.lastSent().Msg.Text, htmlEventName)
+
+	env.reset()
+	env.expectGetEventByID(7, &ev)
+	require.True(t, env.sendText(testAdminID, "/7"))
+	assert.Contains(t, env.lastSent().Msg.Text, "🎙 <i>митап</i>: "+escapedEventName+"\n└ <i>ID</i> 7")
+	assert.NotContains(t, env.lastSent().Msg.Text, htmlEventName)
+
+	env.reset()
+	env.expectGetEventByID(7, &ev)
+	require.True(t, env.sendText(testAdminID, "/1"))
+	assert.Equal(t, "Текущее название: "+escapedEventName+"\n\nВведи новое название:", env.lastSent().Msg.Text)
+
+	// The new name is stored as typed and escaped in the confirmation
+	env.reset()
+	env.mock.ExpectExec(regexp.QuoteMeta(sqlUpdateName)).WithArgs("<i>R&D</i>", 7).WillReturnResult(sqlmock.NewResult(0, 1))
+	require.True(t, env.sendText(testAdminID, "<i>R&D</i>"))
+	assert.Equal(t, []string{
+		"✅ Название мероприятия (ID 7) изменено на <b>&lt;i&gt;R&amp;D&lt;/i&gt;</b>." + editNextStepsHint,
+	}, env.texts())
+}
+
+func TestEventEditHandler_StatusToggleEscapesEventName(t *testing.T) {
+	tests := []struct {
+		name      string
+		status    constants.EventStatus
+		newStatus constants.EventStatus
+		want      string
+	}{
+		{
+			name:      "finish",
+			status:    constants.EventStatusActual,
+			newStatus: constants.EventStatusFinished,
+			want: "✅ Мероприятие " + escapedEventName + " (ID 7) завершено.\n" +
+				"Оно больше не показывается в /events, /topics и /topicAdd." + editNextStepsHint,
+		},
+		{
+			name:      "reopen",
+			status:    constants.EventStatusFinished,
+			newStatus: constants.EventStatusActual,
+			want:      "🔄 Мероприятие " + escapedEventName + " (ID 7) снова актуально." + editNextStepsHint,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			env := newTestEnv(t, NewEventEditHandler)
+			ev := editTestEvent()
+			ev.Name = htmlEventName
+			ev.Status = string(tc.status)
+			ev.StartedAt = nil
+
+			env.expectGetLastEvents(ev)
+			require.True(t, env.sendText(testAdminID, "/eventEdit"))
+			env.expectGetEventByID(7, &ev)
+			require.True(t, env.sendText(testAdminID, "/7"))
+
+			env.reset()
+			env.expectGetEventByID(7, &ev)
+			env.mock.ExpectExec(regexp.QuoteMeta(sqlUpdateStatus)).WithArgs(tc.newStatus, 7).
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			require.True(t, env.sendText(testAdminID, "/4"))
+
+			assert.Equal(t, []string{tc.want}, env.texts())
+		})
 	}
 }

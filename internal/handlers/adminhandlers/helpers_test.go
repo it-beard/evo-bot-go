@@ -45,6 +45,11 @@ const (
 	sqlDeleteTopic        = `DELETE FROM topics WHERE id = \$1`
 )
 
+// privateOnlyNotice is the auto-deleted HTML reply to a private-only command sent to a group
+const privateOnlyNotice = "<b>Прошу прощения</b> 🧐\n\nЭта команда работает только в <i>личной беседе</i> со мной. " +
+	"Напиши мне в ЛС, и я с удовольствием помогу (я тебя там пинганул, если мы общались ранее)." +
+	"\n\nЭто сообщение и твоя команда будут автоматически удалены через 10 секунд."
+
 var (
 	fixedTime = time.Date(2025, 3, 14, 18, 30, 0, 0, time.UTC)
 
@@ -268,6 +273,40 @@ func (e *testEnv) lastSendMessage() testutils.APICall {
 	call, ok := e.client.LastCallTo("sendMessage")
 	require.True(e.t, ok, "sendMessage was not called")
 	return call
+}
+
+// assertPrivateOnlyNotice checks that a command sent to a group got only the HTML "private chat only" notice
+// plus a ping in private, and that the admin check was skipped because the chat type is checked first
+func (e *testEnv) assertPrivateOnlyNotice(cmd *gotgbot.Message) {
+	e.t.Helper()
+	sends := e.client.CallsTo("sendMessage")
+	require.Len(e.t, sends, 2)
+
+	notice := sends[0]
+	assert.Equal(e.t, cmd.Chat.Id, notice.Int64("chat_id"))
+	assert.Equal(e.t, "HTML", notice.Params["parse_mode"])
+	assert.Equal(e.t, privateOnlyNotice, notice.Params["text"])
+	var reply gotgbot.ReplyParameters
+	require.NoError(e.t, notice.DecodeJSON("reply_parameters", &reply))
+	assert.Equal(e.t, cmd.MessageId, reply.MessageId)
+
+	// The user gets pinged in private
+	assert.Equal(e.t, cmd.From.Id, sends[1].Int64("chat_id"))
+	assert.NotEmpty(e.t, sends[1].Params["text"])
+
+	assert.Empty(e.t, e.client.CallsTo("getChatMember"), "the admin check must not run for a group chat")
+	for _, text := range e.client.SentTexts() {
+		assert.NotContains(e.t, text, "доступна только администраторам")
+	}
+}
+
+// answeredCallbackIDs returns the callback query IDs of all answerCallbackQuery calls
+func (e *testEnv) answeredCallbackIDs() []string {
+	var ids []string
+	for _, c := range e.client.CallsTo("answerCallbackQuery") {
+		ids = append(ids, c.Params["callback_query_id"])
+	}
+	return ids
 }
 
 // deletedMessageIDs returns IDs of all deleted messages

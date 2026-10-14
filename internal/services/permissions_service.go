@@ -51,11 +51,11 @@ func (s *PermissionsService) CheckPrivateChatType(msg *gotgbot.Message) bool {
 	if msg.Chat.Type != constants.PrivateChatType {
 		if err := s.messageSenderService.ReplyWithCleanupAfterDelayWithPing(
 			msg,
-			"*Прошу прощения* 🧐\n\nЭта команда работает только в _личной беседе_ со мной. "+
-				"Напишите мне в ЛС, и я с удовольствием помогу (я тебя там пинганул, если мы общались ранее)."+
-				"\n\nДанное сообщение и твоя команда будут автоматически удалены через 10 секунд.",
+			"<b>Прошу прощения</b> 🧐\n\nЭта команда работает только в <i>личной беседе</i> со мной. "+
+				"Напиши мне в ЛС, и я с удовольствием помогу (я тебя там пинганул, если мы общались ранее)."+
+				"\n\nЭто сообщение и твоя команда будут автоматически удалены через 10 секунд.",
 			10, &gotgbot.SendMessageOpts{
-				ParseMode: "Markdown",
+				ParseMode: "HTML",
 			}); err != nil {
 			log.Printf("%s: Failed to send private-only message: %v", utils.GetCurrentTypeName(), err)
 		}
@@ -81,14 +81,16 @@ func (s *PermissionsService) CheckClubMemberPermissions(msg *gotgbot.Message, co
 	return true
 }
 
-// CheckAdminAndPrivateChat combines permission and chat type checking for admin-only private commands
+// CheckAdminAndPrivateChat combines permission and chat type checking for admin-only private commands.
+// The chat type is checked first, like for member commands, so a command sent to the group is always
+// answered with the auto-deleted "private chat only" notice instead of a permanent reply.
 // Returns true if all checks pass, false otherwise
 func (s *PermissionsService) CheckAdminAndPrivateChat(msg *gotgbot.Message, commandName string) bool {
-	if !s.CheckAdminPermissions(msg, commandName) {
+	if !s.CheckPrivateChatType(msg) {
 		return false
 	}
 
-	if !s.CheckPrivateChatType(msg) {
+	if !s.CheckAdminPermissions(msg, commandName) {
 		return false
 	}
 

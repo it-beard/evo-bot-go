@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"evo-bot-go/internal/formatters"
@@ -22,8 +24,9 @@ func TestStartHandler_NonPrivateChatIsRejected(t *testing.T) {
 
 	warning := sends[0]
 	assert.Equal(t, testGroupChatIDForTest, warning.Int64("chat_id"))
-	assert.Contains(t, warning.Params["text"], "работает только в _личной беседе_")
-	assert.Equal(t, "Markdown", warning.Params["parse_mode"])
+	assert.Contains(t, warning.Params["text"], "работает только в <i>личной беседе</i>")
+	assert.Contains(t, warning.Params["text"], "Напиши мне в ЛС")
+	assert.Equal(t, "HTML", warning.Params["parse_mode"])
 	assert.Contains(t, warning.Params["reply_parameters"], `"message_id":`)
 
 	assert.Equal(t, testUserID, sends[1].Int64("chat_id"), "the user is pinged in the private chat")
@@ -46,9 +49,11 @@ func TestStartHandler_ClubMemberGetsGreetingAndHelp(t *testing.T) {
 	greeting, ok := f.client.LastCallTo("sendMessage")
 	require.True(t, ok)
 	assert.Equal(t, testUserID, greeting.Int64("chat_id"))
-	assert.Equal(t, "Markdown", greeting.Params["parse_mode"])
-	assert.Contains(t, greeting.Params["text"], "Приветствую, *First*! 🎩")
-	assert.Contains(t, greeting.Params["text"], "Рад видеть тебя среди участников нашего клуба")
+	assert.Equal(t, "HTML", greeting.Params["parse_mode"])
+	assert.Equal(t, "Приветствую, <b>First</b>! 🎩\n\n"+
+		"Я — <b>Дженкинс Вебстер</b>, потомственный дворецкий и верный помощник клуба <i>«Эволюция Кода»</i> 🧐\n\n"+
+		"Рад видеть тебя среди участников нашего клуба! Я готов помочь тебе во всех твоих начинаниях. 🤵",
+		greeting.Params["text"])
 	assert.Contains(t, greeting.Params["reply_parameters"], `"message_id":`)
 
 	markup := replyKeyboard(t, greeting)
@@ -114,10 +119,14 @@ func TestStartHandler_NonMemberGetsInvitation(t *testing.T) {
 			sends := f.client.CallsTo("sendMessage")
 			require.Len(t, sends, 1)
 			text := sends[0].Params["text"]
-			assert.Contains(t, text, "Приветствую, *First*! 🎩")
-			assert.Contains(t, text, "Позвольте предложить тебе присоединиться")
+			assert.Equal(t, "Приветствую, <b>First</b>! 🎩\n\n"+
+				"Я — <b>Дженкинс Вебстер</b>, потомственный дворецкий и верный помощник клуба <i>«Эволюция Кода»</i> 🧐\n\n"+
+				"Позволь предложить тебе присоединиться к нашему изысканному сообществу разработчиков и разработчиц, "+
+				"где я буду рад служить тебе всеми своими возможностями и ресурсами.",
+				text)
+			assert.NotContains(t, text, "Позвольте", "the user is addressed with \"ты\"")
 			assert.NotContains(t, text, "Рад видеть тебя среди участников")
-			assert.Equal(t, "Markdown", sends[0].Params["parse_mode"])
+			assert.Equal(t, "HTML", sends[0].Params["parse_mode"])
 
 			markup := replyKeyboard(t, sends[0])
 			require.Len(t, markup.InlineKeyboard, 1)
@@ -139,8 +148,41 @@ func TestStartHandler_GreetingWithoutFirstName(t *testing.T) {
 
 	texts := f.client.SentTexts()
 	require.Len(t, texts, 1)
-	assert.Contains(t, texts[0], "Приветствую! 🎩")
-	assert.NotContains(t, texts[0], "Приветствую, *")
+	assert.True(t, strings.HasPrefix(texts[0], "Приветствую! 🎩\n\n"), "no empty bold name: %q", texts[0])
+	assert.NotContains(t, texts[0], "<b></b>")
+}
+
+func TestStartHandler_GreetingEscapesFirstName(t *testing.T) {
+	tests := []struct {
+		firstName string
+		greeting  string
+	}{
+		{firstName: "Anna <3", greeting: "Приветствую, <b>Anna &lt;3</b>! 🎩"},
+		{firstName: "Alex_*", greeting: "Приветствую, <b>Alex_*</b>! 🎩"},
+		{firstName: "<b>Bob</b> & Co", greeting: "Приветствую, <b>&lt;b&gt;Bob&lt;/b&gt; &amp; Co</b>! 🎩"},
+		{firstName: `O'Neil "Jr"`, greeting: "Приветствую, <b>O&#39;Neil &#34;Jr&#34;</b>! 🎩"},
+	}
+
+	for _, tt := range tests {
+		for _, member := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s/member=%v", tt.firstName, member), func(t *testing.T) {
+				f := newStartFixture(t)
+				if !member {
+					f.client.SetMemberStatus(testUserID, "left")
+				}
+				msg := testutils.NewPrivateMessage(testUserID, "/start")
+				msg.From.FirstName = tt.firstName
+
+				require.True(t, f.dispatch(t, testutils.MessageUpdate(msg)))
+
+				sends := f.client.CallsTo("sendMessage")
+				require.Len(t, sends, 1)
+				assert.Equal(t, "HTML", sends[0].Params["parse_mode"])
+				assert.True(t, strings.HasPrefix(sends[0].Params["text"], tt.greeting+"\n\n"),
+					"greeting must start with %q, got %q", tt.greeting, sends[0].Params["text"])
+			})
+		}
+	}
 }
 
 func TestStartHandler_IgnoresUnrelatedUpdates(t *testing.T) {

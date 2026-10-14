@@ -12,6 +12,7 @@ import (
 	"evo-bot-go/internal/database/repositories"
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/testutils"
+	"evo-bot-go/internal/utils"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -129,6 +130,18 @@ func (d *deps) newTopicAddHandler() ext.Handler {
 	return NewTopicAddHandler(d.cfg, repositories.NewTopicRepository(d.db), repositories.NewEventRepository(d.db), d.sender, d.permissions)
 }
 
+// newTopicAddState builds the /topicAdd state handlers directly, so a test can tamper with the conversation data
+func (d *deps) newTopicAddState() *topicAddHandler {
+	return &topicAddHandler{
+		config:               d.cfg,
+		topicRepository:      repositories.NewTopicRepository(d.db),
+		eventRepository:      repositories.NewEventRepository(d.db),
+		messageSenderService: d.sender,
+		userStore:            utils.NewUserDataStore(),
+		permissionsService:   d.permissions,
+	}
+}
+
 func (d *deps) dispatch(t *testing.T, h ext.Handler, u *gotgbot.Update) bool {
 	t.Helper()
 	handled, err := testutils.Dispatch(d.bot, h, u)
@@ -191,12 +204,17 @@ func assertKeyboardRemoved(t *testing.T, client *testutils.MockBotClient, messag
 	assert.Equal(t, messageIDs, removed)
 }
 
+const privateOnlyNoticeText = "<b>Прошу прощения</b> 🧐\n\nЭта команда работает только в <i>личной беседе</i> со мной. " +
+	"Напиши мне в ЛС, и я с удовольствием помогу (я тебя там пинганул, если мы общались ранее)." +
+	"\n\nЭто сообщение и твоя команда будут автоматически удалены через 10 секунд."
+
 func assertPrivateOnlyRejection(t *testing.T, client *testutils.MockBotClient) {
 	t.Helper()
 	sends := client.CallsTo("sendMessage")
 	require.Len(t, sends, 2, "private-only warning + ping in the private chat")
 	assert.Equal(t, testGroupChatID, sends[0].Int64("chat_id"))
-	assert.Contains(t, sends[0].Params["text"], "работает только в _личной беседе_")
+	assert.Equal(t, "HTML", sends[0].Params["parse_mode"])
+	assert.Equal(t, privateOnlyNoticeText, sends[0].Params["text"])
 	assert.Equal(t, testUserID, sends[1].Int64("chat_id"))
 	assert.Empty(t, client.CallsTo("getChatMember"))
 }

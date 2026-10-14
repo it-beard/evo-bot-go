@@ -20,7 +20,7 @@ const (
 		"VALUES ($1, $2, $3, $4) RETURNING id"
 
 	coffeePoolMenuText = "<b>Запуск опроса по кофейным встречам</b>\n\n⚠️ ЭТА КОМАНДА НУЖНА ДЛЯ ТЕСТИРОВАНИЯ ФУНКЦИОНАЛА!" +
-		"\n\nВы уверены, что хотите запустить новый опрос по кофейным встречам?" +
+		"\n\nТочно запустить новый опрос по кофейным встречам?" +
 		"\n\nОпрос будет отправлен в топик \"Random Coffee\" (ID: 33)."
 	coffeePoolProcessingText = "<b>Запуск опроса по кофейным встречам</b>\n\n⏳ Создание опроса..."
 	coffeePoolSuccessText    = "<b>Запуск опроса по кофейным встречам</b>\n\n✅ Опрос по кофейным встречам успешно создан и отправлен в группу!"
@@ -250,11 +250,12 @@ func TestTryCreateCoffeePoolHandler_MenuSendFailureIsReturned(t *testing.T) {
 
 func TestTryCreateCoffeePoolHandler_Cancel(t *testing.T) {
 	tests := []struct {
-		name   string
-		cancel func(env *testEnv) bool
+		name       string
+		cancel     func(env *testEnv) bool
+		isCallback bool
 	}{
-		{"cancel button", func(env *testEnv) bool { return env.click(testAdminID, constants.TryCreateCoffeePoolCancelCallback) }},
-		{"cancel command", func(env *testEnv) bool { return env.sendText(testAdminID, "/cancel") }},
+		{"cancel button", func(env *testEnv) bool { return env.click(testAdminID, constants.TryCreateCoffeePoolCancelCallback) }, true},
+		{"cancel command", func(env *testEnv) bool { return env.sendText(testAdminID, "/cancel") }, false},
 	}
 
 	for _, tc := range tests {
@@ -265,6 +266,11 @@ func TestTryCreateCoffeePoolHandler_Cancel(t *testing.T) {
 
 			require.True(t, tc.cancel(env))
 
+			if tc.isCallback {
+				assert.Len(t, env.answeredCallbacks(), 1)
+			} else {
+				assert.Empty(t, env.answeredCallbacks())
+			}
 			assert.Equal(t, [][2]int64{msgRef(menu)}, env.deletedMessages())
 			assert.Equal(t, []string{coffeePoolCanceledText}, env.texts())
 			assert.Equal(t, testAdminID, env.lastSent().Msg.Chat.Id)
@@ -293,20 +299,74 @@ func TestTryCreateCoffeePoolHandler_AccessIsRestricted(t *testing.T) {
 		require.True(t, env.sendText(testUserID, "/tryCreateCoffeePool"))
 
 		assert.Equal(t, []string{adminOnlyText}, env.texts())
+		assert.Len(t, env.client.CallsTo("getChatMember"), 1)
 		assert.False(t, env.click(testUserID, constants.TryCreateCoffeePoolConfirmCallback), "conversation must not be started")
 		assert.Empty(t, env.client.CallsTo("sendPoll"))
 	})
 
-	t.Run("group chat", func(t *testing.T) {
-		env, _ := newCoffeePoolEnv(t)
+	for _, sender := range groupChatSenders {
+		t.Run("group chat by "+sender.name, func(t *testing.T) {
+			env, _ := newCoffeePoolEnv(t)
 
-		require.True(t, env.sendGroupText(testAdminID, "/tryCreateCoffeePool"))
+			require.True(t, env.sendGroupText(sender.id, "/tryCreateCoffeePool"))
 
-		sent := env.sentMessages()
-		require.Len(t, sent, 2)
-		assert.Equal(t, fullChatID(), sent[0].Msg.Chat.Id)
-		assert.Contains(t, sent[0].Msg.Text, "Эта команда работает только в _личной беседе_ со мной")
-		assert.Equal(t, testAdminID, sent[1].Msg.Chat.Id)
-		assert.False(t, env.sendGroupText(testAdminID, "hello"), "conversation must not be started")
-	})
+			env.requirePrivateOnlyNotice(sender.id)
+			assert.False(t, env.sendGroupText(sender.id, "hello"), "conversation must not be started")
+		})
+	}
+}
+
+func TestTryCreateCoffeePoolHandler_ButtonPressesAreAnswered(t *testing.T) {
+	tests := []struct {
+		name    string
+		data    string
+		setup   func(env *testEnv, mock sqlmock.Sqlmock)
+		wantErr bool
+	}{
+		{
+			name:  "confirm",
+			data:  constants.TryCreateCoffeePoolConfirmCallback,
+			setup: func(_ *testEnv, mock sqlmock.Sqlmock) { expectPollSaved(mock) },
+		},
+		{
+			name:    "confirm when the poll cannot be created",
+			data:    constants.TryCreateCoffeePoolConfirmCallback,
+			setup:   func(env *testEnv, _ sqlmock.Sqlmock) { env.cfg.RandomCoffeeTopicID = 0 },
+			wantErr: true,
+		},
+		{
+			name: "confirm when the processing message cannot be sent",
+			data: constants.TryCreateCoffeePoolConfirmCallback,
+			setup: func(env *testEnv, _ sqlmock.Sqlmock) {
+				env.failSendWhen(func(call testutils.APICall) bool { return call.Params["text"] == coffeePoolProcessingText })
+			},
+			wantErr: true,
+		},
+		{
+			name: "cancel",
+			data: constants.TryCreateCoffeePoolCancelCallback,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			env, mock := newCoffeePoolEnv(t)
+			openCoffeePoolMenu(t, env)
+			env.reset()
+			if tc.setup != nil {
+				tc.setup(env, mock)
+			}
+
+			update := testutils.CallbackUpdate(testAdminID, tc.data)
+			handled, err := env.tryDispatch(update)
+
+			assert.True(t, handled)
+			if tc.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, []string{update.CallbackQuery.Id}, env.answeredCallbacks(), "the button press is answered exactly once")
+		})
+	}
 }

@@ -44,24 +44,43 @@ func TestEventHandlers_NonAdminIsRejected(t *testing.T) {
 }
 
 func TestEventHandlers_GroupChatIsRejected(t *testing.T) {
+	const privateOnlyNotice = "<b>Прошу прощения</b> 🧐\n\n" +
+		"Эта команда работает только в <i>личной беседе</i> со мной. " +
+		"Напиши мне в ЛС, и я с удовольствием помогу (я тебя там пинганул, если мы общались ранее)." +
+		"\n\nЭто сообщение и твоя команда будут автоматически удалены через 10 секунд."
+
+	users := []struct {
+		name   string
+		userID int64
+	}{
+		{"admin", testAdminID},
+		{"non-admin", testUserID},
+	}
+
 	for _, tc := range allEventHandlers {
-		t.Run(tc.name, func(t *testing.T) {
-			env := newTestEnv(t, tc.factory)
+		for _, user := range users {
+			t.Run(tc.name+"/"+user.name, func(t *testing.T) {
+				env := newTestEnv(t, tc.factory)
 
-			require.True(t, env.sendGroupText(testAdminID, "/"+tc.command))
+				require.True(t, env.sendGroupText(user.userID, "/"+tc.command))
 
-			sent := env.sentMessages()
-			require.Len(t, sent, 2)
-			// A markdown notice is posted in the group as a reply ...
-			assert.Equal(t, fullChatID(), sent[0].Msg.Chat.Id)
-			assert.Equal(t, "Markdown", sent[0].Call.Params["parse_mode"])
-			assert.Contains(t, sent[0].Msg.Text, "Эта команда работает только в _личной беседе_ со мной")
-			assert.Contains(t, sent[0].Call.Params["reply_parameters"], "message_id")
-			// ... and the admin is pinged in private messages
-			assert.Equal(t, testAdminID, sent[1].Msg.Chat.Id)
+				sent := env.sentMessages()
+				require.Len(t, sent, 2)
+				// An HTML notice is posted in the group as a reply ...
+				assert.Equal(t, fullChatID(), sent[0].Msg.Chat.Id)
+				assert.Equal(t, "HTML", sent[0].Call.Params["parse_mode"])
+				assert.Equal(t, privateOnlyNotice, sent[0].Msg.Text)
+				assert.Contains(t, sent[0].Call.Params["reply_parameters"], "message_id")
+				// ... and the user is pinged in private messages
+				assert.Equal(t, user.userID, sent[1].Msg.Chat.Id)
 
-			// The conversation was not started
-			assert.False(t, env.sendGroupText(testAdminID, "1"))
-		})
+				// The chat type is checked first, so admin rights are not even looked up
+				assert.Empty(t, env.client.CallsTo("getChatMember"))
+				assert.NotContains(t, env.texts(), adminOnlyText)
+
+				// The conversation was not started
+				assert.False(t, env.sendGroupText(user.userID, "1"))
+			})
+		}
 	}
 }

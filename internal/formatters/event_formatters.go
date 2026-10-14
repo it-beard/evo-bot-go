@@ -2,12 +2,25 @@ package formatters
 
 import (
 	"fmt"
+	"html"
 	"strings"
 	"time"
 
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/database/repositories"
 )
+
+// topicAuthorUnknown is stored as the author of topics added by members without a username
+const topicAuthorUnknown = "не указано"
+
+// EventDateLayout is the only format event dates are shown in; dates are always displayed in UTC
+const EventDateLayout = "02.01.2006 в 15:04 UTC"
+
+// EventDateInputLayout is the format admins type event dates in (interpreted as UTC)
+const EventDateInputLayout = "02.01.2006 15:04"
+
+// EventDateInputHint explains EventDateInputLayout to admins
+const EventDateInputHint = "<b>ДД.ММ.ГГГГ ЧЧ:ММ</b> по UTC, например <code>25.12.2026 18:30</code>"
 
 func GetTypeEmoji(eventType constants.EventType) string {
 	switch eventType {
@@ -54,107 +67,141 @@ func GetStatusEmoji(status constants.EventStatus) string {
 	}
 }
 
-func FormatEventListForTopicsView(events []repositories.Event, title string) string {
-	var response strings.Builder
-	response.WriteString(fmt.Sprintf("%s:\n", title))
+// FormatEventType renders an event type as emoji plus its Russian name, e.g. "🎙 митап"
+func FormatEventType(eventType constants.EventType) string {
+	return fmt.Sprintf("%s %s", GetTypeEmoji(eventType), html.EscapeString(GetTypeInRussian(eventType)))
+}
 
-	for _, event := range events {
-		// Handle optional started_at field
-		startedAtStr := "не указано"
-		if event.StartedAt != nil && !event.StartedAt.IsZero() {
-			startedAtStr = event.StartedAt.Format("02.01.2006 в 15:04")
+// FormatEventTypeOptions lists all event types as tappable numbered commands
+func FormatEventTypeOptions() string {
+	var options strings.Builder
+	for i, eventType := range constants.AllEventTypes {
+		if i > 0 {
+			options.WriteString("\n")
 		}
+		options.WriteString(fmt.Sprintf("/%d. %s", i+1, FormatEventType(eventType)))
+	}
+	return options.String()
+}
 
-		typeEmoji := GetTypeEmoji(constants.EventType(event.Type))
-		typeInRussian := GetTypeInRussian(constants.EventType(event.Type))
+// FormatEventDate renders an optional event start in EventDateLayout
+func FormatEventDate(startedAt *time.Time) string {
+	if startedAt == nil || startedAt.IsZero() {
+		return "не указано"
+	}
+	return startedAt.UTC().Format(EventDateLayout)
+}
 
-		response.WriteString(fmt.Sprintf("\n%s _%s_: *%s*\n", typeEmoji, typeInRussian, event.Name))
-		response.WriteString(fmt.Sprintf("└   _ID_ /%d, _когда_: %s\n",
-			event.ID, startedAtStr))
+// FormatEventName renders an event name in bold, escaped for HTML
+func FormatEventName(name string) string {
+	return "<b>" + html.EscapeString(name) + "</b>"
+}
+
+// FormatEventSummary renders a single event in the list entry layout, for prompts and confirmations
+func FormatEventSummary(event repositories.Event) string {
+	eventType := constants.EventType(event.Type)
+	return fmt.Sprintf("%s <i>%s</i>: %s\n└ <i>ID</i> %d, <i>когда</i>: %s",
+		GetTypeEmoji(eventType), html.EscapeString(GetTypeInRussian(eventType)), FormatEventName(event.Name),
+		event.ID, FormatEventDate(event.StartedAt))
+}
+
+// formatTimeUntil returns a hint like " <i>(через 2д 5ч)</i>" for events starting within a week
+func formatTimeUntil(startedAt *time.Time, now time.Time) string {
+	if startedAt == nil || !startedAt.After(now) {
+		return ""
+	}
+
+	timeUntil := startedAt.Sub(now)
+	switch {
+	case timeUntil <= 24*time.Hour:
+		hours := int(timeUntil.Hours())
+		mins := int(timeUntil.Minutes()) % 60
+		if hours > 0 {
+			return fmt.Sprintf(" <i>(через %dч %dмин)</i>", hours, mins)
+		}
+		return fmt.Sprintf(" <i>(через %dмин)</i>", mins)
+	case timeUntil <= 7*24*time.Hour:
+		days := int(timeUntil.Hours() / 24)
+		hours := int(timeUntil.Hours()) % 24
+		return fmt.Sprintf(" <i>(через %dд %dч)</i>", days, hours)
+	default:
+		return ""
+	}
+}
+
+// eventEntryOptions controls which details an event list entry shows
+type eventEntryOptions struct {
+	withID     bool
+	withStatus bool
+}
+
+// formatEventEntry renders one event of a list; every event list of the bot uses this layout
+func formatEventEntry(event repositories.Event, opts eventEntryOptions, now time.Time) string {
+	var entry strings.Builder
+
+	entry.WriteString("\n")
+	if opts.withStatus {
+		entry.WriteString(GetStatusEmoji(constants.EventStatus(event.Status)) + " ")
+	}
+	eventType := constants.EventType(event.Type)
+	entry.WriteString(fmt.Sprintf("%s <i>%s</i>: %s\n",
+		GetTypeEmoji(eventType), html.EscapeString(GetTypeInRussian(eventType)), FormatEventName(event.Name)))
+
+	entry.WriteString("└ ")
+	if opts.withID {
+		entry.WriteString(fmt.Sprintf("<i>ID</i> /%d, ", event.ID))
+	}
+	entry.WriteString(fmt.Sprintf("<i>когда</i>: %s%s\n", FormatEventDate(event.StartedAt), formatTimeUntil(event.StartedAt, now)))
+
+	return entry.String()
+}
+
+func formatEventList(events []repositories.Event, title string, opts eventEntryOptions) string {
+	var response strings.Builder
+	response.WriteString(fmt.Sprintf("<b>%s</b>\n", html.EscapeString(title)))
+
+	now := time.Now().UTC()
+	for _, event := range events {
+		response.WriteString(formatEventEntry(event, opts, now))
 	}
 
 	return response.String()
 }
 
+// FormatEventListForEventsView renders the /events list for club members
 func FormatEventListForEventsView(events []repositories.Event, title string) string {
-	var response strings.Builder
-	response.WriteString(fmt.Sprintf("%s:\n", title))
-
-	for _, event := range events {
-		// Handle optional started_at field
-		startedAtStr := "не указано"
-		if event.StartedAt != nil && !event.StartedAt.IsZero() {
-			startedAtStr = event.StartedAt.Format("02.01.2006 в 15:04 UTC")
-
-			// Add time remaining if event is in the future
-			utcNow := time.Now().UTC()
-			if event.StartedAt.After(utcNow) {
-				timeUntil := event.StartedAt.Sub(utcNow)
-
-				switch {
-				case timeUntil <= 24*time.Hour:
-					// Less than 24 hours
-					hours := int(timeUntil.Hours())
-					mins := int(timeUntil.Minutes()) % 60
-					if hours > 0 {
-						startedAtStr += fmt.Sprintf(" _(через %dч %dмин)_", hours, mins)
-					} else {
-						startedAtStr += fmt.Sprintf(" _(через %dмин)_", mins)
-					}
-				case timeUntil <= 7*24*time.Hour:
-					// Less than 7 days
-					days := int(timeUntil.Hours() / 24)
-					hours := int(timeUntil.Hours()) % 24
-					startedAtStr += fmt.Sprintf(" _(через %dд %dч)_", days, hours)
-				}
-			}
-		}
-
-		typeEmoji := GetTypeEmoji(constants.EventType(event.Type))
-		typeInRussian := GetTypeInRussian(constants.EventType(event.Type))
-
-		response.WriteString(fmt.Sprintf("\n%s _%s_: *%s*\n", typeEmoji, typeInRussian, event.Name))
-		response.WriteString(fmt.Sprintf("└   _когда_: %s\n", startedAtStr))
-	}
-
-	return response.String()
+	return formatEventList(events, title, eventEntryOptions{})
 }
 
-func FormatEventListForAdmin(events []repositories.Event, title string, cancelCommand string, actionDescription string) string {
-	var response strings.Builder
-	response.WriteString(fmt.Sprintf("*%s*\n", title))
+// FormatEventListForTopicsView renders a list of events to pick one by ID, e.g. in /topics
+func FormatEventListForTopicsView(events []repositories.Event, title string, actionDescription string) string {
+	return formatEventList(events, title, eventEntryOptions{withID: true}) +
+		fmt.Sprintf("\n👉 Нажми на ID мероприятия, %s.", actionDescription)
+}
 
-	for _, event := range events {
-		// Handle optional started_at field
-		startedAtStr := "не указано"
-		if event.StartedAt != nil && !event.StartedAt.IsZero() {
-			startedAtStr = event.StartedAt.Format("02.01.2006 в 15:04 UTC")
-		}
+// FormatEventListForAdmin renders a list of events with their statuses to pick one by ID in admin commands
+func FormatEventListForAdmin(events []repositories.Event, title string, actionDescription string) string {
+	return formatEventList(events, title, eventEntryOptions{withID: true, withStatus: true}) +
+		fmt.Sprintf("\n<i>%s — актуальное, %s — завершено</i>",
+			GetStatusEmoji(constants.EventStatusActual), GetStatusEmoji(constants.EventStatusFinished)) +
+		fmt.Sprintf("\n\n👉 Нажми на ID мероприятия, %s.", actionDescription)
+}
 
-		statusEmoji := GetStatusEmoji(constants.EventStatus(event.Status))
-		typeEmoji := GetTypeEmoji(constants.EventType(event.Type))
-
-		response.WriteString(fmt.Sprintf("\n%s ID /%d: *%s*\n", typeEmoji, event.ID, event.Name))
-		response.WriteString(fmt.Sprintf("└ %s _когда_: *%s*\n",
-			statusEmoji, startedAtStr))
-	}
-
-	response.WriteString(fmt.Sprintf("\nПожалуйста, отправь ID мероприятия, %s.", actionDescription))
-
-	return response.String()
+// formatTopicListHeader renders the event the topic list belongs to
+func formatTopicListHeader(eventName string, eventType string) string {
+	typed := constants.EventType(eventType)
+	return fmt.Sprintf("%s <i>%s</i>: %s\n",
+		GetTypeEmoji(typed), html.EscapeString(GetTypeInRussian(typed)), FormatEventName(eventName))
 }
 
 func FormatHtmlTopicListForUsers(topics []repositories.Topic, eventName string, eventType string) string {
 	var response strings.Builder
 
-	typeEmoji := GetTypeEmoji(constants.EventType(eventType))
-	typeInRussian := GetTypeInRussian(constants.EventType(eventType))
-
-	response.WriteString(fmt.Sprintf("\n %s Мероприятие (%s): <b>%s</b>\n", typeEmoji, typeInRussian, eventName))
+	response.WriteString(formatTopicListHeader(eventName, eventType))
 
 	if len(topics) == 0 {
 		response.WriteString(
-			fmt.Sprintf("\n🔍 Для этого мероприятия пока нет тем и вопросов. \n Используй команду /%s для добавления.", constants.TopicAddCommand))
+			fmt.Sprintf("\n🔍 Для этого мероприятия пока нет тем и вопросов.\nИспользуй команду /%s для добавления.", constants.TopicAddCommand))
 	} else {
 		topicCount := len(topics)
 		response.WriteString(fmt.Sprintf("📋 Найдено тем и вопросов: <b>%d</b>\n\n", topicCount))
@@ -165,7 +212,7 @@ func FormatHtmlTopicListForUsers(topics []repositories.Topic, eventName string, 
 			response.WriteString(fmt.Sprintf(
 				"<i>%s</i> <blockquote expandable>%s</blockquote>\n",
 				dateFormatted,
-				topic.Topic,
+				html.EscapeString(topic.Topic),
 			))
 
 			// Don't add separator after the last item
@@ -189,18 +236,17 @@ func FormatHtmlTopicListForUsers(topics []repositories.Topic, eventName string, 
 func FormatHtmlTopicListForAdmin(topics []repositories.Topic, eventName string, eventType string) string {
 	var response strings.Builder
 
-	typeEmoji := GetTypeEmoji(constants.EventType(eventType))
-	typeInRussian := GetTypeInRussian(constants.EventType(eventType))
-
-	response.WriteString(fmt.Sprintf("\n %s <i>Мероприятие (%s):</i> %s\n\n", typeEmoji, typeInRussian, eventName))
+	response.WriteString(formatTopicListHeader(eventName, eventType))
 
 	if len(topics) == 0 {
-		response.WriteString("Для этого мероприятия пока нет тем и вопросов.")
+		response.WriteString("\nДля этого мероприятия пока нет тем и вопросов.")
 	} else {
+		response.WriteString(fmt.Sprintf("📋 Найдено тем и вопросов: <b>%d</b>\n\n", len(topics)))
 		for _, topic := range topics {
-			userNickname := "не указано"
-			if topic.UserNickname != nil {
-				userNickname = "@" + *topic.UserNickname
+			// Topics of members without a username are stored with this placeholder
+			userNickname := topicAuthorUnknown
+			if topic.UserNickname != nil && *topic.UserNickname != "" && *topic.UserNickname != topicAuthorUnknown {
+				userNickname = "@" + html.EscapeString(*topic.UserNickname)
 			}
 			dateFormatted := topic.CreatedAt.Format("02.01.2006")
 			response.WriteString(fmt.Sprintf(
@@ -209,7 +255,7 @@ func FormatHtmlTopicListForAdmin(topics []repositories.Topic, eventName string, 
 				dateFormatted,
 				userNickname,
 			))
-			response.WriteString(fmt.Sprintf("<blockquote expandable>%s</blockquote> \n", topic.Topic))
+			response.WriteString(fmt.Sprintf("<blockquote expandable>%s</blockquote> \n", html.EscapeString(topic.Topic)))
 		}
 	}
 

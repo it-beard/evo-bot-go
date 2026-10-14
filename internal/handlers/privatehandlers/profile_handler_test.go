@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -83,16 +84,6 @@ func openFieldEditor(t *testing.T, d *deps, h ext.Handler, callback string, u te
 	return d.lastSentID(t, "Введи ")
 }
 
-// dispatchFieldValue sends a new field value. After a successful save the handler returns
-// NextConversationState(profileStateEditMyProfile), a state that is not registered in the conversation,
-// so gotgbot reports an "unknown state" error (reported as a production bug). The error is therefore
-// not asserted here, only the side effects are.
-func dispatchFieldValue(t *testing.T, d *deps, h ext.Handler, u *gotgbot.Update) {
-	t.Helper()
-	handled, _ := testutils.Dispatch(d.bot, h, u)
-	require.True(t, handled)
-}
-
 func dbUser(u testDBUser) *repositories.User {
 	return &repositories.User{ID: u.ID, TgID: u.TgID, Firstname: u.Firstname, Lastname: u.Lastname, TgUsername: u.Username}
 }
@@ -147,6 +138,19 @@ func TestProfileHandler_MenuShowsFieldStatuses(t *testing.T) {
 				"└ ✅ Биография",
 				"👉 <a href='https://telegram.me/c/1234567890/13/555'>Ссылка</a> на твой профиль.",
 			},
+		},
+		{
+			name: "names are HTML-escaped",
+			expect: func(d *deps) {
+				d.expectUserWithProfile(
+					testDBUser{ID: 7, TgID: testUserID, Firstname: "<Иван>", Lastname: "Петров & Ко", Username: "user501"},
+					myProfile)
+			},
+			contains: []string{
+				"└ ✅ Имя <i>(&lt;Иван&gt;)</i>",
+				"└ ✅ Фамилия <i>(Петров &amp; Ко)</i>",
+			},
+			notContains: []string{"<Иван>", "Петров & Ко"},
 		},
 		{
 			name:         "empty profile",
@@ -280,14 +284,109 @@ func TestProfileHandler_EditMenuAndBack(t *testing.T) {
 	assert.True(t, strings.HasPrefix(lastSend(t, d.client).Params["text"], "<b>Меню \"Профиль\"</b>"))
 }
 
+func TestProfileHandler_ButtonPressesAreAnswered(t *testing.T) {
+	tests := []struct {
+		name     string
+		open     func(t *testing.T, d *deps, h ext.Handler)
+		callback string
+		expect   func(d *deps)
+		want     string // substring of the message shown after the press
+	}{
+		{
+			name:     "edit in the main menu",
+			open:     func(t *testing.T, d *deps, h ext.Handler) { openProfileMenu(t, d, h, me, myProfile) },
+			callback: constants.ProfileEditMyProfileCallback,
+			want:     profileMenuEditHeader,
+		},
+		{
+			name:     "search in the main menu",
+			open:     func(t *testing.T, d *deps, h ext.Handler) { openProfileMenu(t, d, h, me, myProfile) },
+			callback: constants.ProfileSearchProfileCallback,
+			want:     profileMenuSearchHeader,
+		},
+		{
+			name:     "firstname in the edit menu",
+			open:     func(t *testing.T, d *deps, h ext.Handler) { openProfileMenu(t, d, h, me, myProfile) },
+			callback: constants.ProfileEditFirstnameCallback,
+			expect:   func(d *deps) { d.expectUserWithProfile(me, myProfile) },
+			want:     profileMenuEditFirstnameHeader,
+		},
+		{
+			name:     "lastname in the edit menu",
+			open:     func(t *testing.T, d *deps, h ext.Handler) { openProfileMenu(t, d, h, me, myProfile) },
+			callback: constants.ProfileEditLastnameCallback,
+			expect:   func(d *deps) { d.expectUserWithProfile(me, myProfile) },
+			want:     profileMenuEditLastnameHeader,
+		},
+		{
+			name:     "bio in the edit menu",
+			open:     func(t *testing.T, d *deps, h ext.Handler) { openProfileMenu(t, d, h, me, myProfile) },
+			callback: constants.ProfileEditBioCallback,
+			expect:   func(d *deps) { d.expectUserWithProfile(me, myProfile) },
+			want:     profileMenuEditBioHeader,
+		},
+		{
+			name: "back in the edit menu",
+			open: func(t *testing.T, d *deps, h ext.Handler) {
+				openProfileMenu(t, d, h, me, myProfile)
+				require.True(t, d.dispatch(t, h, testutils.CallbackUpdate(testUserID, constants.ProfileEditMyProfileCallback)))
+			},
+			callback: constants.ProfileStartCallback,
+			expect:   func(d *deps) { d.expectUserWithProfile(me, myProfile) },
+			want:     profileMenuHeader,
+		},
+		{
+			name:     "back while searching",
+			open:     func(t *testing.T, d *deps, h ext.Handler) { openSearch(t, d, h) },
+			callback: constants.ProfileStartCallback,
+			expect:   func(d *deps) { d.expectUserWithProfile(me, myProfile) },
+			want:     profileMenuHeader,
+		},
+		{
+			name: "back while editing a field",
+			open: func(t *testing.T, d *deps, h ext.Handler) {
+				openFieldEditor(t, d, h, constants.ProfileEditBioCallback, me, myProfile)
+			},
+			callback: constants.ProfileEditMyProfileCallback,
+			want:     profileMenuEditHeader,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := newDeps(t)
+			h := d.newProfileHandler()
+			tt.open(t, d, h)
+			d.client.Reset()
+			if tt.expect != nil {
+				tt.expect(d)
+			}
+			press := testutils.CallbackUpdate(testUserID, tt.callback)
+
+			require.True(t, d.dispatch(t, h, press))
+
+			answers := d.client.CallsTo("answerCallbackQuery")
+			require.Len(t, answers, 1, "the button spinner is removed")
+			assert.Equal(t, press.CallbackQuery.Id, answers[0].Params["callback_query_id"])
+			assert.Contains(t, lastSend(t, d.client).Params["text"], tt.want)
+		})
+	}
+}
+
 func TestProfileHandler_UnknownButtonAndStrayTextAreIgnored(t *testing.T) {
 	d := newDeps(t)
 	h := d.newProfileHandler()
 	openProfileMenu(t, d, h, me, myProfile)
 	d.client.Reset()
 
-	require.True(t, d.dispatch(t, h, testutils.CallbackUpdate(testUserID, "profile_unknown")))
-	assert.Empty(t, d.client.Calls())
+	unknown := testutils.CallbackUpdate(testUserID, "profile_unknown")
+	require.True(t, d.dispatch(t, h, unknown))
+	calls := d.client.Calls()
+	require.Len(t, calls, 1, "the press is only answered, nothing else happens")
+	assert.Equal(t, "answerCallbackQuery", calls[0].Method)
+	assert.Equal(t, unknown.CallbackQuery.Id, calls[0].Params["callback_query_id"])
+	assert.Equal(t, profileStateViewOptions, conversationState(t, d, h))
+	d.client.Reset()
 
 	stray := testutils.NewPrivateMessage(testUserID, "просто текст")
 	require.True(t, d.dispatch(t, h, testutils.MessageUpdate(stray)))
@@ -366,6 +465,7 @@ func TestProfileHandler_FieldEditorShowsCurrentValue(t *testing.T) {
 	tests := []struct {
 		name     string
 		callback string
+		user     *testDBUser // defaults to me
 		profile  testDBProfile
 		header   string
 		current  string
@@ -392,8 +492,26 @@ func TestProfileHandler_FieldEditorShowsCurrentValue(t *testing.T) {
 			callback: constants.ProfileEditBioCallback,
 			profile:  testDBProfile{ID: 3, UserID: 7, Bio: "Люблю <b>Go</b> & Rust"},
 			header:   profileMenuEditBioHeader,
-			current:  "Текущее значение: <pre>Люблю &lt;b&gt;Go&lt;/b&gt; & Rust</pre>",
+			current:  "Текущее значение: <pre>Люблю &lt;b&gt;Go&lt;/b&gt; &amp; Rust</pre>",
 			ask:      "Введи обновлённую биографию (до 3900 символов):",
+		},
+		{
+			name:     "firstname is HTML-escaped",
+			callback: constants.ProfileEditFirstnameCallback,
+			user:     &testDBUser{ID: 7, TgID: testUserID, Firstname: "<Иван>", Lastname: "Петров", Username: "user501"},
+			profile:  myProfile,
+			header:   profileMenuEditFirstnameHeader,
+			current:  "Текущее значение: <code>&lt;Иван&gt;</code>",
+			ask:      "Введи новое имя:",
+		},
+		{
+			name:     "lastname is HTML-escaped",
+			callback: constants.ProfileEditLastnameCallback,
+			user:     &testDBUser{ID: 7, TgID: testUserID, Firstname: "Иван", Lastname: "Петров & <Ко>", Username: "user501"},
+			profile:  myProfile,
+			header:   profileMenuEditLastnameHeader,
+			current:  "Текущее значение: <code>Петров &amp; &lt;Ко&gt;</code>",
+			ask:      "Введи новую фамилию:",
 		},
 	}
 
@@ -401,9 +519,13 @@ func TestProfileHandler_FieldEditorShowsCurrentValue(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			d := newDeps(t)
 			h := d.newProfileHandler()
-			menuID := openProfileMenu(t, d, h, me, tt.profile)
+			user := me
+			if tt.user != nil {
+				user = *tt.user
+			}
+			menuID := openProfileMenu(t, d, h, user, tt.profile)
 			d.client.Reset()
-			d.expectUserWithProfile(me, tt.profile)
+			d.expectUserWithProfile(user, tt.profile)
 
 			require.True(t, d.dispatch(t, h, testutils.CallbackUpdate(testUserID, tt.callback)))
 
@@ -490,15 +612,129 @@ func TestProfileHandler_SaveNameFields(t *testing.T) {
 			d.expectUserWithProfile(me, incomplete)
 			value := testutils.NewPrivateMessage(testUserID, "Alexander")
 
-			dispatchFieldValue(t, d, h, testutils.MessageUpdate(value))
+			require.True(t, d.dispatch(t, h, testutils.MessageUpdate(value)))
 
 			assert.ElementsMatch(t, []int64{promptID, value.MessageId}, deletedMessageIDs(d.client))
-			assert.Equal(t, []string{"*" + tt.header + "*\n\n" + tt.savedText}, d.client.SentTexts(),
+			assert.Equal(t, []string{"<b>" + tt.header + "</b>\n\n" + tt.savedText}, d.client.SentTexts(),
 				"an incomplete profile is not published")
 			saved := lastSend(t, d.client)
 			assert.Equal(t, "HTML", saved.Params["parse_mode"])
 			assert.Equal(t, []string{constants.ProfileEditMyProfileCallback, constants.ProfileFullCancel}, callbackData(t, saved))
 			assert.Empty(t, d.client.CallsTo("editMessageText"))
+			assert.Equal(t, profileStateViewOptions, conversationState(t, d, h), "the menu state handles the buttons of the message")
+		})
+	}
+}
+
+// After a value is saved, its message offers "Back" (to the edit menu) and "Cancel". The handler moves to the
+// menu state, so both buttons work, and further text is no longer taken as a new value.
+func TestProfileHandler_ButtonsAfterSaving(t *testing.T) {
+	incomplete := testDBProfile{ID: 3, UserID: 7} // no bio, so saving a name does not publish the profile
+
+	fields := []struct {
+		name     string
+		callback string
+		value    string
+		expect   func(d *deps)
+		saved    string
+	}{
+		{
+			name:     "firstname",
+			callback: constants.ProfileEditFirstnameCallback,
+			value:    "Пётр",
+			expect: func(d *deps) {
+				d.expectUserWithProfile(me, incomplete)
+				d.sql.ExpectExec(strings.ReplaceAll(updateUserFieldSQL, "%s", "firstname")).
+					WithArgs("Пётр", me.ID).WillReturnResult(sqlmock.NewResult(0, 1))
+				d.expectUserWithProfile(me, incomplete)
+			},
+			saved: "✅ Имя сохранено!",
+		},
+		{
+			name:     "lastname",
+			callback: constants.ProfileEditLastnameCallback,
+			value:    "Сидоров",
+			expect: func(d *deps) {
+				d.expectUserWithProfile(me, incomplete)
+				d.sql.ExpectExec(strings.ReplaceAll(updateUserFieldSQL, "%s", "lastname")).
+					WithArgs("Сидоров", me.ID).WillReturnResult(sqlmock.NewResult(0, 1))
+				d.expectUserWithProfile(me, incomplete)
+			},
+			saved: "✅ Фамилия сохранена!",
+		},
+		{
+			name:     "bio",
+			callback: constants.ProfileEditBioCallback,
+			value:    "Новая био",
+			expect: func(d *deps) {
+				d.expectUserWithProfile(me, incomplete)
+				d.sql.ExpectExec(updateProfileBioSQL).
+					WithArgs("Новая био", incomplete.ID).WillReturnResult(sqlmock.NewResult(0, 1))
+				// the profile is complete now and gets published
+				d.expectUserWithProfile(me, testDBProfile{ID: 3, UserID: 7, Bio: "Новая био"})
+				d.sql.ExpectExec(updatePublishedIDSQL).
+					WithArgs(sqlmock.AnyArg(), incomplete.ID).WillReturnResult(sqlmock.NewResult(0, 1))
+			},
+			saved: "✅ Биография сохранена!",
+		},
+	}
+
+	for _, f := range fields {
+		// saveField opens the field editor, saves a value and returns the id of the "saved" message
+		saveField := func(t *testing.T, d *deps, h ext.Handler) int64 {
+			t.Helper()
+			openFieldEditor(t, d, h, f.callback, me, incomplete)
+			d.client.Reset()
+			f.expect(d)
+
+			require.True(t, d.dispatch(t, h, privateText(testUserID, f.value)), "no handler error such as an unknown state")
+
+			require.Equal(t, profileStateViewOptions, conversationState(t, d, h))
+			savedID := d.lastSentID(t, f.saved)
+			d.client.Reset()
+			return savedID
+		}
+
+		t.Run(f.name+": back", func(t *testing.T) {
+			d := newDeps(t)
+			h := d.newProfileHandler()
+			savedID := saveField(t, d, h)
+
+			require.True(t, d.dispatch(t, h, testutils.CallbackUpdate(testUserID, constants.ProfileEditMyProfileCallback)))
+
+			assert.Len(t, d.client.CallsTo("answerCallbackQuery"), 1)
+			assert.Equal(t, []int64{savedID}, deletedMessageIDs(d.client))
+			editMenu := lastSend(t, d.client)
+			assert.Equal(t, "<b>Профиль → Редактирование</b>\n\nВыбери, что бы ты хотел/а изменить:", editMenu.Params["text"])
+			assert.Equal(t, constants.ProfileEditFirstnameCallback, callbackData(t, editMenu)[0])
+			assert.Equal(t, profileStateViewOptions, conversationState(t, d, h))
+		})
+
+		t.Run(f.name+": cancel", func(t *testing.T) {
+			d := newDeps(t)
+			h := d.newProfileHandler()
+			savedID := saveField(t, d, h)
+
+			require.True(t, d.dispatch(t, h, testutils.CallbackUpdate(testUserID, constants.ProfileFullCancel)))
+
+			assert.Len(t, d.client.CallsTo("answerCallbackQuery"), 1)
+			assert.Equal(t, []string{profileSessionEndedText}, d.client.SentTexts())
+			assert.Equal(t, []int64{savedID}, deletedMessageIDs(d.client))
+			assert.Empty(t, conversationState(t, d, h), "the conversation is over")
+		})
+
+		t.Run(f.name+": more text", func(t *testing.T) {
+			d := newDeps(t)
+			h := d.newProfileHandler()
+			saveField(t, d, h)
+			stray := testutils.NewPrivateMessage(testUserID, "ещё одно значение")
+
+			// No DB expectations: the text must not be saved as a new value
+			require.True(t, d.dispatch(t, h, testutils.MessageUpdate(stray)))
+
+			assert.Equal(t, []int64{stray.MessageId}, deletedMessageIDs(d.client), "stray text is deleted by the fallback")
+			assert.Empty(t, d.client.CallsTo("sendMessage"))
+			assert.Equal(t, profileStateViewOptions, conversationState(t, d, h))
 		})
 	}
 }
@@ -511,9 +747,9 @@ func TestProfileHandler_TooLongNameIsRejected(t *testing.T) {
 		wantText string
 	}{
 		{name: "firstname", callback: constants.ProfileEditFirstnameCallback, column: "firstname",
-			wantText: "*Профиль → Редактирование → Имя*\n\nИмя слишком длинное. Пожалуйста, введи более короткое имя (не более 30 символов):"},
+			wantText: "<b>Профиль → Редактирование → Имя</b>\n\nИмя слишком длинное. Пожалуйста, введи более короткое имя (не более 30 символов):"},
 		{name: "lastname", callback: constants.ProfileEditLastnameCallback, column: "lastname",
-			wantText: "*Профиль → Редактирование → Фамилия*\n\nФамилия слишком длинная. Пожалуйста, введи более короткую фамилию (не более 30 символов):"},
+			wantText: "<b>Профиль → Редактирование → Фамилия</b>\n\nФамилия слишком длинная. Пожалуйста, введи более короткую фамилию (не более 30 символов):"},
 	}
 
 	for _, tt := range tests {
@@ -530,7 +766,7 @@ func TestProfileHandler_TooLongNameIsRejected(t *testing.T) {
 			assert.ElementsMatch(t, []int64{promptID, tooLong.MessageId}, deletedMessageIDs(d.client))
 			rejection := lastSend(t, d.client)
 			assert.Equal(t, tt.wantText, rejection.Params["text"])
-			assert.Equal(t, "Markdown", rejection.Params["parse_mode"])
+			assert.Equal(t, "HTML", rejection.Params["parse_mode"])
 			assert.Equal(t, []string{constants.ProfileEditMyProfileCallback, constants.ProfileFullCancel}, callbackData(t, rejection))
 
 			// Still waiting for the value: exactly 30 characters are accepted
@@ -539,7 +775,7 @@ func TestProfileHandler_TooLongNameIsRejected(t *testing.T) {
 			d.sql.ExpectExec(strings.ReplaceAll(updateUserFieldSQL, "%s", tt.column)).
 				WithArgs(strings.Repeat("b", 30), me.ID).WillReturnResult(sqlmock.NewResult(0, 1))
 			d.expectUserWithProfile(me, incomplete)
-			dispatchFieldValue(t, d, h, privateText(testUserID, strings.Repeat("b", 30)))
+			require.True(t, d.dispatch(t, h, privateText(testUserID, strings.Repeat("b", 30))))
 			assert.Contains(t, lastSend(t, d.client).Params["text"], "сохранен")
 		})
 	}
@@ -561,7 +797,7 @@ func TestProfileHandler_SaveFieldDatabaseError(t *testing.T) {
 				d.sql.ExpectExec(strings.ReplaceAll(updateUserFieldSQL, "%s", "firstname")).
 					WillReturnError(errors.New("db down"))
 			},
-			wantText: "*Профиль → Редактирование → Имя*\n\nПроизошла ошибка при сохранении имени.",
+			wantText: "<b>Профиль → Редактирование → Имя</b>\n\nПроизошла ошибка при сохранении имени.",
 			wantErr:  "failed to save firstname",
 		},
 		{
@@ -570,7 +806,7 @@ func TestProfileHandler_SaveFieldDatabaseError(t *testing.T) {
 			expect: func(d *deps) {
 				d.sql.ExpectQuery(selectUserByTgID).WillReturnError(errors.New("db down"))
 			},
-			wantText: "*Профиль → Редактирование → Фамилия*\n\nПроизошла ошибка при сохранении фамилии.",
+			wantText: "<b>Профиль → Редактирование → Фамилия</b>\n\nПроизошла ошибка при сохранении фамилии.",
 			wantErr:  "failed to save lastname",
 		},
 		{
@@ -580,7 +816,7 @@ func TestProfileHandler_SaveFieldDatabaseError(t *testing.T) {
 				d.expectUser(me)
 				d.sql.ExpectQuery(selectProfileByUser).WillReturnError(errors.New("db down"))
 			},
-			wantText: "*Профиль → Редактирование → Фамилия*\n\nПроизошла ошибка при сохранении фамилии.",
+			wantText: "<b>Профиль → Редактирование → Фамилия</b>\n\nПроизошла ошибка при сохранении фамилии.",
 			wantErr:  "failed to save lastname",
 		},
 		{
@@ -590,7 +826,7 @@ func TestProfileHandler_SaveFieldDatabaseError(t *testing.T) {
 				d.expectUserWithProfile(me, myProfile)
 				d.sql.ExpectExec(updateProfileBioSQL).WillReturnError(errors.New("db down"))
 			},
-			wantText: "*Профиль → Редактирование → О себе*\n\nПроизошла ошибка при сохранении биографии.",
+			wantText: "<b>Профиль → Редактирование → О себе</b>\n\nПроизошла ошибка при сохранении биографии.",
 			wantErr:  "failed to save bio",
 		},
 		{
@@ -599,7 +835,7 @@ func TestProfileHandler_SaveFieldDatabaseError(t *testing.T) {
 			expect: func(d *deps) {
 				d.sql.ExpectQuery(selectUserByTgID).WillReturnError(errors.New("db down"))
 			},
-			wantText: "*Профиль → Редактирование → О себе*\n\nПроизошла ошибка при сохранении биографии.",
+			wantText: "<b>Профиль → Редактирование → О себе</b>\n\nПроизошла ошибка при сохранении биографии.",
 			wantErr:  "failed to save bio",
 		},
 		{
@@ -609,7 +845,7 @@ func TestProfileHandler_SaveFieldDatabaseError(t *testing.T) {
 				d.expectUser(me)
 				d.sql.ExpectQuery(selectProfileByUser).WillReturnError(errors.New("db down"))
 			},
-			wantText: "*Профиль → Редактирование → О себе*\n\nПроизошла ошибка при сохранении биографии.",
+			wantText: "<b>Профиль → Редактирование → О себе</b>\n\nПроизошла ошибка при сохранении биографии.",
 			wantErr:  "failed to save bio",
 		},
 	}
@@ -629,7 +865,7 @@ func TestProfileHandler_SaveFieldDatabaseError(t *testing.T) {
 			assert.Contains(t, err.Error(), tt.wantErr)
 			assert.Equal(t, []string{tt.wantText}, d.client.SentTexts())
 			reply := lastSend(t, d.client)
-			assert.Equal(t, "Markdown", reply.Params["parse_mode"])
+			assert.Equal(t, "HTML", reply.Params["parse_mode"])
 			assert.Contains(t, reply.Params["reply_parameters"], `"message_id":`)
 			assert.Empty(t, d.client.CallsTo("deleteMessage"))
 		})
@@ -650,9 +886,9 @@ func TestProfileHandler_TooLongBioIsRejected(t *testing.T) {
 
 	assert.ElementsMatch(t, []int64{promptID, tooLong.MessageId}, deletedMessageIDs(d.client))
 	rejection := lastSend(t, d.client)
-	assert.Equal(t, "*Профиль → Редактирование → О себе*\n\nТекущая длина: 3902 символов\n\nПожалуйста, сократи до 3900 символов и пришли снова:",
+	assert.Equal(t, "<b>Профиль → Редактирование → О себе</b>\n\nТекущая длина: 3902 символов\n\nПожалуйста, сократи до 3900 символов и пришли снова:",
 		rejection.Params["text"])
-	assert.Equal(t, "Markdown", rejection.Params["parse_mode"])
+	assert.Equal(t, "HTML", rejection.Params["parse_mode"])
 	assert.Equal(t, []string{constants.ProfileEditMyProfileCallback, constants.ProfileFullCancel}, callbackData(t, rejection))
 }
 
@@ -690,7 +926,7 @@ func TestProfileHandler_SaveBioPublishesNewProfile(t *testing.T) {
 	d.sql.ExpectExec(updatePublishedIDSQL).WithArgs(publishedID, unpublished.ID).WillReturnResult(sqlmock.NewResult(0, 1))
 	value := testutils.NewPrivateMessage(testUserID, "Новая <био>")
 
-	dispatchFieldValue(t, d, h, testutils.MessageUpdate(value))
+	require.True(t, d.dispatch(t, h, testutils.MessageUpdate(value)))
 
 	publicText := formatters.FormatPublicProfileForMessage(dbUser(me), dbProfile(updated), false)
 	assert.Contains(t, publicText, "Новая &lt;био&gt;")
@@ -704,9 +940,12 @@ func TestProfileHandler_SaveBioPublishesNewProfile(t *testing.T) {
 	assert.ElementsMatch(t, []int64{promptID, value.MessageId}, deletedMessageIDs(d.client))
 	saved := lastSend(t, d.client)
 	assert.Equal(t, testUserID, saved.Int64("chat_id"))
-	assert.True(t, strings.HasPrefix(saved.Params["text"], "*Профиль → Редактирование → О себе*\n\n✅ Биография сохранена!\n✅ Профиль <a href='"))
-	assert.True(t, strings.HasSuffix(saved.Params["text"], "'>опубликован</a> на канале \"Интро\"."))
+	assert.Equal(t, "<b>Профиль → Редактирование → О себе</b>\n\n✅ Биография сохранена!"+
+		fmt.Sprintf("\n✅ Профиль <a href='https://telegram.me/c/1234567890/13/%d'>опубликован</a> на канале \"Интро\".", d.sentID(t, publicText)),
+		saved.Params["text"], "the link points to the intro message that was just published")
+	assert.Equal(t, "HTML", saved.Params["parse_mode"])
 	assert.Empty(t, d.client.CallsTo("editMessageText"))
+	assert.Equal(t, profileStateViewOptions, conversationState(t, d, h))
 }
 
 func TestProfileHandler_SaveBioUpdatesPublishedProfile(t *testing.T) {
@@ -756,7 +995,7 @@ func TestProfileHandler_SaveBioUpdatesPublishedProfile(t *testing.T) {
 			d.expectUserWithProfile(me, updated)
 			d.sql.ExpectExec(updatePublishedIDSQL).WithArgs(storedID, published.ID).WillReturnResult(sqlmock.NewResult(0, 1))
 
-			dispatchFieldValue(t, d, h, privateText(testUserID, "Новая био"))
+			require.True(t, d.dispatch(t, h, privateText(testUserID, "Новая био")))
 
 			publicText := formatters.FormatPublicProfileForMessage(dbUser(me), dbProfile(updated), false)
 			edit, ok := d.client.LastCallTo("editMessageText")
@@ -785,6 +1024,10 @@ func TestProfileHandler_SaveBioUpdatesPublishedProfile(t *testing.T) {
 			assert.Contains(t, saved, "✅ Биография сохранена!")
 			if tt.wantLinkToOld {
 				assert.Contains(t, saved, "<a href='https://telegram.me/c/1234567890/13/555'>опубликован</a>")
+			} else {
+				assert.Contains(t, saved, fmt.Sprintf("<a href='https://telegram.me/c/1234567890/13/%d'>опубликован</a>", d.sentID(t, publicText)),
+					"the link points to the re-posted intro message")
+				assert.NotContains(t, saved, "/13/555'")
 			}
 		})
 	}
@@ -860,11 +1103,11 @@ func TestProfileHandler_SaveBioWhenPublishingFails(t *testing.T) {
 			d.sql.ExpectExec(updateProfileBioSQL).WithArgs("Новая био", myProfile.ID).WillReturnResult(sqlmock.NewResult(0, 1))
 			tt.expect(d)
 
-			dispatchFieldValue(t, d, h, privateText(testUserID, "Новая био"))
+			require.True(t, d.dispatch(t, h, privateText(testUserID, "Новая био")))
 
 			saved := lastSend(t, d.client)
 			assert.Equal(t, testUserID, saved.Int64("chat_id"))
-			assert.Equal(t, "*Профиль → Редактирование → О себе*\n\n✅ Биография сохранена!", saved.Params["text"],
+			assert.Equal(t, "<b>Профиль → Редактирование → О себе</b>\n\n✅ Биография сохранена!", saved.Params["text"],
 				"the bio is saved even if the profile could not be published")
 		})
 	}
@@ -995,9 +1238,9 @@ func TestProfileHandler_SearchNotFound(t *testing.T) {
 
 	assert.ElementsMatch(t, []int64{searchID, query.MessageId}, deletedMessageIDs(d.client))
 	notFound := lastSend(t, d.client)
-	assert.Equal(t, "*Профиль → Поиск*\n\nПользователь *nobody* не найден.\n\nПопробуй ещё раз, прислав мне имя пользователя снова:",
+	assert.Equal(t, "<b>Профиль → Поиск</b>\n\nПользователь <b>nobody</b> не найден.\n\nПопробуй ещё раз, прислав мне имя пользователя снова:",
 		notFound.Params["text"])
-	assert.Equal(t, "Markdown", notFound.Params["parse_mode"])
+	assert.Equal(t, "HTML", notFound.Params["parse_mode"])
 	assert.Equal(t, []string{constants.ProfileStartCallback, constants.ProfileFullCancel}, callbackData(t, notFound))
 
 	// Still in search mode: the next query is processed
@@ -1008,6 +1251,23 @@ func TestProfileHandler_SearchNotFound(t *testing.T) {
 	require.True(t, d.dispatch(t, h, privateText(testUserID, "anna")))
 	assert.Contains(t, lastSend(t, d.client).Params["text"], "Анна Смирнова")
 	assert.Contains(t, deletedMessageIDs(d.client), d.lastSentID(t, "не найден"))
+}
+
+func TestProfileHandler_SearchNotFoundEscapesQuery(t *testing.T) {
+	d := newDeps(t)
+	h := d.newProfileHandler()
+	openSearch(t, d, h)
+	d.client.Reset()
+	d.sql.ExpectQuery(selectUserByUsername).WithArgs("<b>x & y").WillReturnRows(sqlmock.NewRows(userColumns))
+	d.sql.ExpectQuery(selectUserByName).WithArgs("<b>x", "& y").WillReturnRows(sqlmock.NewRows(userColumns))
+
+	require.True(t, d.dispatch(t, h, privateText(testUserID, "<b>x & y")))
+
+	notFound := lastSend(t, d.client)
+	assert.Equal(t, "<b>Профиль → Поиск</b>\n\nПользователь <b>&lt;b&gt;x &amp; y</b> не найден.\n\nПопробуй ещё раз, прислав мне имя пользователя снова:",
+		notFound.Params["text"])
+	assert.Equal(t, "HTML", notFound.Params["parse_mode"])
+	assert.Equal(t, profileStateAwaitQueryForSearch, conversationState(t, d, h))
 }
 
 func TestProfileHandler_SearchDatabaseErrors(t *testing.T) {

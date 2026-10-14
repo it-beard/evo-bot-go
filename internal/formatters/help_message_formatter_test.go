@@ -37,6 +37,7 @@ func TestFormatHelpMessage_RegularUser(t *testing.T) {
 	assert.NotContains(t, result, adminSectionHeader)
 	assert.NotContains(t, result, testCommandsHeader)
 	assert.NotContains(t, result, "/"+constants.EventSetupCommand)
+	assert.Contains(t, result, "└ /cancel - Отменить текущий диалог с ботом\n")
 }
 
 func TestFormatHelpMessage_Admin(t *testing.T) {
@@ -56,7 +57,6 @@ func TestFormatHelpMessage_Admin(t *testing.T) {
 		constants.EventEditCommand,
 		constants.EventDeleteCommand,
 		constants.ShowTopicsCommand,
-		constants.CodeCommand,
 		constants.AdminProfilesCommand,
 		constants.TrySummarizeCommand,
 		constants.TryCreateCoffeePoolCommand,
@@ -64,6 +64,28 @@ func TestFormatHelpMessage_Admin(t *testing.T) {
 		constants.TryLinkToLearnCommand,
 	} {
 		assert.Contains(t, result, "└ /"+command+" - ", "admin help must describe /%s", command)
+	}
+
+	assert.Contains(t, result,
+		"└ /"+constants.EventStartCommand+" - Запустить мероприятие (опубликовать ссылку в чате объявлений)\n")
+	assert.Contains(t, result,
+		"└ /"+constants.ShowTopicsCommand+" - Просмотреть темы и вопросы к мероприятиям <b>с возможностью удаления</b>\n")
+}
+
+func TestFormatHelpMessage_DoesNotListRemovedCodeCommand(t *testing.T) {
+	for _, isAdmin := range []bool{false, true} {
+		result := FormatHelpMessage(isAdmin, helpTestConfig())
+
+		assert.NotContains(t, result, "/code", "isAdmin=%v", isAdmin)
+		assert.NotContains(t, result, "авторизации TG-клиента", "isAdmin=%v", isAdmin)
+	}
+}
+
+func TestFormatHelpMessage_AddressesUserInformally(t *testing.T) {
+	result := FormatHelpMessage(true, helpTestConfig())
+
+	for _, formal := range []string{"Напишите", "Нажмите", "Выберите", "Отправьте", "Используйте", " Вы ", " Вас "} {
+		assert.NotContains(t, result, formal)
 	}
 }
 

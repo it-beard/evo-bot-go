@@ -16,6 +16,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,8 +27,20 @@ const (
 	testRandomCoffeeTopicID       = 33
 	testIntroTopicID              = 44
 
-	adminOnlyText = "Эта команда доступна только администраторам."
+	adminOnlyText   = "Эта команда доступна только администраторам."
+	privateOnlyText = "<b>Прошу прощения</b> 🧐\n\nЭта команда работает только в <i>личной беседе</i> со мной. " +
+		"Напиши мне в ЛС, и я с удовольствием помогу (я тебя там пинганул, если мы общались ранее)." +
+		"\n\nЭто сообщение и твоя команда будут автоматически удалены через 10 секунд."
 )
+
+// groupChatSenders are the users who try admin commands in the club supergroup
+var groupChatSenders = []struct {
+	name string
+	id   int64
+}{
+	{"admin", testAdminID},
+	{"non-admin", testUserID},
+}
 
 // sentMessage is a message the bot successfully sent through sendMessage
 type sentMessage struct {
@@ -188,6 +201,31 @@ func (e *testEnv) deletedMessages() [][2]int64 {
 		deleted = append(deleted, [2]int64{call.Int64("chat_id"), call.Int64("message_id")})
 	}
 	return deleted
+}
+
+// answeredCallbacks returns the ids of the callback queries the bot answered
+func (e *testEnv) answeredCallbacks() []string {
+	var ids []string
+	for _, call := range e.client.CallsTo("answerCallbackQuery") {
+		ids = append(ids, call.Params["callback_query_id"])
+	}
+	return ids
+}
+
+// requirePrivateOnlyNotice asserts that a command sent to the group was answered with the auto-deleted
+// HTML "private chat only" notice plus a ping in the sender's private chat, and that the chat type was
+// checked before (and instead of) the admin rights
+func (e *testEnv) requirePrivateOnlyNotice(userID int64) {
+	e.t.Helper()
+	sent := e.sentMessages()
+	require.Len(e.t, sent, 2)
+	notice, ping := sent[0], sent[1]
+	assert.Equal(e.t, fullChatID(), notice.Msg.Chat.Id)
+	assert.Equal(e.t, privateOnlyText, notice.Msg.Text)
+	assert.Equal(e.t, "HTML", notice.Call.Params["parse_mode"])
+	assert.Equal(e.t, userID, ping.Msg.Chat.Id, "the sender is pinged in private messages")
+	assert.NotContains(e.t, e.texts(), adminOnlyText)
+	assert.Empty(e.t, e.client.CallsTo("getChatMember"), "admin rights must not be checked for a group command")
 }
 
 func msgRef(msg gotgbot.Message) [2]int64 {

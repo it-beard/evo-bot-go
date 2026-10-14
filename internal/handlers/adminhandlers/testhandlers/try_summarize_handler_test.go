@@ -2,6 +2,7 @@ package testhandlers
 
 import (
 	"encoding/json"
+	"net/http"
 	"os"
 	"regexp"
 	"slices"
@@ -22,11 +23,13 @@ import (
 )
 
 const (
-	summarizeConfirmText = "Вы собираетесь запустить процесс тестирования саммаризации общения в клубе. " +
-		"Саммаризация будет отправлена в личные сообщения.\n\nПодтвердите действие, нажав одну из кнопок ниже:"
-	summarizeCanceledText = "Операция саммаризации отменена."
-	summarizeStartedText  = "Запуск процесса саммаризации..."
-	summarizeDoneText     = "Саммаризация успешно создана."
+	summarizeConfirmText = "Ты собираешься запустить тестовую саммаризацию общения в клубе. " +
+		"Результат придёт в личные сообщения.\n\nПодтверди действие кнопкой ниже:"
+	summarizeUseButtonsText = "Пожалуйста, нажми на одну из кнопок выше или /cancel для отмены."
+	summarizeCanceledText   = "Операция саммаризации отменена."
+	summarizeStartedText    = "Запуск процесса саммаризации..."
+	summarizeDoneText       = "✅ Саммаризация успешно создана."
+	summarizeFailedText     = "Произошла ошибка при создании саммаризации."
 
 	sqlGroupTopic      = "SELECT id, topic_id, name, created_at, updated_at FROM group_topics WHERE topic_id = $1"
 	sqlRecentMessages  = "FROM group_messages WHERE group_topic_id = $1 AND created_at >= NOW() - INTERVAL '24 hours'"
@@ -64,6 +67,31 @@ func waitForText(t *testing.T, env *testEnv, text string) {
 		time.Second, 5*time.Millisecond, "bot never sent %q", text)
 }
 
+// waitForSummarizationResult waits until the background summarization reports its result (success or failure)
+func waitForSummarizationResult(t *testing.T, env *testEnv) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		texts := env.texts()
+		return slices.Contains(texts, summarizeDoneText) || slices.Contains(texts, summarizeFailedText)
+	}, time.Second, 5*time.Millisecond, "bot never reported the summarization result")
+}
+
+// expectTopicMessages sets up the DB for summarizing two messages of the monitored topic
+func expectTopicMessages(mock sqlmock.Sqlmock) {
+	created := time.Date(2025, 4, 7, 10, 0, 0, 0, time.UTC)
+	mock.ExpectQuery(regexp.QuoteMeta(sqlGroupTopic)).WithArgs(int64(testMonitoredTopic)).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "topic_id", "name", "created_at", "updated_at"}).
+			AddRow(1, testMonitoredTopic, "General", created, created))
+	mock.ExpectQuery(regexp.QuoteMeta(sqlRecentMessages)).WithArgs(int64(testMonitoredTopic)).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"id", "message_id", "message_text", "reply_to_message_id", "user_tg_id", "group_topic_id", "created_at", "updated_at",
+		}).
+			AddRow(1, 501, "Hello from Alice", nil, 111, testMonitoredTopic, created, created).
+			AddRow(2, 502, "Hi Bob", nil, 222, testMonitoredTopic, created, created))
+	mock.ExpectQuery(regexp.QuoteMeta(sqlPromptTemplate)).WithArgs(prompts.DailySummarizationPromptKey).
+		WillReturnRows(sqlmock.NewRows([]string{"template_text"}).AddRow("chat=%s topic=%s|%s|%s|%s|%s|%s|%s\nCONTEXT:%s"))
+}
+
 // chdirTemp runs the test inside a temp dir: the summarization service writes last-prompt-log.txt into the working dir
 func chdirTemp(t *testing.T) {
 	dir := t.TempDir()
@@ -85,7 +113,7 @@ func TestTrySummarizeHandler_AsksForConfirmation(t *testing.T) {
 	// Any message while waiting asks to use the buttons and keeps the state
 	env.reset()
 	require.True(t, env.sendText(testAdminID, "go"))
-	assert.Equal(t, []string{"Пожалуйста, нажмите на одну из кнопок выше, или используйте кнопку отмены."}, env.texts())
+	assert.Equal(t, []string{summarizeUseButtonsText}, env.texts())
 	assert.True(t, env.sendText(testAdminID, "still here"))
 }
 
@@ -106,8 +134,8 @@ func TestTrySummarizeHandler_ConfirmWithoutMonitoredTopics(t *testing.T) {
 	env.requireKeyboardRemoved(confirm)
 	assert.False(t, env.sendText(testAdminID, "go"), "conversation must be over")
 
-	// Asynchronous part: nothing to summarise, the admin is told it is done
-	waitForText(t, env, summarizeDoneText)
+	// Asynchronous part: nothing to summarise, the admin is told it is done (and only that)
+	waitForSummarizationResult(t, env)
 	assert.Equal(t, []string{summarizeStartedText, summarizeDoneText}, env.texts())
 	assert.Empty(t, openai.Requests())
 }
@@ -121,22 +149,10 @@ func TestTrySummarizeHandler_ConfirmSendsSummaryToAdminDM(t *testing.T) {
 
 	openSummarizeConfirmation(t, env)
 	env.reset()
-
-	created := time.Date(2025, 4, 7, 10, 0, 0, 0, time.UTC)
-	mock.ExpectQuery(regexp.QuoteMeta(sqlGroupTopic)).WithArgs(int64(testMonitoredTopic)).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "topic_id", "name", "created_at", "updated_at"}).
-			AddRow(1, testMonitoredTopic, "General", created, created))
-	mock.ExpectQuery(regexp.QuoteMeta(sqlRecentMessages)).WithArgs(int64(testMonitoredTopic)).
-		WillReturnRows(sqlmock.NewRows([]string{
-			"id", "message_id", "message_text", "reply_to_message_id", "user_tg_id", "group_topic_id", "created_at", "updated_at",
-		}).
-			AddRow(1, 501, "Hello from Alice", nil, 111, testMonitoredTopic, created, created).
-			AddRow(2, 502, "Hi Bob", nil, 222, testMonitoredTopic, created, created))
-	mock.ExpectQuery(regexp.QuoteMeta(sqlPromptTemplate)).WithArgs(prompts.DailySummarizationPromptKey).
-		WillReturnRows(sqlmock.NewRows([]string{"template_text"}).AddRow("chat=%s topic=%s|%s|%s|%s|%s|%s|%s\nCONTEXT:%s"))
+	expectTopicMessages(mock)
 
 	require.True(t, env.click(testAdminID, trySummarizeCallbackConfirmYes))
-	waitForText(t, env, summarizeDoneText)
+	waitForSummarizationResult(t, env)
 
 	// The prompt is built from the topic messages
 	prompt := openai.LastPrompt()
@@ -156,6 +172,30 @@ func TestTrySummarizeHandler_ConfirmSendsSummaryToAdminDM(t *testing.T) {
 	assert.True(t, strings.HasPrefix(summary.Msg.Text, "📋 Сводка чата <b>\"General\"</b> за "), summary.Msg.Text)
 	assert.True(t, strings.HasSuffix(summary.Msg.Text, "\n\n• Обсудили Go"), summary.Msg.Text)
 	assert.Equal(t, summarizeDoneText, sent[2].Msg.Text)
+	assert.NotContains(t, env.texts(), summarizeFailedText)
+}
+
+// When the summary cannot be generated the admin must get only the error, never the success message.
+//
+// SUSPECTED PRODUCTION BUG: this test fails. SummarizationService.RunDailySummarization logs per-topic
+// errors and always returns nil, so the error branch of trySummarizeHandler.startSummarization is
+// unreachable and /trySummarize still reports "✅ Саммаризация успешно создана." after a failure.
+func TestTrySummarizeHandler_FailedSummarizationIsNotReportedAsSuccess(t *testing.T) {
+	chdirTemp(t)
+	env, mock, openai := newSummarizeEnv(t)
+	env.cfg.MonitoredTopicsIDs = []int{testMonitoredTopic}
+	openai.FailWith(http.StatusInternalServerError)
+
+	openSummarizeConfirmation(t, env)
+	env.reset()
+	expectTopicMessages(mock)
+
+	require.True(t, env.click(testAdminID, trySummarizeCallbackConfirmYes))
+	waitForSummarizationResult(t, env)
+
+	require.Len(t, openai.Requests(), 1, "the summary is requested from OpenAI")
+	assert.Equal(t, []string{summarizeStartedText, summarizeFailedText}, env.texts(),
+		"the OpenAI failure must be reported as an error; RunDailySummarization swallows per-topic errors")
 }
 
 func TestTrySummarizeHandler_Cancel(t *testing.T) {
@@ -194,27 +234,28 @@ func TestTrySummarizeHandler_AccessIsRestricted(t *testing.T) {
 
 		require.True(t, env.sendText(testUserID, "/trySummarize"))
 
+		// The admin-only notice is sent exactly once: there is no second admin check in the handler
 		assert.Equal(t, []string{adminOnlyText}, env.texts())
+		assert.Len(t, env.client.CallsTo("getChatMember"), 1)
 		assert.False(t, env.click(testUserID, trySummarizeCallbackConfirmYes), "conversation must not be started")
 	})
 
-	t.Run("group chat", func(t *testing.T) {
-		env, _, _ := newSummarizeEnv(t)
+	for _, sender := range groupChatSenders {
+		t.Run("group chat by "+sender.name, func(t *testing.T) {
+			env, _, _ := newSummarizeEnv(t)
 
-		require.True(t, env.sendGroupText(testAdminID, "/trySummarize"))
+			require.True(t, env.sendGroupText(sender.id, "/trySummarize"))
 
-		sent := env.sentMessages()
-		require.Len(t, sent, 2)
-		assert.Equal(t, fullChatID(), sent[0].Msg.Chat.Id)
-		assert.Contains(t, sent[0].Msg.Text, "Эта команда работает только в _личной беседе_ со мной")
-		assert.Equal(t, testAdminID, sent[1].Msg.Chat.Id)
-		assert.False(t, env.sendGroupText(testAdminID, "go"), "conversation must not be started")
-	})
+			env.requirePrivateOnlyNotice(sender.id)
+			assert.False(t, env.sendGroupText(sender.id, "go"), "conversation must not be started")
+		})
+	}
 
-	t.Run("admin rights lost between checks", func(t *testing.T) {
+	t.Run("admin rights are checked once", func(t *testing.T) {
 		env, _, _ := newSummarizeEnv(t)
 		var checks atomic.Int32
 		env.client.On("getChatMember", func(call testutils.APICall) (json.RawMessage, error) {
+			// Only the first check sees an admin: a repeated check would reject the command
 			status := "member"
 			if checks.Add(1) == 1 {
 				status = "administrator"
@@ -227,8 +268,8 @@ func TestTrySummarizeHandler_AccessIsRestricted(t *testing.T) {
 
 		require.True(t, env.sendText(testAdminID, "/trySummarize"))
 
-		assert.Equal(t, int32(2), checks.Load())
-		assert.Equal(t, []string{adminOnlyText}, env.texts())
-		assert.False(t, env.click(testAdminID, trySummarizeCallbackConfirmYes), "conversation must not be started")
+		assert.Equal(t, int32(1), checks.Load())
+		assert.Equal(t, []string{summarizeConfirmText}, env.texts())
+		assert.True(t, env.sendText(testAdminID, "go"), "conversation must be started")
 	})
 }

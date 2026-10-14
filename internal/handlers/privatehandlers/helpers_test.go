@@ -3,6 +3,7 @@ package privatehandlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -22,6 +23,8 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/conversation"
 	"github.com/openai/openai-go/v2/option"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -298,15 +301,35 @@ func deletedMessageIDs(client *testutils.MockBotClient) []int64 {
 	return ids
 }
 
+// privateOnlyText is the auto-deleted notice sent when a command is used outside of a private chat
+const privateOnlyText = "<b>Прошу прощения</b> 🧐\n\nЭта команда работает только в <i>личной беседе</i> со мной. " +
+	"Напиши мне в ЛС, и я с удовольствием помогу (я тебя там пинганул, если мы общались ранее)." +
+	"\n\nЭто сообщение и твоя команда будут автоматически удалены через 10 секунд."
+
 // assertPrivateOnlyRejection checks the reply sent for a command used outside of a private chat
 func assertPrivateOnlyRejection(t *testing.T, client *testutils.MockBotClient) {
 	t.Helper()
 	sends := client.CallsTo("sendMessage")
 	require.Len(t, sends, 2, "private-only warning + ping in the private chat")
 	assert.Equal(t, testGroupChatID, sends[0].Int64("chat_id"))
-	assert.Contains(t, sends[0].Params["text"], "работает только в _личной беседе_")
+	assert.Equal(t, privateOnlyText, sends[0].Params["text"])
+	assert.Equal(t, "HTML", sends[0].Params["parse_mode"])
 	assert.Equal(t, testUserID, sends[1].Int64("chat_id"))
 	assert.Empty(t, client.CallsTo("getChatMember"))
+}
+
+// conversationState returns the conversation state testUserID is in within their private chat,
+// or "" when no conversation is running
+func conversationState(t *testing.T, d *deps, h ext.Handler) string {
+	t.Helper()
+	conv, ok := h.(handlers.Conversation)
+	require.True(t, ok, "the handler is a conversation")
+	state, err := conv.StateStorage.Get(ext.NewContext(d.bot, privateText(testUserID, "state probe"), nil))
+	if errors.Is(err, conversation.ErrKeyNotFound) {
+		return ""
+	}
+	require.NoError(t, err)
+	return state.Key
 }
 
 // assertClubOnlyRejection checks the reply sent to a user who is not a club member

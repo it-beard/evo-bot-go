@@ -103,7 +103,7 @@ func aiSearchSpecs() []aiSearchSpec {
 			cancelCallback: introCallbackConfirmCancel,
 			startText:      "Пришли мне поисковый запрос для интеллектуального поиска по участникам клуба",
 			startParseMode: "HTML",
-			cancelText:     "Поиск отменён.",
+			cancelText:     "Операция поиска участников отменена.",
 			newHandler:     (*deps).newIntroHandler,
 			expectData: func(d *deps) {
 				d.expectActiveProfiles(activeProfileRow{ProfileID: 1, UserID: 10, Bio: "Пишу на Go", PublishedID: int64(555),

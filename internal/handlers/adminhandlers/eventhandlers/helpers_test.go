@@ -3,6 +3,7 @@ package eventhandlers
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"sync"
 	"testing"
@@ -42,6 +43,23 @@ const (
 	sqlDeleteTopic   = "DELETE FROM topics WHERE id = $1"
 
 	adminOnlyText = "Эта команда доступна только администраторам."
+
+	// An event name with HTML special characters and how it must appear in HTML messages
+	htmlEventName    = "<b>Bold</b> & Co"
+	escapedEventName = "<b>&lt;b&gt;Bold&lt;/b&gt; &amp; Co</b>"
+
+	// Texts shared by the event admin commands
+	eventListErrorText = "Произошла ошибка при получении списка мероприятий."
+	noEventsText       = "Пока нет ни одного мероприятия. Создать новое можно командой /eventSetup."
+	invalidEventIDText = "Неверный ID. Пожалуйста, нажми на ID мероприятия из списка выше или /cancel для отмены."
+	useButtonsText     = "Пожалуйста, нажми на одну из кнопок выше или /cancel для отмены."
+	adminListTitle     = "<b>📋 Последние мероприятия</b>\n"
+	adminListLegend    = "\n<i>🔄 — актуальное, ✅ — завершено</i>"
+	dateInputHint      = "<b>ДД.ММ.ГГГГ ЧЧ:ММ</b> по UTC, например <code>25.12.2026 18:30</code>"
+	invalidDateText    = "Неверный формат даты. Пожалуйста, введи дату и время в формате " + dateInputHint +
+		" или /cancel для отмены."
+	typeOptionsText = "/1. 💬 клубный созвон\n/2. 🎙 митап\n/3. ⚙️ воркшоп\n/4. 📚 книжный клуб\n/5. 👥 конфа"
+	invalidTypeText = "Неверный тип мероприятия. Пожалуйста, нажми на номер типа от 1 до 5 или /cancel для отмены."
 )
 
 var (
@@ -69,12 +87,17 @@ type messageLog struct {
 	nextID int64
 	sent   []sentMessage
 	fail   func(call testutils.APICall) bool
+	// beforeSend is called for every sendMessage call before it is answered
+	beforeSend func(call testutils.APICall)
 }
 
 func (l *messageLog) respond(call testutils.APICall) (json.RawMessage, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
+	if l.beforeSend != nil {
+		l.beforeSend(call)
+	}
 	if l.fail != nil && l.fail(call) {
 		return nil, &gotgbot.TelegramError{Method: call.Method, Code: 400, Description: "Bad Request: mocked failure"}
 	}
@@ -177,6 +200,13 @@ func (e *testEnv) failSendWhen(pred func(call testutils.APICall) bool) {
 	e.log.fail = pred
 }
 
+// onSend registers a callback that runs for every sendMessage call before it is answered
+func (e *testEnv) onSend(fn func(call testutils.APICall)) {
+	e.log.mu.Lock()
+	defer e.log.mu.Unlock()
+	e.log.beforeSend = fn
+}
+
 func (e *testEnv) sentMessages() []sentMessage {
 	e.log.mu.Lock()
 	defer e.log.mu.Unlock()
@@ -236,6 +266,11 @@ func eventRows(events ...repositories.Event) *sqlmock.Rows {
 		rows.AddRow(ev.ID, ev.Name, ev.Type, ev.Status, startedAt, fixedTime, fixedTime)
 	}
 	return rows
+}
+
+// eventNotFoundText is the reply to an event ID that does not exist
+func eventNotFoundText(id int) string {
+	return fmt.Sprintf("Мероприятие с ID %d не найдено. Пожалуйста, нажми на ID мероприятия из списка выше или /cancel для отмены.", id)
 }
 
 func timePtr(t time.Time) *time.Time {

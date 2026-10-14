@@ -108,7 +108,7 @@ func openPairsMenu(t *testing.T, env *testEnv, mock sqlmock.Sqlmock, people ...p
 
 func pairsMenuText(participants int) string {
 	return pairsHeader + "\n\n⚠️ ЭТА КОМАНДА НУЖНА ДЛЯ ТЕСТИРОВАНИЯ ФУНКЦИОНАЛА!" +
-		"\n\nВы уверены, что хотите сгенерировать пары для текущего опроса?" +
+		"\n\nТочно сгенерировать пары для текущего опроса?" +
 		"\n\n📊 Опрос: неделя 2025-04-07" +
 		"\n👥 Участников: " + strconv.Itoa(participants) +
 		"\n\n⚠️ Пары будут отправлены в сообщество."
@@ -336,6 +336,7 @@ func TestTryGenerateCoffeePairsHandler_CancelCommand(t *testing.T) {
 
 	assert.Equal(t, []string{pairsCanceledText}, env.texts())
 	assert.Equal(t, [][2]int64{msgRef(menu)}, env.deletedMessages())
+	assert.Empty(t, env.answeredCallbacks(), "a command has no button press to answer")
 	assert.Empty(t, env.client.CallsTo("stopPoll"))
 	assert.False(t, env.click(testAdminID, constants.TryGenerateCoffeePairsConfirmCallback), "conversation must be over")
 }
@@ -359,19 +360,83 @@ func TestTryGenerateCoffeePairsHandler_AccessIsRestricted(t *testing.T) {
 		require.True(t, env.sendText(testUserID, "/tryGenerateCoffeePairs"))
 
 		assert.Equal(t, []string{adminOnlyText}, env.texts())
+		assert.Len(t, env.client.CallsTo("getChatMember"), 1)
 		assert.False(t, env.click(testUserID, constants.TryGenerateCoffeePairsConfirmCallback), "conversation must not be started")
 	})
 
-	t.Run("group chat", func(t *testing.T) {
-		env, _ := newPairsEnv(t)
+	for _, sender := range groupChatSenders {
+		t.Run("group chat by "+sender.name, func(t *testing.T) {
+			env, _ := newPairsEnv(t)
 
-		require.True(t, env.sendGroupText(testAdminID, "/tryGenerateCoffeePairs"))
+			require.True(t, env.sendGroupText(sender.id, "/tryGenerateCoffeePairs"))
 
-		sent := env.sentMessages()
-		require.Len(t, sent, 2)
-		assert.Equal(t, fullChatID(), sent[0].Msg.Chat.Id)
-		assert.Contains(t, sent[0].Msg.Text, "Эта команда работает только в _личной беседе_ со мной")
-		assert.Equal(t, testAdminID, sent[1].Msg.Chat.Id)
-		assert.False(t, env.sendGroupText(testAdminID, "hello"), "conversation must not be started")
-	})
+			env.requirePrivateOnlyNotice(sender.id)
+			assert.False(t, env.sendGroupText(sender.id, "hello"), "conversation must not be started")
+		})
+	}
+}
+
+func TestTryGenerateCoffeePairsHandler_ButtonPressesAreAnswered(t *testing.T) {
+	tests := []struct {
+		name    string
+		data    string
+		setup   func(env *testEnv, mock sqlmock.Sqlmock)
+		wantErr bool
+	}{
+		{
+			name:  "confirm",
+			data:  constants.TryGenerateCoffeePairsConfirmCallback,
+			setup: func(_ *testEnv, mock sqlmock.Sqlmock) { expectSuccessfulPairing(mock) },
+		},
+		{
+			name: "confirm when pairing fails",
+			data: constants.TryGenerateCoffeePairsConfirmCallback,
+			setup: func(_ *testEnv, mock sqlmock.Sqlmock) {
+				expectLatestPoll(mock)
+				expectParticipants(mock, alice)
+			},
+		},
+		{
+			name: "confirm when the processing message cannot be sent",
+			data: constants.TryGenerateCoffeePairsConfirmCallback,
+			setup: func(env *testEnv, _ sqlmock.Sqlmock) {
+				env.failSendWhen(func(call testutils.APICall) bool { return strings.Contains(call.Params["text"], "⏳") })
+			},
+			wantErr: true,
+		},
+		{
+			name: "back",
+			data: constants.TryGenerateCoffeePairsBackCallback,
+			setup: func(_ *testEnv, mock sqlmock.Sqlmock) {
+				expectLatestPoll(mock)
+				expectParticipants(mock, alice, bob)
+			},
+		},
+		{
+			name: "cancel",
+			data: constants.TryGenerateCoffeePairsCancelCallback,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			env, mock := newPairsEnv(t)
+			openPairsMenu(t, env, mock, alice, bob)
+			env.reset()
+			if tc.setup != nil {
+				tc.setup(env, mock)
+			}
+
+			update := testutils.CallbackUpdate(testAdminID, tc.data)
+			handled, err := env.tryDispatch(update)
+
+			assert.True(t, handled)
+			if tc.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, []string{update.CallbackQuery.Id}, env.answeredCallbacks(), "the button press is answered exactly once")
+		})
+	}
 }

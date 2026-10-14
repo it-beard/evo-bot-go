@@ -323,6 +323,7 @@ func replyVariants() []replyVariant {
 			},
 			wantParseMode: "HTML",
 		},
+		{name: "ReplyHtmlWithReturnMessage", reply: (*MessageSenderService).ReplyHtmlWithReturnMessage, returnsMsg: true, wantParseMode: "HTML"},
 	}
 }
 

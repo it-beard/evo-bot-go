@@ -1,7 +1,6 @@
 package privatehandlers
 
 import (
-	"context"
 	"database/sql"
 	"evo-bot-go/internal/buttons"
 	"evo-bot-go/internal/clients"
@@ -12,6 +11,7 @@ import (
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 	"fmt"
+	"html"
 	"strings"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -24,7 +24,6 @@ import (
 const (
 	// Conversation states
 	profileStateViewOptions         = "profile_state_view_options"
-	profileStateEditMyProfile       = "profile_state_edit_my_profile"
 	profileStateAwaitQueryForSearch = "profile_state_await_query_for_search"
 	profileStateAwaitBio            = "profile_state_await_bio"
 	profileStateAwaitFirstname      = "profile_state_await_firstname"
@@ -35,7 +34,6 @@ const (
 	profileCtxDataKeyPreviousMessageID       = "profile_ctx_data_previous_message_id"
 	profileCtxDataKeyPreviousChatID          = "profile_ctx_data_previous_chat_id"
 	profileCtxDataKeyLastMessageTimeFromUser = "profile_ctx_data_last_message_time_from_user"
-	profileCtxDataKeyCancelFunc              = "profile_ctx_data_key_cancel_func"
 
 	// Menu headers
 	profileMenuHeader              = "Меню \"Профиль\""
@@ -128,6 +126,9 @@ func (h *profileHandler) handleCallback(b *gotgbot.Bot, ctx *ext.Context) error 
 	callback := ctx.Update.CallbackQuery
 	data := callback.Data
 
+	// Answer the callback query to remove the loading state on the button
+	_, _ = callback.Answer(b, nil)
+
 	effectiveMsg := ctx.EffectiveMessage
 
 	switch data {
@@ -170,10 +171,10 @@ func (h *profileHandler) handleStart(b *gotgbot.Bot, ctx *ext.Context) error {
 	dbUser, err := h.userRepository.GetOrCreate(user)
 	if err == nil {
 		if dbUser.Firstname != "" {
-			firstNameString = "└ ✅ Имя" + " <i>(" + dbUser.Firstname + ")</i>"
+			firstNameString = "└ ✅ Имя" + " <i>(" + html.EscapeString(dbUser.Firstname) + ")</i>"
 		}
 		if dbUser.Lastname != "" {
-			lastNameString = "└ ✅ Фамилия" + " <i>(" + dbUser.Lastname + ")</i>"
+			lastNameString = "└ ✅ Фамилия" + " <i>(" + html.EscapeString(dbUser.Lastname) + ")</i>"
 		}
 
 		profile, err := h.profileRepository.GetOrCreate(dbUser.ID)
@@ -286,9 +287,9 @@ func (h *profileHandler) handleSearchProfileInput(b *gotgbot.Bot, ctx *ext.Conte
 	if err == sql.ErrNoRows {
 		h.RemovePreviousMessage(b, &userId)
 		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
-		editedMsg, err := h.messageSenderService.SendMarkdownWithReturnMessage(msg.Chat.Id,
-			fmt.Sprintf("*%s*", profileMenuSearchHeader)+
-				fmt.Sprintf("\n\nПользователь *%s* не найден.", username)+
+		editedMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(msg.Chat.Id,
+			fmt.Sprintf("<b>%s</b>", profileMenuSearchHeader)+
+				fmt.Sprintf("\n\nПользователь <b>%s</b> не найден.", html.EscapeString(username))+
 				"\n\nПопробуй ещё раз, прислав мне имя пользователя снова:",
 			&gotgbot.SendMessageOpts{
 				ReplyMarkup: buttons.ProfileBackCancelButtons(constants.ProfileStartCallback),
@@ -351,15 +352,13 @@ func (h *profileHandler) handleEditField(b *gotgbot.Bot, ctx *ext.Context, msg *
 
 	switch nextState {
 	case profileStateAwaitBio:
-		dbProfile.Bio = strings.ReplaceAll(dbProfile.Bio, "<", "&lt;")
-		dbProfile.Bio = strings.ReplaceAll(dbProfile.Bio, ">", "&gt;")
-		oldFieldValue = "Текущее значение: <pre>" + dbProfile.Bio + "</pre>"
+		oldFieldValue = "Текущее значение: <pre>" + html.EscapeString(dbProfile.Bio) + "</pre>"
 		menuHeader = profileMenuEditBioHeader
 	case profileStateAwaitFirstname:
-		oldFieldValue = "Текущее значение: <code>" + dbUser.Firstname + "</code>"
+		oldFieldValue = "Текущее значение: <code>" + html.EscapeString(dbUser.Firstname) + "</code>"
 		menuHeader = profileMenuEditFirstnameHeader
 	case profileStateAwaitLastname:
-		oldFieldValue = "Текущее значение: <code>" + dbUser.Lastname + "</code>"
+		oldFieldValue = "Текущее значение: <code>" + html.EscapeString(dbUser.Lastname) + "</code>"
 		menuHeader = profileMenuEditLastnameHeader
 	}
 
@@ -405,9 +404,9 @@ func (h *profileHandler) handleBioInput(b *gotgbot.Bot, ctx *ext.Context) error 
 	if bioLength > constants.ProfileBioLengthLimit {
 		h.RemovePreviousMessage(b, &msg.From.Id)
 		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
-		errMsg, _ := h.messageSenderService.SendMarkdownWithReturnMessage(
+		errMsg, _ := h.messageSenderService.SendHtmlWithReturnMessage(
 			msg.Chat.Id,
-			fmt.Sprintf("*%s*", profileMenuEditBioHeader)+
+			fmt.Sprintf("<b>%s</b>", profileMenuEditBioHeader)+
 				fmt.Sprintf("\n\nТекущая длина: %d символов", bioLength)+
 				fmt.Sprintf("\n\nПожалуйста, сократи до %d символов и пришли снова:", constants.ProfileBioLengthLimit),
 			&gotgbot.SendMessageOpts{
@@ -420,8 +419,8 @@ func (h *profileHandler) handleBioInput(b *gotgbot.Bot, ctx *ext.Context) error 
 
 	err := h.saveProfileField(ctx.EffectiveUser, "bio", bio)
 	if err != nil {
-		_ = h.messageSenderService.ReplyMarkdown(msg,
-			fmt.Sprintf("*%s*", profileMenuEditBioHeader)+
+		_ = h.messageSenderService.ReplyHtml(msg,
+			fmt.Sprintf("<b>%s</b>", profileMenuEditBioHeader)+
 				"\n\nПроизошла ошибка при сохранении биографии.", nil)
 		return fmt.Errorf("%s: failed to save bio in handleBioInput: %w", utils.GetCurrentTypeName(), err)
 	}
@@ -432,7 +431,7 @@ func (h *profileHandler) handleBioInput(b *gotgbot.Bot, ctx *ext.Context) error 
 	h.RemovePreviousMessage(b, &msg.From.Id)
 	b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
 	sendMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(msg.Chat.Id,
-		fmt.Sprintf("*%s*", profileMenuEditBioHeader)+
+		fmt.Sprintf("<b>%s</b>", profileMenuEditBioHeader)+
 			"\n\n✅ Биография сохранена!"+profilePublishedMessage,
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: buttons.ProfileBackCancelButtons(constants.ProfileEditMyProfileCallback),
@@ -442,7 +441,7 @@ func (h *profileHandler) handleBioInput(b *gotgbot.Bot, ctx *ext.Context) error 
 	}
 
 	h.SavePreviousMessageInfo(msg.From.Id, sendMsg)
-	return handlers.NextConversationState(profileStateEditMyProfile)
+	return handlers.NextConversationState(profileStateViewOptions)
 }
 
 // Firstname handler
@@ -453,9 +452,9 @@ func (h *profileHandler) handleFirstnameInput(b *gotgbot.Bot, ctx *ext.Context) 
 	if len(firstname) > 30 {
 		h.RemovePreviousMessage(b, &msg.From.Id)
 		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
-		errMsg, _ := h.messageSenderService.SendMarkdownWithReturnMessage(
+		errMsg, _ := h.messageSenderService.SendHtmlWithReturnMessage(
 			msg.Chat.Id,
-			fmt.Sprintf("*%s*", profileMenuEditFirstnameHeader)+
+			fmt.Sprintf("<b>%s</b>", profileMenuEditFirstnameHeader)+
 				"\n\nИмя слишком длинное. Пожалуйста, введи более короткое имя (не более 30 символов):",
 			&gotgbot.SendMessageOpts{
 				ReplyMarkup: buttons.ProfileBackCancelButtons(constants.ProfileEditMyProfileCallback),
@@ -467,8 +466,8 @@ func (h *profileHandler) handleFirstnameInput(b *gotgbot.Bot, ctx *ext.Context) 
 
 	err := h.saveUserField(ctx.EffectiveUser, "firstname", firstname)
 	if err != nil {
-		_ = h.messageSenderService.ReplyMarkdown(msg,
-			fmt.Sprintf("*%s*", profileMenuEditFirstnameHeader)+
+		_ = h.messageSenderService.ReplyHtml(msg,
+			fmt.Sprintf("<b>%s</b>", profileMenuEditFirstnameHeader)+
 				"\n\nПроизошла ошибка при сохранении имени.", nil)
 		return fmt.Errorf("%s: failed to save firstname in handleFirstnameInput: %w", utils.GetCurrentTypeName(), err)
 	}
@@ -480,7 +479,7 @@ func (h *profileHandler) handleFirstnameInput(b *gotgbot.Bot, ctx *ext.Context) 
 	h.RemovePreviousMessage(b, &msg.From.Id)
 	b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
 	sendMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(msg.Chat.Id,
-		fmt.Sprintf("*%s*", profileMenuEditFirstnameHeader)+
+		fmt.Sprintf("<b>%s</b>", profileMenuEditFirstnameHeader)+
 			"\n\n✅ Имя сохранено!"+profilePublishedMessage,
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: buttons.ProfileBackCancelButtons(constants.ProfileEditMyProfileCallback),
@@ -490,7 +489,7 @@ func (h *profileHandler) handleFirstnameInput(b *gotgbot.Bot, ctx *ext.Context) 
 	}
 
 	h.SavePreviousMessageInfo(msg.From.Id, sendMsg)
-	return handlers.NextConversationState(profileStateEditMyProfile)
+	return handlers.NextConversationState(profileStateViewOptions)
 }
 
 // Lastname handler
@@ -501,9 +500,9 @@ func (h *profileHandler) handleLastnameInput(b *gotgbot.Bot, ctx *ext.Context) e
 	if len(lastname) > 30 {
 		h.RemovePreviousMessage(b, &msg.From.Id)
 		b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
-		errMsg, _ := h.messageSenderService.SendMarkdownWithReturnMessage(
+		errMsg, _ := h.messageSenderService.SendHtmlWithReturnMessage(
 			msg.Chat.Id,
-			fmt.Sprintf("*%s*", profileMenuEditLastnameHeader)+
+			fmt.Sprintf("<b>%s</b>", profileMenuEditLastnameHeader)+
 				"\n\nФамилия слишком длинная. Пожалуйста, введи более короткую фамилию (не более 30 символов):",
 			&gotgbot.SendMessageOpts{
 				ReplyMarkup: buttons.ProfileBackCancelButtons(constants.ProfileEditMyProfileCallback),
@@ -515,8 +514,8 @@ func (h *profileHandler) handleLastnameInput(b *gotgbot.Bot, ctx *ext.Context) e
 
 	err := h.saveUserField(ctx.EffectiveUser, "lastname", lastname)
 	if err != nil {
-		_ = h.messageSenderService.ReplyMarkdown(msg,
-			fmt.Sprintf("*%s*", profileMenuEditLastnameHeader)+
+		_ = h.messageSenderService.ReplyHtml(msg,
+			fmt.Sprintf("<b>%s</b>", profileMenuEditLastnameHeader)+
 				"\n\nПроизошла ошибка при сохранении фамилии.", nil)
 		return fmt.Errorf("%s: failed to save lastname in handleLastnameInput: %w", utils.GetCurrentTypeName(), err)
 	}
@@ -528,7 +527,7 @@ func (h *profileHandler) handleLastnameInput(b *gotgbot.Bot, ctx *ext.Context) e
 	h.RemovePreviousMessage(b, &msg.From.Id)
 	b.DeleteMessage(msg.Chat.Id, msg.MessageId, nil)
 	sendMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(msg.Chat.Id,
-		fmt.Sprintf("*%s*", profileMenuEditLastnameHeader)+
+		fmt.Sprintf("<b>%s</b>", profileMenuEditLastnameHeader)+
 			"\n\n✅ Фамилия сохранена!"+profilePublishedMessage,
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: buttons.ProfileBackCancelButtons(constants.ProfileEditMyProfileCallback),
@@ -538,7 +537,7 @@ func (h *profileHandler) handleLastnameInput(b *gotgbot.Bot, ctx *ext.Context) e
 	}
 
 	h.SavePreviousMessageInfo(msg.From.Id, sendMsg)
-	return handlers.NextConversationState(profileStateEditMyProfile)
+	return handlers.NextConversationState(profileStateViewOptions)
 }
 
 func (h *profileHandler) handleCallbackCancel(b *gotgbot.Bot, ctx *ext.Context) error {
@@ -552,16 +551,7 @@ func (h *profileHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	userId := ctx.EffectiveUser.Id
 
-	// Check if there's an ongoing operation to cancel
-	if cancelFunc, ok := h.userStore.Get(ctx.EffectiveUser.Id, profileCtxDataKeyCancelFunc); ok {
-		// Call the cancel function to stop any ongoing API calls
-		if cf, ok := cancelFunc.(context.CancelFunc); ok {
-			cf()
-			h.messageSenderService.Send(msg.Chat.Id, "Операция поиска профилей отменена.", nil)
-		}
-	} else {
-		h.messageSenderService.Send(msg.Chat.Id, "Сессия работы с профилями завершена.", nil)
-	}
+	h.messageSenderService.Send(msg.Chat.Id, "Сессия работы с профилями завершена.", nil)
 
 	h.RemovePreviousMessage(b, &userId)
 	h.userStore.Clear(userId)
@@ -638,7 +628,7 @@ func (h *profileHandler) tryToPublishProfile(b *gotgbot.Bot, ctx *ext.Context, w
 
 	profilePublishedMessage := fmt.Sprintf(
 		"\n✅ Профиль <a href='%s'>опубликован</a> на канале \"Интро\".",
-		utils.GetIntroMessageLink(h.config, profile.PublishedMessageID.Int64))
+		utils.GetIntroMessageLink(h.config, messageID))
 	return profilePublishedMessage, nil
 }
 

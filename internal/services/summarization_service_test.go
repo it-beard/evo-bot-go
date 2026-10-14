@@ -218,8 +218,12 @@ func TestSummarizationService_RunDailySummarization_ContinuesAfterTopicFailure(t
 	f.expectMessages(6, testGroupMessage{messageID: 1, userTgID: 2, text: "hi", createdAt: time.Now()})
 	f.expectTemplate(testPromptTemplate)
 
-	require.NoError(t, f.svc.RunDailySummarization(context.Background(), false))
+	err := f.svc.RunDailySummarization(context.Background(), false)
 
+	// The failure is reported to the caller, but the other topics are still summarized
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "topic 5")
+	assert.Contains(t, err.Error(), "db is down")
 	texts := f.client.SentTexts()
 	require.Len(t, texts, 1)
 	assert.Contains(t, texts[0], "\"Working\"")
@@ -249,7 +253,9 @@ func TestSummarizationService_RunDailySummarization_TemplateError(t *testing.T) 
 	f.expectMessages(5, testGroupMessage{messageID: 1, userTgID: 2, text: "hi", createdAt: time.Now()})
 	f.mock.ExpectQuery(templateQuery).WillReturnError(errors.New("db is down"))
 
-	require.NoError(t, f.svc.RunDailySummarization(context.Background(), false))
+	err := f.svc.RunDailySummarization(context.Background(), false)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to get prompt template")
 
 	assert.Empty(t, f.ai.Requests())
 	assert.Empty(t, f.client.Calls())
@@ -262,7 +268,7 @@ func TestSummarizationService_RunDailySummarization_OpenAIError(t *testing.T) {
 	f.expectTemplate(testPromptTemplate)
 	f.ai.FailWith(http.StatusInternalServerError)
 
-	require.NoError(t, f.svc.RunDailySummarization(context.Background(), false))
+	require.Error(t, f.svc.RunDailySummarization(context.Background(), false))
 
 	assert.Len(t, f.ai.Requests(), 1)
 	assert.Empty(t, f.client.Calls(), "nothing is sent when the summary could not be generated")
@@ -280,4 +286,17 @@ func TestSummarizationService_RunDailySummarization_PromptLogWriteFailureIsToler
 
 	assert.Len(t, f.ai.Requests(), 1)
 	assert.Len(t, f.client.CallsTo("sendMessage"), 1)
+}
+
+func TestSummarizationService_RunDailySummarization_SendFailureIsReported(t *testing.T) {
+	f := newSummarizationFixture(t, 5)
+	f.expectTopicName(5, "Topic")
+	f.expectMessages(5, testGroupMessage{messageID: 1, userTgID: 2, text: "hi", createdAt: time.Now()})
+	f.expectTemplate(testPromptTemplate)
+	f.client.OnError("sendMessage", "Bad Request: can't parse entities")
+
+	err := f.svc.RunDailySummarization(context.Background(), false)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to send summary")
 }

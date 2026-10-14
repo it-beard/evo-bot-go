@@ -2,8 +2,9 @@ package eventhandlers
 
 import (
 	"fmt"
+	"html"
 	"log"
-	"strconv"
+	"net/url"
 	"strings"
 
 	"evo-bot-go/internal/buttons"
@@ -36,12 +37,6 @@ const (
 	// Callbacks names
 	eventStartCallbackConfirmYes    = "event_start_callback_confirm_yes"
 	eventStartCallbackConfirmCancel = "event_start_callback_confirm_cancel"
-)
-
-// Confirmation message options
-const (
-	eventStartConfirmYes = "да"
-	eventStartConfirmNo  = "нет"
 )
 
 type eventStartHandler struct {
@@ -96,69 +91,39 @@ func (h *eventStartHandler) startEvent(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
 	// Check if user has admin permissions and is in a private chat
-	if !h.permissionsService.CheckAdminAndPrivateChat(msg, constants.ShowTopicsCommand) {
-		log.Printf("%s: User %d (%s) tried to use /%s without admin permissions.",
-			utils.GetCurrentTypeName(),
-			ctx.EffectiveUser.Id,
-			ctx.EffectiveUser.Username,
-			constants.ShowTopicsCommand,
-		)
+	if !h.permissionsService.CheckAdminAndPrivateChat(msg, constants.EventStartCommand) {
 		return handlers.EndConversation()
 	}
 
-	// Get a list of active events
-	events, err := h.eventRepository.GetLastEvents(constants.EventEditGetLastLimit)
-	if err != nil {
-		h.messageSenderService.Reply(msg, "Произошла ошибка при получении списка актуальных мероприятий.", nil)
-		log.Printf("%s: Error during event retrieval: %v", utils.GetCurrentTypeName(), err)
+	sentMsg, ok := sendAdminEventList(h.eventRepository, h.messageSenderService, msg,
+		"которое ты хочешь запустить", eventStartCallbackConfirmCancel)
+	if !ok {
 		return handlers.EndConversation()
 	}
-
-	if len(events) == 0 {
-		h.messageSenderService.Reply(msg, "Нет мероприятий для старта.", nil)
-		return handlers.EndConversation()
-	}
-
-	title := fmt.Sprintf("Последние %d мероприятия:", len(events))
-	actionDescription := "которое ты хочешь запустить"
-	formattedResponse := formatters.FormatEventListForAdmin(events, title, constants.CancelCommand, actionDescription)
-
-	sentMsg, _ := h.messageSenderService.ReplyMarkdownWithReturnMessage(msg, formattedResponse, &gotgbot.SendMessageOpts{
-		ReplyMarkup: buttons.CancelButton(eventStartCallbackConfirmCancel),
-	})
 
 	h.SavePreviousMessageInfo(ctx.EffectiveUser.Id, sentMsg)
 	return handlers.NextConversationState(eventStartStateSelectEvent)
 }
 
-// 2. handleSelectEvent processes the user's selection of an event to finish
+// 2. handleSelectEvent processes the user's selection of an event to start
 func (h *eventStartHandler) handleSelectEvent(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
-	eventIDStr := strings.TrimSpace(strings.Replace(msg.Text, "/", "", 1))
 
-	eventID, err := strconv.Atoi(eventIDStr)
-	if err != nil {
-		h.messageSenderService.Reply(msg, fmt.Sprintf("Неверный ID. Пожалуйста, введи числовой ID или /%s для отмены.", constants.CancelCommand), nil)
+	event, ok := findSelectedEvent(h.eventRepository, h.messageSenderService, msg)
+	if !ok {
 		return nil // Stay in the same state
 	}
 
-	// Store the selected event ID
-	h.userStore.Set(ctx.EffectiveUser.Id, eventStartCtxDataKeySelectedEventID, eventID)
-
-	// Get event details to show in the prompt
-	event, err := h.eventRepository.GetEventByID(eventID)
-	if err != nil {
-		h.messageSenderService.Reply(msg, fmt.Sprintf("Ошибка при получении мероприятия с ID %d", eventID), nil)
-		log.Printf("%s: Error during event retrieval: %v", utils.GetCurrentTypeName(), err)
-		return handlers.EndConversation()
-	}
-
 	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
-	sentMsg, _ := h.messageSenderService.ReplyMarkdownWithReturnMessage(
+
+	// Store the selected event ID
+	h.userStore.Set(ctx.EffectiveUser.Id, eventStartCtxDataKeySelectedEventID, event.ID)
+
+	sentMsg, _ := h.messageSenderService.ReplyHtmlWithReturnMessage(
 		msg,
 		fmt.Sprintf(
-			"🔗 Отправь мне ссылку на мероприятие '%s' (ID: %d)\nЭта ссылка будет отправлена в чат объявлений.",
-			event.Name, event.ID,
+			"🚀 <b>Запуск мероприятия</b>\n\n%s\n\n🔗 Отправь мне ссылку на мероприятие, она будет опубликована в чате объявлений:",
+			formatters.FormatEventSummary(*event),
 		),
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: buttons.CancelButton(eventStartCallbackConfirmCancel),
@@ -174,53 +139,39 @@ func (h *eventStartHandler) handleEnterLink(b *gotgbot.Bot, ctx *ext.Context) er
 	msg := ctx.EffectiveMessage
 	eventLink := strings.TrimSpace(msg.Text)
 
-	// Simple validation for the link
-	if !strings.HasPrefix(eventLink, "http://") && !strings.HasPrefix(eventLink, "https://") {
+	// The link becomes an inline button, so it has to be a valid absolute http(s) URL
+	if !isValidEventLink(eventLink) {
 		h.messageSenderService.Reply(msg, fmt.Sprintf(
-			"Пожалуйста, введи корректную ссылку, начинающуюся с http:// или https:// (или используй /%s для отмены):",
-			constants.CancelCommand,
+			"Некорректная ссылка. Пожалуйста, отправь полную ссылку вида https://… %s.",
+			formatters.CancelHint,
 		), nil)
 		return nil // Stay in the same state
 	}
 
-	// Store the event link
-	h.userStore.Set(ctx.EffectiveUser.Id, eventStartCtxDataKeyEventLink, eventLink)
-
-	// Get the event ID
-	eventIDVal, ok := h.userStore.Get(ctx.EffectiveUser.Id, eventStartCtxDataKeySelectedEventID)
+	eventID, ok := h.selectedEventID(ctx)
 	if !ok {
-		h.messageSenderService.Reply(msg, fmt.Sprintf(
-			"Произошла ошибка при получении выбранного мероприятия. Пожалуйста, начни заново с /%s",
-			constants.EventStartCommand,
-		), nil)
-		log.Printf("%s: Error during event retrieval.", utils.GetCurrentTypeName())
-		return handlers.EndConversation()
-	}
-
-	eventID, ok := eventIDVal.(int)
-	if !ok {
-		log.Println("Invalid event ID type:", eventIDVal)
-		h.messageSenderService.Reply(msg, fmt.Sprintf(
-			"Произошла внутренняя ошибка (неверный тип ID). Пожалуйста, начни заново с /%s",
-			constants.EventStartCommand,
-		), nil)
-		log.Printf("%s: Invalid event ID type: %v", utils.GetCurrentTypeName(), eventIDVal)
 		return handlers.EndConversation()
 	}
 
 	// Get event details to show in the confirmation message
 	event, err := h.eventRepository.GetEventByID(eventID)
 	if err != nil {
-		h.messageSenderService.Reply(msg, fmt.Sprintf("Ошибка при получении мероприятия с ID %d", eventID), nil)
+		h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
+		h.messageSenderService.Reply(msg, fmt.Sprintf("Произошла ошибка при получении мероприятия с ID %d.", eventID), nil)
 		log.Printf("%s: Error during event retrieval: %v", utils.GetCurrentTypeName(), err)
+		h.userStore.Clear(ctx.EffectiveUser.Id)
 		return handlers.EndConversation()
 	}
 
+	// Store the event link
+	h.userStore.Set(ctx.EffectiveUser.Id, eventStartCtxDataKeyEventLink, eventLink)
+
 	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 
-	sentMsg, err := h.messageSenderService.ReplyMarkdownWithReturnMessage(msg, fmt.Sprintf(
-		"*Подтверждение запуска мероприятия*\n\n🎯 *%s* _(ID: %d)_\n\n🔗 Ссылка: `%s`\n\nЭта ссылка будет отправлена в чат объявлений.\n\nНажми на кнопку ниже для подтверждения или отмены",
-		event.Name, event.ID, eventLink,
+	sentMsg, _ := h.messageSenderService.ReplyHtmlWithReturnMessage(msg, fmt.Sprintf(
+		"🚀 <b>Запустить мероприятие?</b>\n\n%s\n\n🔗 Ссылка: <code>%s</code>\n\n"+
+			"Объявление со ссылкой будет опубликовано и закреплено в чате объявлений, а мероприятие получит статус «завершено».",
+		formatters.FormatEventSummary(*event), html.EscapeString(eventLink),
 	), &gotgbot.SendMessageOpts{
 		ReplyMarkup: buttons.ConfirmAndCancelButton(eventStartCallbackConfirmYes, eventStartCallbackConfirmCancel),
 	})
@@ -235,63 +186,31 @@ func (h *eventStartHandler) handleCallbackYes(b *gotgbot.Bot, ctx *ext.Context) 
 	cb := ctx.Update.CallbackQuery
 	_, _ = cb.Answer(b, nil)
 
-	// Get the selected event ID
-	eventIDVal, ok := h.userStore.Get(ctx.EffectiveUser.Id, eventStartCtxDataKeySelectedEventID)
-	if !ok {
-		h.messageSenderService.Reply(ctx.EffectiveMessage, fmt.Sprintf(
-			"Произошла ошибка при получении выбранного мероприятия. Пожалуйста, начни заново с /%s",
-			constants.EventStartCommand,
-		), nil)
-		log.Printf("%s: Error during event retrieval.", utils.GetCurrentTypeName())
-		return handlers.EndConversation()
-	}
+	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
+	defer h.userStore.Clear(ctx.EffectiveUser.Id)
 
-	eventID, ok := eventIDVal.(int)
+	eventID, ok := h.selectedEventID(ctx)
 	if !ok {
-		log.Println("Invalid event ID type:", eventIDVal)
-		h.messageSenderService.Reply(ctx.EffectiveMessage, fmt.Sprintf(
-			"Произошла внутренняя ошибка (неверный тип ID). Пожалуйста, начни заново с /%s",
-			constants.EventStartCommand,
-		), nil)
-		log.Printf("%s: Invalid event ID type: %v", utils.GetCurrentTypeName(), eventIDVal)
 		return handlers.EndConversation()
 	}
 
 	// Get the event link
-	eventLinkVal, ok := h.userStore.Get(ctx.EffectiveUser.Id, eventStartCtxDataKeyEventLink)
-	if !ok {
-		h.messageSenderService.Reply(ctx.EffectiveMessage, fmt.Sprintf(
-			"Произошла ошибка при получении ссылки на мероприятие. Пожалуйста, начни заново с /%s",
-			constants.EventStartCommand,
-		), nil)
-		log.Printf("%s: Error during event link retrieval.", utils.GetCurrentTypeName())
-		return handlers.EndConversation()
-	}
-
+	eventLinkVal, _ := h.userStore.Get(ctx.EffectiveUser.Id, eventStartCtxDataKeyEventLink)
 	eventLink, ok := eventLinkVal.(string)
 	if !ok {
-		log.Println("Invalid event link type:", eventLinkVal)
+		log.Printf("%s: Event link is missing or invalid: %v", utils.GetCurrentTypeName(), eventLinkVal)
 		h.messageSenderService.Reply(ctx.EffectiveMessage, fmt.Sprintf(
-			"Произошла внутренняя ошибка (неверный тип ссылки). Пожалуйста, начни заново с /%s",
+			"Произошла ошибка: не удалось найти ссылку на мероприятие. Пожалуйста, начни заново с /%s.",
 			constants.EventStartCommand,
 		), nil)
-		log.Printf("%s: Invalid event link type: %v", utils.GetCurrentTypeName(), eventLinkVal)
 		return handlers.EndConversation()
 	}
 
-	// Get the event details for the success message
+	// Get the event details for the announcement
 	event, err := h.eventRepository.GetEventByID(eventID)
 	if err != nil {
-		h.messageSenderService.Reply(ctx.EffectiveMessage, fmt.Sprintf("Ошибка при получении мероприятия с ID %d", eventID), nil)
+		h.messageSenderService.Reply(ctx.EffectiveMessage, fmt.Sprintf("Произошла ошибка при получении мероприятия с ID %d.", eventID), nil)
 		log.Printf("%s: Error during event retrieval: %v", utils.GetCurrentTypeName(), err)
-		return handlers.EndConversation()
-	}
-
-	// Update the event status to active (or use the appropriate constant)
-	err = h.eventRepository.UpdateEventStatus(eventID, constants.EventStatusFinished) // When ivent already started in DB we need to set status to finished
-	if err != nil {
-		h.messageSenderService.Reply(ctx.EffectiveMessage, "Произошла ошибка при обновлении статуса мероприятия.", nil)
-		log.Printf("%s: Error during event update: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 
@@ -306,20 +225,20 @@ func (h *eventStartHandler) handleCallbackYes(b *gotgbot.Bot, ctx *ext.Context) 
 		},
 	}
 
-	// Send announcement message with the event link to the announcement topic if configured
+	// Send announcement message with the event link to the announcement topic
 	announcementMsg := fmt.Sprintf(
-		"🔴 *НАЧИНАЕМ ИВЕНТ!* 🔴\n\n%s *%s*\n",
+		"🔴 <b>НАЧИНАЕМ ИВЕНТ!</b> 🔴\n\n%s %s\n",
 		formatters.GetTypeEmoji(constants.EventType(event.Type)),
-		event.Name,
+		formatters.FormatEventName(event.Name),
 	)
 
 	if event.Type == string(constants.EventTypeClubCall) {
-		announcementMsg += fmt.Sprintf("💡 [Про формат и правила клубных созвонов](https://telegram.me/c/2069889012/127/33823)\n")
+		announcementMsg += "💡 <a href=\"https://telegram.me/c/2069889012/127/33823\">Про формат и правила клубных созвонов</a>\n"
 	}
 
-	announcementMsg += fmt.Sprintf("\nИспользуй кнопку ниже, чтобы присоединиться ⬇️")
+	announcementMsg += "\nИспользуй кнопку ниже, чтобы присоединиться ⬇️"
 
-	sentAnnouncementMsg, err := h.messageSenderService.SendMarkdownWithReturnMessage(
+	sentAnnouncementMsg, err := h.messageSenderService.SendHtmlWithReturnMessage(
 		utils.ChatIdToFullChatId(h.config.SuperGroupChatID),
 		announcementMsg,
 		&gotgbot.SendMessageOpts{
@@ -327,44 +246,68 @@ func (h *eventStartHandler) handleCallbackYes(b *gotgbot.Bot, ctx *ext.Context) 
 			ReplyMarkup:     buttonWithLink,
 		},
 	)
+	if err != nil || sentAnnouncementMsg == nil {
+		// Nothing was announced, so the event stays actual and can be started again
+		log.Printf("%s: Error sending announcement message: %v", utils.GetCurrentTypeName(), err)
+		h.messageSenderService.Reply(ctx.EffectiveMessage, fmt.Sprintf(
+			"Не удалось опубликовать объявление в чате объявлений, мероприятие не запущено. Проверь ссылку и попробуй ещё раз: /%s.",
+			constants.EventStartCommand,
+		), nil)
+		return handlers.EndConversation()
+	}
 
 	// Pin the announcement message with notification for all users
-	if err == nil && sentAnnouncementMsg != nil {
-		err = h.messageSenderService.PinMessage(
-			sentAnnouncementMsg.Chat.Id,
-			sentAnnouncementMsg.MessageId,
-			true,
-		)
-		if err != nil {
-			log.Printf("%s: Error pinning announcement message: %v", utils.GetCurrentTypeName(), err)
-		}
+	if err := h.messageSenderService.PinMessage(sentAnnouncementMsg.Chat.Id, sentAnnouncementMsg.MessageId, true); err != nil {
+		log.Printf("%s: Error pinning announcement message: %v", utils.GetCurrentTypeName(), err)
+	}
+
+	// A started event is over for the bot: it disappears from /events, /topics and /topicAdd
+	if err := h.eventRepository.UpdateEventStatus(eventID, constants.EventStatusFinished); err != nil {
+		log.Printf("%s: Error during event update: %v", utils.GetCurrentTypeName(), err)
+		h.messageSenderService.Reply(ctx.EffectiveMessage, fmt.Sprintf(
+			"⚠️ Объявление опубликовано, но статус мероприятия обновить не удалось. Заверши его вручную через /%s.",
+			constants.EventEditCommand,
+		), nil)
+		return handlers.EndConversation()
 	}
 
 	// Confirmation message
-	h.messageSenderService.ReplyMarkdown(
+	h.messageSenderService.ReplyHtml(
 		ctx.EffectiveMessage,
-		fmt.Sprintf("✅ *Мероприятие успешно запущено!*\n\n🎯 *%s* _(ID: %d)_\n\n📢 Ссылка отправлена в чат объявлений.", event.Name, event.ID),
+		fmt.Sprintf("✅ Мероприятие %s (ID %d) запущено!\n\n📢 Объявление со ссылкой опубликовано в чате объявлений.",
+			formatters.FormatEventName(event.Name), event.ID),
 		nil,
 	)
-
-	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
-
-	// Clean up user data
-	h.userStore.Clear(ctx.EffectiveUser.Id)
 
 	return handlers.EndConversation()
 }
 
 // handleTextDuringConfirmation handles text messages during the confirmation state
 func (h *eventStartHandler) handleTextDuringConfirmation(b *gotgbot.Bot, ctx *ext.Context) error {
-	log.Printf("%s: User %d sent text during confirmation", utils.GetCurrentTypeName(), ctx.EffectiveUser.Id)
-
-	h.messageSenderService.Reply(
-		ctx.EffectiveMessage,
-		fmt.Sprintf("Пожалуйста, нажмите на одну из кнопок выше, или используйте /%s для отмены.", constants.CancelCommand),
-		nil,
-	)
+	h.messageSenderService.Reply(ctx.EffectiveMessage, formatters.UseButtonsText, nil)
 	return nil // Stay in the same state
+}
+
+// selectedEventID returns the event chosen earlier in the conversation, or reports the problem to the user
+func (h *eventStartHandler) selectedEventID(ctx *ext.Context) (int, bool) {
+	eventIDVal, _ := h.userStore.Get(ctx.EffectiveUser.Id, eventStartCtxDataKeySelectedEventID)
+	eventID, ok := eventIDVal.(int)
+	if !ok {
+		log.Printf("%s: Selected event ID is missing or invalid: %v", utils.GetCurrentTypeName(), eventIDVal)
+		h.messageSenderService.Reply(ctx.EffectiveMessage, formatters.LostEventText(constants.EventStartCommand), nil)
+		h.userStore.Clear(ctx.EffectiveUser.Id)
+		return 0, false
+	}
+	return eventID, true
+}
+
+// isValidEventLink reports whether link is an absolute http(s) URL that Telegram accepts for a button
+func isValidEventLink(link string) bool {
+	parsed, err := url.Parse(link)
+	if err != nil {
+		return false
+	}
+	return (parsed.Scheme == "http" || parsed.Scheme == "https") && parsed.Host != ""
 }
 
 // handleCallbackCancel processes the cancel button click
@@ -379,7 +322,7 @@ func (h *eventStartHandler) handleCallbackCancel(b *gotgbot.Bot, ctx *ext.Contex
 // handleCancel handles the /cancel command
 func (h *eventStartHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
-	h.messageSenderService.Reply(msg, "Операция старта мероприятия отменена.", nil)
+	h.messageSenderService.Reply(msg, "Операция запуска мероприятия отменена.", nil)
 	log.Printf("%s: Event start canceled", utils.GetCurrentTypeName())
 
 	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
@@ -412,6 +355,9 @@ func (h *eventStartHandler) MessageRemoveInlineKeyboard(b *gotgbot.Bot, userID *
 }
 
 func (h *eventStartHandler) SavePreviousMessageInfo(userID int64, sentMsg *gotgbot.Message) {
+	if sentMsg == nil {
+		return
+	}
 	h.userStore.SetPreviousMessageInfo(userID, sentMsg.MessageId, sentMsg.Chat.Id,
 		eventStartCtxDataKeyPreviousMessageID, eventStartCtxDataKeyPreviousChatID)
 }

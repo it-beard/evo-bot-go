@@ -60,6 +60,7 @@ func TestHelpHandler_ShowsHelpDependingOnRole(t *testing.T) {
 			assert.Equal(t, "HTML", help.Params["parse_mode"])
 			assert.Contains(t, help.Params["reply_parameters"], `"message_id":`)
 			assert.Equal(t, formatters.FormatHelpMessage(tt.wantAdmin, d.cfg), help.Params["text"])
+			assert.NotContains(t, help.Params["text"], "└ /code ", "the removed /code command is not listed")
 			if tt.wantAdmin {
 				assert.Contains(t, help.Params["text"], "Команды администратора")
 			} else {

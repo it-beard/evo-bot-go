@@ -11,8 +11,11 @@ import (
 )
 
 const (
-	adminOnlyText = "Эта команда доступна только администраторам."
-	clubOnlyText  = "Эта команда доступна только участникам клуба."
+	adminOnlyText   = "Эта команда доступна только администраторам."
+	clubOnlyText    = "Эта команда доступна только участникам клуба."
+	privateOnlyText = "<b>Прошу прощения</b> 🧐\n\nЭта команда работает только в <i>личной беседе</i> со мной. " +
+		"Напиши мне в ЛС, и я с удовольствием помогу (я тебя там пинганул, если мы общались ранее)." +
+		"\n\nЭто сообщение и твоя команда будут автоматически удалены через 10 секунд."
 )
 
 func newPermissionsFixture() (*PermissionsService, *testutils.MockBotClient) {
@@ -151,9 +154,8 @@ func TestPermissionsService_CheckPrivateChatType_Group(t *testing.T) {
 	require.Len(t, sends, 2, "a reply in the group and a ping in private")
 	reply := sends[0]
 	assert.Equal(t, testFullChatID, reply.Int64("chat_id"))
-	assert.Equal(t, "Markdown", reply.Params["parse_mode"])
-	assert.Contains(t, reply.Params["text"], "только в _личной беседе_")
-	assert.Contains(t, reply.Params["text"], "через 10 секунд")
+	assert.Equal(t, "HTML", reply.Params["parse_mode"])
+	assert.Equal(t, privateOnlyText, reply.Params["text"])
 	var rp gotgbot.ReplyParameters
 	require.NoError(t, reply.DecodeJSON("reply_parameters", &rp))
 	assert.Equal(t, msg.MessageId, rp.MessageId)
@@ -171,31 +173,49 @@ func TestPermissionsService_CheckPrivateChatType_ReplyErrorStillDenies(t *testin
 	assert.Len(t, client.CallsTo("sendMessage"), 1)
 }
 
-func TestPermissionsService_CheckAdminAndPrivateChat(t *testing.T) {
-	t.Run("non admin is rejected before the chat type check", func(t *testing.T) {
+func TestPermissionsService_CheckAdminAndPrivateChat_GroupChatGetsPrivateOnlyNotice(t *testing.T) {
+	// The chat type is checked first: whatever the user's role, a command sent to a group only gets the
+	// auto-deleted "private chat only" notice, and the membership is not even looked up.
+	for _, status := range []string{"member", "administrator", "creator", "left"} {
+		t.Run(status, func(t *testing.T) {
+			s, client := newPermissionsFixture()
+			client.SetMemberStatus(40, status)
+			msg := testutils.NewGroupMessage(40, testFullChatID, 0, "/cmd")
+
+			assert.False(t, s.CheckAdminAndPrivateChat(msg, "cmd"))
+
+			sends := client.CallsTo("sendMessage")
+			require.Len(t, sends, 2, "the private-only notice in the group and a ping in private")
+			assert.Equal(t, testFullChatID, sends[0].Int64("chat_id"))
+			assert.Equal(t, privateOnlyText, sends[0].Params["text"])
+			assert.Equal(t, "HTML", sends[0].Params["parse_mode"])
+			assert.Equal(t, int64(40), sends[1].Int64("chat_id"), "the user is pinged in the private chat")
+			assert.NotContains(t, client.SentTexts(), adminOnlyText, "no permanent \"only admins\" reply in the group")
+			assert.Empty(t, client.CallsTo("getChatMember"), "admin rights must not be checked outside private chats")
+		})
+	}
+}
+
+func TestPermissionsService_CheckAdminAndPrivateChat_PrivateChat(t *testing.T) {
+	t.Run("non admin is rejected", func(t *testing.T) {
 		s, client := newPermissionsFixture()
-		msg := testutils.NewGroupMessage(40, testFullChatID, 0, "/cmd")
+		client.SetMemberStatus(40, "member")
+		msg := testutils.NewPrivateMessage(40, "/cmd")
 
 		assert.False(t, s.CheckAdminAndPrivateChat(msg, "cmd"))
 		assert.Equal(t, []string{adminOnlyText}, client.SentTexts())
+		assertRepliedTo(t, client, msg, adminOnlyText)
+		assert.Len(t, client.CallsTo("getChatMember"), 1)
 	})
 
-	t.Run("admin in group chat is rejected", func(t *testing.T) {
-		s, client := newPermissionsFixture()
-		client.SetMemberStatus(40, "administrator")
-		msg := testutils.NewGroupMessage(40, testFullChatID, 0, "/cmd")
+	for _, status := range []string{"administrator", "creator"} {
+		t.Run(status+" passes", func(t *testing.T) {
+			s, client := newPermissionsFixture()
+			client.SetMemberStatus(40, status)
 
-		assert.False(t, s.CheckAdminAndPrivateChat(msg, "cmd"))
-		texts := client.SentTexts()
-		require.NotEmpty(t, texts)
-		assert.Contains(t, texts[0], "личной беседе")
-	})
-
-	t.Run("admin in private chat passes", func(t *testing.T) {
-		s, client := newPermissionsFixture()
-		client.SetMemberStatus(40, "creator")
-
-		assert.True(t, s.CheckAdminAndPrivateChat(testutils.NewPrivateMessage(40, "/cmd"), "cmd"))
-		assert.Empty(t, client.CallsTo("sendMessage"))
-	})
+			assert.True(t, s.CheckAdminAndPrivateChat(testutils.NewPrivateMessage(40, "/cmd"), "cmd"))
+			assert.Empty(t, client.CallsTo("sendMessage"))
+			assert.Len(t, client.CallsTo("getChatMember"), 1)
+		})
+	}
 }
