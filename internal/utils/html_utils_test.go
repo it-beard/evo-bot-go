@@ -294,3 +294,197 @@ func TestExtractNestedEntities(t *testing.T) {
 		})
 	}
 }
+
+func TestConvertEntityToHTML_AllEntityTypes(t *testing.T) {
+	tests := []struct {
+		name     string
+		text     string
+		entity   gotgbot.MessageEntity
+		expected string
+	}{
+		{
+			name:     "Italic with newline",
+			text:     "a\nb",
+			entity:   gotgbot.MessageEntity{Type: "italic"},
+			expected: "<em>a<br>\nb</em>",
+		},
+		{
+			name:     "Underline",
+			text:     "under",
+			entity:   gotgbot.MessageEntity{Type: "underline"},
+			expected: "<u>under</u>",
+		},
+		{
+			name:     "Strikethrough",
+			text:     "gone",
+			entity:   gotgbot.MessageEntity{Type: "strikethrough"},
+			expected: "<s>gone</s>",
+		},
+		{
+			name:     "Code escapes HTML",
+			text:     "a<b>&c",
+			entity:   gotgbot.MessageEntity{Type: "code"},
+			expected: "<code>a&lt;b&gt;&amp;c</code>",
+		},
+		{
+			name:     "Pre with language keeps raw newlines",
+			text:     "if a < b {\n}",
+			entity:   gotgbot.MessageEntity{Type: "pre", Language: "go"},
+			expected: "<pre><code class=\"language-go\">if a &lt; b {\n}</code></pre>",
+		},
+		{
+			name:     "Pre language is escaped",
+			text:     "x",
+			entity:   gotgbot.MessageEntity{Type: "pre", Language: `"><script>`},
+			expected: "<pre><code class=\"language-&#34;&gt;&lt;script&gt;\">x</code></pre>",
+		},
+		{
+			name:     "Pre without language",
+			text:     "line1\nline2",
+			entity:   gotgbot.MessageEntity{Type: "pre"},
+			expected: "<pre><code>line1\nline2</code></pre>",
+		},
+		{
+			name:     "Text link escapes URL",
+			text:     "click",
+			entity:   gotgbot.MessageEntity{Type: "text_link", Url: `https://e.com/?a=1&b="2"`},
+			expected: "<a href=\"https://e.com/?a=1&amp;b=&#34;2&#34;\">click</a>",
+		},
+		{
+			name:     "Text mention with user",
+			text:     "Bob",
+			entity:   gotgbot.MessageEntity{Type: "text_mention", User: &gotgbot.User{Id: 42}},
+			expected: "<a href=\"tg://user?id=42\">Bob</a>",
+		},
+		{
+			name:     "Text mention without user",
+			text:     "Bob <x>",
+			entity:   gotgbot.MessageEntity{Type: "text_mention"},
+			expected: "Bob &lt;x&gt;",
+		},
+		{
+			name:     "Mention",
+			text:     "@bob",
+			entity:   gotgbot.MessageEntity{Type: "mention"},
+			expected: "@bob",
+		},
+		{
+			name:     "Hashtag",
+			text:     "#go",
+			entity:   gotgbot.MessageEntity{Type: "hashtag"},
+			expected: "#go",
+		},
+		{
+			name:     "Cashtag",
+			text:     "$USD",
+			entity:   gotgbot.MessageEntity{Type: "cashtag"},
+			expected: "$USD",
+		},
+		{
+			name:     "Bot command",
+			text:     "/start",
+			entity:   gotgbot.MessageEntity{Type: "bot_command"},
+			expected: "/start",
+		},
+		{
+			name:     "URL with query is escaped",
+			text:     "https://x.io/?a=1&b=2",
+			entity:   gotgbot.MessageEntity{Type: "url"},
+			expected: "<a href=\"https://x.io/?a=1&amp;b=2\">https://x.io/?a=1&amp;b=2</a>",
+		},
+		{
+			name:     "Email",
+			text:     "me@example.com",
+			entity:   gotgbot.MessageEntity{Type: "email"},
+			expected: "<a href=\"mailto:me@example.com\">me@example.com</a>",
+		},
+		{
+			name:     "Phone number",
+			text:     "+1234567",
+			entity:   gotgbot.MessageEntity{Type: "phone_number"},
+			expected: "<a href=\"tel:+1234567\">+1234567</a>",
+		},
+		{
+			name:     "Spoiler",
+			text:     "secret",
+			entity:   gotgbot.MessageEntity{Type: "spoiler"},
+			expected: "<span class=\"spoiler\">secret</span>",
+		},
+		{
+			name:     "Blockquote",
+			text:     "quote\nline",
+			entity:   gotgbot.MessageEntity{Type: "blockquote"},
+			expected: "<blockquote>quote<br>\nline</blockquote>",
+		},
+		{
+			name:     "Unknown type is escaped plain text",
+			text:     "<custom>",
+			entity:   gotgbot.MessageEntity{Type: "custom_emoji"},
+			expected: "&lt;custom&gt;",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, convertEntityToHTML(tt.text, tt.entity))
+		})
+	}
+}
+
+func TestConvertToHTML_SameOffsetPrefersLongerEntity(t *testing.T) {
+	entities := []gotgbot.MessageEntity{
+		{Type: "bold", Offset: 0, Length: 5},
+		{Type: "italic", Offset: 0, Length: 11},
+	}
+
+	result := ConvertToHTML("Hello world", entities)
+
+	assert.Equal(t, "<em>Hello world</em>", result)
+}
+
+func TestConvertToHTML_DoesNotMutateInputEntities(t *testing.T) {
+	entities := []gotgbot.MessageEntity{
+		{Type: "italic", Offset: 6, Length: 5},
+		{Type: "bold", Offset: 0, Length: 5},
+	}
+	original := append([]gotgbot.MessageEntity(nil), entities...)
+
+	result := ConvertToHTML("Hello world", entities)
+
+	assert.Equal(t, "<strong>Hello</strong> <em>world</em>", result)
+	assert.Equal(t, original, entities)
+}
+
+func TestConvertToHTML_UTF16OffsetsWithEmoji(t *testing.T) {
+	// "👍" occupies two UTF-16 code units, so "bold" starts at UTF-16 offset 3
+	result := ConvertToHTML("👍 bold!", []gotgbot.MessageEntity{{Type: "bold", Offset: 3, Length: 4}})
+
+	assert.Equal(t, "👍 <strong>bold</strong>!", result)
+}
+
+func TestConvertToHTML_MixedEntitiesAndEscaping(t *testing.T) {
+	text := "Hi @bob, see https://x.io & <tag>"
+	entities := []gotgbot.MessageEntity{
+		{Type: "mention", Offset: 3, Length: 4},
+		{Type: "url", Offset: 13, Length: 12},
+	}
+
+	result := ConvertToHTML(text, entities)
+
+	assert.Equal(t, "Hi @bob, see <a href=\"https://x.io\">https://x.io</a> &amp; &lt;tag&gt;", result)
+}
+
+func TestEscapeAndConvertNewlines_TrailingAndConsecutiveNewlines(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{input: "a\n", expected: "a<br>\n"},
+		{input: "a\n\nb", expected: "a<br>\n<br>\nb"},
+		{input: "\n", expected: "<br>\n"},
+	}
+
+	for _, tt := range tests {
+		assert.Equal(t, tt.expected, escapeAndConvertNewlines(tt.input), "input %q", tt.input)
+	}
+}

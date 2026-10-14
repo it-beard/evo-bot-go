@@ -23,13 +23,16 @@ func NewOpenAiClient() (*OpenAiClient, error) {
 
 	apiKey := appConfig.OpenAIAPIKey
 
-	client := openai.NewClient(
-		option.WithAPIKey(apiKey),
-	)
+	return NewOpenAiClientWithOptions(option.WithAPIKey(apiKey)), nil
+}
+
+// NewOpenAiClientWithOptions creates a client with explicit request options (e.g. a custom base URL in tests)
+func NewOpenAiClientWithOptions(opts ...option.RequestOption) *OpenAiClient {
+	client := openai.NewClient(opts...)
 
 	return &OpenAiClient{
 		client: &client,
-	}, nil
+	}
 }
 
 // GetCompletion sends a message to OpenAI and returns the response

@@ -56,27 +56,34 @@ func (s *DailySummarizationTask) run() {
 		case <-s.stop:
 			return
 		case now := <-ticker.C:
-			// Check if it's time to run
-			if now.After(nextRun) {
-				log.Printf("%s: Running scheduled summarization", utils.GetCurrentTypeName())
-
-				// Run summarization in a separate goroutine
-				go func() {
-					ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-					defer cancel()
-
-					// For scheduled tasks, always send to the chat (not to DM)
-					if err := s.summarizationService.RunDailySummarization(ctx, false); err != nil {
-						log.Printf("%s: Error running daily summarization: %v", utils.GetCurrentTypeName(), err)
-					}
-				}()
-
-				// Calculate next run time
-				nextRun = s.calculateNextRun()
-				log.Printf("%s: Next summarization scheduled for: %v", utils.GetCurrentTypeName(), nextRun)
-			}
+			nextRun = s.runIfDue(now, nextRun)
 		}
 	}
+}
+
+// runIfDue starts the daily summarization once the scheduled time has passed and returns the next scheduled time
+func (s *DailySummarizationTask) runIfDue(now time.Time, nextRun time.Time) time.Time {
+	if !now.After(nextRun) {
+		return nextRun
+	}
+
+	log.Printf("%s: Running scheduled summarization", utils.GetCurrentTypeName())
+
+	// Run summarization in a separate goroutine
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		defer cancel()
+
+		// For scheduled tasks, always send to the chat (not to DM)
+		if err := s.summarizationService.RunDailySummarization(ctx, false); err != nil {
+			log.Printf("%s: Error running daily summarization: %v", utils.GetCurrentTypeName(), err)
+		}
+	}()
+
+	// Calculate next run time
+	nextRun = s.calculateNextRun()
+	log.Printf("%s: Next summarization scheduled for: %v", utils.GetCurrentTypeName(), nextRun)
+	return nextRun
 }
 
 // calculateNextRun calculates the next run time

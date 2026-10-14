@@ -243,3 +243,22 @@ func TestIsUserAdminOrCreator_Error(t *testing.T) {
 	result := IsUserAdminOrCreator(bot, testUserID, mockConfig)
 	assert.False(t, result, "API error should result in user not having admin privileges")
 }
+
+func TestIsMessageFromSuperGroupChat(t *testing.T) {
+	tests := []struct {
+		chatType string
+		expected bool
+	}{
+		{chatType: "supergroup", expected: true},
+		{chatType: "group", expected: false},
+		{chatType: "private", expected: false},
+		{chatType: "channel", expected: false},
+		{chatType: "", expected: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.chatType, func(t *testing.T) {
+			assert.Equal(t, tt.expected, IsMessageFromSuperGroupChat(gotgbot.Chat{Id: -100123, Type: tt.chatType}))
+		})
+	}
+}

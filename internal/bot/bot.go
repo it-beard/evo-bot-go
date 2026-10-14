@@ -71,6 +71,17 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 		return nil, err
 	}
 
+	// Setup database
+	db, err := setupDatabase(appConfig.DBConnection)
+	if err != nil {
+		return nil, err
+	}
+
+	return newTgBotClient(bot, db, openaiClient, appConfig), nil
+}
+
+// newTgBotClient wires dispatcher, repositories, services, tasks and handlers around an initialized bot and database
+func newTgBotClient(bot *gotgbot.Bot, db *database.DB, openaiClient *clients.OpenAiClient, appConfig *config.Config) *TgBotClient {
 	// Setup dispatcher with error handling
 	dispatcher := ext.NewDispatcher(&ext.DispatcherOpts{
 		Error: func(b *gotgbot.Bot, ctx *ext.Context, err error) ext.DispatcherAction {
@@ -82,12 +93,6 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 
 	// Initialize updater
 	updater := ext.NewUpdater(dispatcher, nil)
-
-	// Setup database
-	db, err := setupDatabase(appConfig.DBConnection)
-	if err != nil {
-		return nil, err
-	}
 
 	// Initialize repositories
 	eventRepository := repositories.NewEventRepository(db.DB)
@@ -218,7 +223,7 @@ func NewTgBotClient(openaiClient *clients.OpenAiClient, appConfig *config.Config
 	// Register all handlers
 	client.registerHandlers(deps)
 
-	return client, nil
+	return client
 }
 
 // setupDatabase initializes the database connection and schema

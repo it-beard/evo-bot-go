@@ -20,6 +20,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Race detection**: `go test -race ./...`
 - **Enhanced test output**: `go run gotest.tools/gotestsum@latest --format pkgname --format-icons hivis`
 
+### Test Infrastructure
+Tests are offline: no network, no real database. Shared helpers live in `internal/testutils` (import only from `_test.go` files):
+- `NewTestBot()` → a real `*gotgbot.Bot` backed by `MockBotClient`, which records every Bot API call and returns sensible defaults (override per method with `On`/`OnJSON`/`OnError`, control `getChatMember` with `SetMemberStatus`)
+- `NewMockDB(t)` → `*sql.DB` on go-sqlmock (regexp matching; unmet expectations fail the test), used with real repositories
+- `NewMockOpenAI(t)` → `*clients.OpenAiClient` pointed at a fake OpenAI server
+- Update builders (`NewPrivateMessage`, `NewGroupMessage`, `CallbackUpdate`, `PollAnswerUpdate`, ...) and `Dispatch(bot, handler, update)` to drive handlers end-to-end; reuse one handler value across updates to keep conversation state
+
 ## High-Level Architecture
 
 This is a Telegram bot for the Evocoders Club built in Go with a layered architecture:

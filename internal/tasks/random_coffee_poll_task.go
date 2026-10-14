@@ -59,34 +59,42 @@ func (t *RandomCoffeePollTask) run() {
 		case <-t.stop:
 			return
 		case now := <-ticker.C:
-			if now.After(nextRun) {
-				due, err := t.randomCoffeeService.IsPollDue()
-				if err != nil {
-					log.Printf("%s: Error checking if poll is due, proceeding anyway: %v", utils.GetCurrentTypeName(), err)
-					due = true
-				}
-
-				if due {
-					log.Printf("%s: Running scheduled random coffee poll", utils.GetCurrentTypeName())
-
-					go func() {
-						ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-						defer cancel()
-
-						if err := t.randomCoffeeService.SendPoll(ctx); err != nil {
-							log.Printf("%s: Error sending random coffee poll: %v", utils.GetCurrentTypeName(), err)
-						}
-					}()
-				} else {
-					log.Printf("%s: Skipping random coffee poll this week (interval is %d weeks)",
-						utils.GetCurrentTypeName(), t.config.RandomCoffeeIntervalWeeks)
-				}
-
-				nextRun = t.calculateNextRun()
-				log.Printf("%s: Next random coffee poll scheduled for: %v", utils.GetCurrentTypeName(), nextRun)
-			}
+			nextRun = t.runIfDue(now, nextRun)
 		}
 	}
+}
+
+// runIfDue sends the random coffee poll (if it is due this week) once the scheduled time has passed and returns the next scheduled time
+func (t *RandomCoffeePollTask) runIfDue(now time.Time, nextRun time.Time) time.Time {
+	if !now.After(nextRun) {
+		return nextRun
+	}
+
+	due, err := t.randomCoffeeService.IsPollDue()
+	if err != nil {
+		log.Printf("%s: Error checking if poll is due, proceeding anyway: %v", utils.GetCurrentTypeName(), err)
+		due = true
+	}
+
+	if due {
+		log.Printf("%s: Running scheduled random coffee poll", utils.GetCurrentTypeName())
+
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+			defer cancel()
+
+			if err := t.randomCoffeeService.SendPoll(ctx); err != nil {
+				log.Printf("%s: Error sending random coffee poll: %v", utils.GetCurrentTypeName(), err)
+			}
+		}()
+	} else {
+		log.Printf("%s: Skipping random coffee poll this week (interval is %d weeks)",
+			utils.GetCurrentTypeName(), t.config.RandomCoffeeIntervalWeeks)
+	}
+
+	nextRun = t.calculateNextRun()
+	log.Printf("%s: Next random coffee poll scheduled for: %v", utils.GetCurrentTypeName(), nextRun)
+	return nextRun
 }
 
 // calculateNextRun calculates the next run time
