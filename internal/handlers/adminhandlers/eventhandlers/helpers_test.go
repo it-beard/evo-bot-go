@@ -32,7 +32,7 @@ const (
 	sqlGetLastEvents = "SELECT id, name, type, status, started_at, created_at, updated_at FROM events " +
 		"ORDER BY started_at DESC NULLS LAST LIMIT $1"
 	sqlGetEventByID  = "SELECT id, name, type, status, started_at, created_at, updated_at FROM events WHERE id = $1"
-	sqlCreateEvent   = "INSERT INTO events (name, type, status) VALUES ($1, $2, $3) RETURNING id"
+	sqlCreateEvent   = "INSERT INTO events (name, type, status, started_at) VALUES ($1, $2, $3, $4) RETURNING id"
 	sqlUpdateName    = "UPDATE events SET name = $1, updated_at = NOW() WHERE id = $2"
 	sqlUpdateStatus  = "UPDATE events SET status = $1, updated_at = NOW() WHERE id = $2"
 	sqlUpdateStart   = "UPDATE events SET started_at = $1, updated_at = NOW() WHERE id = $2"

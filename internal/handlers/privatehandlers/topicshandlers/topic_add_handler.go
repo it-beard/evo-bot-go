@@ -6,6 +6,7 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"time"
 
 	"evo-bot-go/internal/buttons"
 	"evo-bot-go/internal/config"
@@ -97,8 +98,8 @@ func (h *topicAddHandler) startTopicAdd(b *gotgbot.Bot, ctx *ext.Context) error 
 		return handlers.EndConversation()
 	}
 
-	// Get last actual events to show for selection
-	events, err := h.eventRepository.GetLastActualEvents(10)
+	// Get upcoming events to show for selection
+	events, err := h.eventRepository.GetUpcomingEvents(10)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Ошибка при получении списка мероприятий.", nil)
 		log.Printf("%s: Error during events retrieval: %v", utils.GetCurrentTypeName(), err)
@@ -153,6 +154,16 @@ func (h *topicAddHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Context)
 			nil,
 		)
 		log.Printf("%s: Error during event retrieval: %v", utils.GetCurrentTypeName(), err)
+		return nil // Stay in the same state
+	}
+
+	// Topics can be added only to events that have not taken place yet
+	if !event.IsUpcoming(time.Now()) {
+		h.messageSenderService.Reply(
+			msg,
+			fmt.Sprintf("Мероприятие с ID %d уже прошло, к нему нельзя добавить темы и вопросы. Пожалуйста, выбери ID из списка выше.", eventID),
+			nil,
+		)
 		return nil // Stay in the same state
 	}
 

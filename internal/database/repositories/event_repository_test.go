@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"errors"
 	"testing"
+	"time"
 
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/testutils"
@@ -16,10 +17,10 @@ import (
 const (
 	eventInsertSQL              = `INSERT INTO events (name, type, status) VALUES ($1, $2, $3) RETURNING id`
 	eventInsertWithStartedAtSQL = `INSERT INTO events (name, type, status, started_at) VALUES ($1, $2, $3, $4) RETURNING id`
-	eventLastActualSQL          = `
+	eventUpcomingSQL            = `
 		SELECT id, name, type, status, started_at, created_at, updated_at
 		FROM events
-		WHERE status = $1
+		WHERE status = $1 AND (started_at IS NULL OR started_at > NOW())
 		ORDER BY started_at ASC NULLS LAST
 		LIMIT $2`
 	eventLastSQL = `
@@ -140,10 +141,10 @@ type eventListCase struct {
 func eventListCases() []eventListCase {
 	return []eventListCase{
 		{
-			name: "GetLastActualEvents",
-			sql:  eventLastActualSQL,
+			name: "GetUpcomingEvents",
+			sql:  eventUpcomingSQL,
 			args: []driver.Value{"actual", 5},
-			call: func(r *EventRepository) ([]Event, error) { return r.GetLastActualEvents(5) },
+			call: func(r *EventRepository) ([]Event, error) { return r.GetUpcomingEvents(5) },
 		},
 		{
 			name: "GetLastEvents",
@@ -538,4 +539,47 @@ func TestEventRepository_GetEventByID_ScanError(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, event)
 	assert.Contains(t, err.Error(), "failed to get event with ID 8")
+}
+
+func TestEvent_IsUpcoming(t *testing.T) {
+	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	past := now.Add(-time.Minute)
+	future := now.Add(time.Minute)
+
+	tests := []struct {
+		name      string
+		status    constants.EventStatus
+		startedAt *time.Time
+		want      bool
+	}{
+		{"actual, starts later", constants.EventStatusActual, &future, true},
+		{"actual, without start date", constants.EventStatusActual, nil, true},
+		{"actual, start date has passed", constants.EventStatusActual, &past, false},
+		{"actual, starts right now", constants.EventStatusActual, &now, false},
+		{"finished, starts later", constants.EventStatusFinished, &future, false},
+		{"finished, without start date", constants.EventStatusFinished, nil, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			event := Event{Status: string(tt.status), StartedAt: tt.startedAt}
+			assert.Equal(t, tt.want, event.IsUpcoming(now))
+		})
+	}
+}
+
+func TestEventRepository_GetUpcomingEvents_HidesPastAndFinishedEvents(t *testing.T) {
+	db, mock, rec := newRecordingMockDB(t)
+	repo := NewEventRepository(db)
+
+	mock.ExpectQuery(`FROM events`).WithArgs("actual", 10).WillReturnRows(sqlmock.NewRows(eventColumns))
+
+	_, err := repo.GetUpcomingEvents(10)
+	require.NoError(t, err)
+
+	// Filtering happens in SQL with the database clock: only actual events that have not started yet
+	// (or have no start date) are returned, so stale "actual" events never reach /events, /topics or /topicAdd
+	query := rec.last()
+	assert.Contains(t, query, "WHERE status = $1 AND (started_at IS NULL OR started_at > NOW())")
+	assert.Contains(t, query, "ORDER BY started_at ASC NULLS LAST")
 }

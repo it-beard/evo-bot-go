@@ -36,7 +36,7 @@ func TestEventsHandler_DatabaseError(t *testing.T) {
 	assert.Equal(t, []string{"Ошибка при получении списка мероприятий."}, d.client.SentTexts())
 }
 
-func TestEventsHandler_NoActualEvents(t *testing.T) {
+func TestEventsHandler_NoUpcomingEvents(t *testing.T) {
 	d := newDeps(t)
 	d.sql.ExpectQuery(selectActiveEvents).WithArgs("actual", 10).WillReturnRows(sqlmock.NewRows(eventColumns))
 
@@ -45,9 +45,9 @@ func TestEventsHandler_NoActualEvents(t *testing.T) {
 	assert.Equal(t, []string{"На данный момент нет актуальных мероприятий."}, d.client.SentTexts())
 }
 
-func TestEventsHandler_ListsActualEvents(t *testing.T) {
+func TestEventsHandler_ListsUpcomingEvents(t *testing.T) {
 	d := newDeps(t)
-	startedAt := time.Date(2020, 3, 4, 18, 30, 0, 0, time.UTC)
+	startedAt := time.Date(2030, 3, 4, 18, 30, 0, 0, time.UTC)
 	d.sql.ExpectQuery(selectActiveEvents).WithArgs("actual", 10).WillReturnRows(
 		sqlmock.NewRows(eventColumns).
 			AddRow(1, "Go Meetup", "meetup", "actual", startedAt, testTime, testTime).
@@ -66,7 +66,7 @@ func TestEventsHandler_ListsActualEvents(t *testing.T) {
 
 	assert.Contains(t, text, "📋 Список ближайших мероприятий:")
 	assert.Contains(t, text, "🎙 _митап_: *Go Meetup*")
-	assert.Contains(t, text, "_когда_: 04.03.2020 в 18:30 UTC")
+	assert.Contains(t, text, "_когда_: 04.03.2030 в 18:30 UTC")
 	assert.Contains(t, text, "📚 _книжный клуб_: *Book Club*")
 	assert.Contains(t, text, "_когда_: не указано")
 	assert.Contains(t, text, "Добавить темы и вопросы /topicAdd.")

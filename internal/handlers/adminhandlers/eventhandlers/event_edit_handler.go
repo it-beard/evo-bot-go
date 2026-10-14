@@ -43,6 +43,10 @@ const (
 	eventEditTypeName      = "name"
 	eventEditTypeStartDate = "startDate"
 	eventEditTypeType      = "type"
+
+	// Shown whenever an admin saves an actual event whose start date has already passed
+	pastStartDateWarning = "⚠️ Дата начала уже прошла, поэтому мероприятие не показывается в /" + constants.EventsCommand +
+		". Если это ошибка, исправь дату через /" + constants.EventEditCommand + "."
 )
 
 type eventEditHandler struct {
@@ -156,7 +160,7 @@ func (h *eventEditHandler) handleSelectEvent(b *gotgbot.Bot, ctx *ext.Context) e
 	}
 
 	// Check if content with this ID exists
-	_, err = h.eventRepository.GetEventByID(eventID)
+	event, err := h.eventRepository.GetEventByID(eventID)
 	if err != nil {
 		log.Printf("%s: Error checking content with ID %d: %v", utils.GetCurrentTypeName(), eventID, err)
 		h.messageSenderService.Reply(
@@ -175,7 +179,10 @@ func (h *eventEditHandler) handleSelectEvent(b *gotgbot.Bot, ctx *ext.Context) e
 	// Ask what the user wants to edit
 	sentMsg, _ := h.messageSenderService.ReplyWithReturnMessage(
 		msg,
-		fmt.Sprintf("Что ты хочешь отредактировать?\n/1. Название\n/2. Дату начала\n/3. Тип\n\nВведи номер:"),
+		fmt.Sprintf(
+			"Что ты хочешь отредактировать?\n/1. Название\n/2. Дату начала\n/3. Тип\n/4. %s\n\nВведи номер:",
+			statusToggleLabel(event),
+		),
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: buttons.CancelButton(eventEditCallbackConfirmCancel),
 		},
@@ -219,14 +226,19 @@ func (h *eventEditHandler) handleSelectEditType(b *gotgbot.Bot, ctx *ext.Context
 
 	// Parse the selection
 	selection, err := strconv.Atoi(selectionText)
-	if err != nil || selection < 1 || selection > 3 {
+	if err != nil || selection < 1 || selection > 4 {
 		h.messageSenderService.Reply(msg, fmt.Sprintf(
-			"Неверный выбор. Пожалуйста, введи число от 1 до 3, или используй кнопку для отмены",
+			"Неверный выбор. Пожалуйста, введи число от 1 до 4, или используй кнопку для отмены",
 		), nil)
 		return nil // Stay in the same state
 	}
 
 	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
+
+	// Changing the status needs no extra input, so it is applied right away
+	if selection == 4 {
+		return h.toggleStatus(ctx, event)
+	}
 
 	var editType string
 	var nextState string
@@ -384,10 +396,15 @@ func (h *eventEditHandler) handleEditStartedAt(b *gotgbot.Bot, ctx *ext.Context)
 		return handlers.EndConversation()
 	}
 
+	warning := ""
+	if !startedAt.After(time.Now()) {
+		warning = "\n" + pastStartDateWarning
+	}
+
 	// Confirmation message
 	h.messageSenderService.ReplyMarkdown(msg, fmt.Sprintf(
-		"Дата начала мероприятия с ID %d успешно обновлена на *%s* \n\nДля продолжения редактирования мероприятия используй команду /%s.\nДля просмотра всех команд используй команду /%s",
-		eventID, startedAt.Format("02.01.2006 15:04 UTC"), constants.EventEditCommand, constants.HelpCommand,
+		"Дата начала мероприятия с ID %d успешно обновлена на *%s* %s\n\nДля продолжения редактирования мероприятия используй команду /%s.\nДля просмотра всех команд используй команду /%s",
+		eventID, startedAt.Format("02.01.2006 15:04 UTC"), warning, constants.EventEditCommand, constants.HelpCommand,
 	), nil)
 
 	// Clean up user data
@@ -487,6 +504,62 @@ func (h *eventEditHandler) handleEditType(b *gotgbot.Bot, ctx *ext.Context) erro
 	h.userStore.Clear(ctx.EffectiveUser.Id)
 
 	return handlers.EndConversation()
+}
+
+// 4.4. toggleStatus finishes an actual event or makes a finished event actual again.
+// Events that pass without the bot (no /eventStart) stay actual until an admin finishes them here.
+func (h *eventEditHandler) toggleStatus(ctx *ext.Context, event *repositories.Event) error {
+	msg := ctx.EffectiveMessage
+
+	newStatus := constants.EventStatusFinished
+	if event.Status == string(constants.EventStatusFinished) {
+		newStatus = constants.EventStatusActual
+	}
+
+	if err := h.eventRepository.UpdateEventStatus(event.ID, newStatus); err != nil {
+		h.messageSenderService.Reply(msg, "Произошла ошибка при обновлении статуса мероприятия.", nil)
+		log.Printf("%s: Error during event update: %v", utils.GetCurrentTypeName(), err)
+		h.userStore.Clear(ctx.EffectiveUser.Id)
+		return handlers.EndConversation()
+	}
+
+	var result string
+	if newStatus == constants.EventStatusFinished {
+		result = fmt.Sprintf(
+			"Мероприятие *%s* (ID %d) завершено %s\nОно больше не показывается в /%s, /%s и /%s.",
+			event.Name, event.ID, formatters.GetStatusEmoji(newStatus),
+			constants.EventsCommand, constants.TopicsCommand, constants.TopicAddCommand,
+		)
+	} else {
+		result = fmt.Sprintf(
+			"Мероприятие *%s* (ID %d) снова актуально %s",
+			event.Name, event.ID, formatters.GetStatusEmoji(newStatus),
+		)
+		event.Status = string(newStatus)
+		if !event.IsUpcoming(time.Now()) {
+			result += fmt.Sprintf("\n%s", pastStartDateWarning)
+		}
+	}
+
+	h.messageSenderService.ReplyMarkdown(
+		msg,
+		fmt.Sprintf(
+			"%s\n\nДля продолжения редактирования мероприятия используй команду /%s.\nДля просмотра всех команд используй команду /%s",
+			result, constants.EventEditCommand, constants.HelpCommand,
+		),
+		nil,
+	)
+
+	h.userStore.Clear(ctx.EffectiveUser.Id)
+	return handlers.EndConversation()
+}
+
+// statusToggleLabel returns the edit menu entry that switches the event to the opposite status
+func statusToggleLabel(event *repositories.Event) string {
+	if event.Status == string(constants.EventStatusFinished) {
+		return fmt.Sprintf("Вернуть в актуальные %s", formatters.GetStatusEmoji(constants.EventStatusActual))
+	}
+	return fmt.Sprintf("Завершить %s", formatters.GetStatusEmoji(constants.EventStatusFinished))
 }
 
 // handleCallbackCancel processes the cancel button click

@@ -39,7 +39,7 @@ func FormatHelpMessage(isAdmin bool, config *config.Config) string {
 		adminHelpText := "\n\n<b>🔐 Команды администратора</b>\n" +
 			fmt.Sprintf("└ /%s - Начать мероприятие\n", constants.EventStartCommand) +
 			fmt.Sprintf("└ /%s - Создать новое мероприятие\n", constants.EventSetupCommand) +
-			fmt.Sprintf("└ /%s - Редактировать мероприятие\n", constants.EventEditCommand) +
+			fmt.Sprintf("└ /%s - Редактировать или завершить мероприятие\n", constants.EventEditCommand) +
 			fmt.Sprintf("└ /%s - Удалить мероприятие\n", constants.EventDeleteCommand) +
 			fmt.Sprintf("└ /%s - Просмотреть темы и вопросы к предстоящим мероприятиям <b>с возможностью удаления</b>\n", constants.ShowTopicsCommand) +
 			fmt.Sprintf("└ /%s - Ввести код для авторизации TG-клиента (задом наперед)\n", constants.CodeCommand) +

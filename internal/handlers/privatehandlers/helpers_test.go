@@ -335,7 +335,7 @@ const (
 	insertTemplateSQL    = `INSERT INTO prompting_templates \(template_key, template_text\) VALUES \(\$1, \$2\) ON CONFLICT \(template_key\) DO NOTHING`
 	selectGroupMsgsSQL   = `FROM group_messages\s+WHERE group_topic_id = \$1\s+ORDER BY created_at DESC`
 	selectGroupTopicSQL  = `FROM group_topics\s+WHERE topic_id = \$1`
-	selectActiveEvents   = `FROM events\s+WHERE status = \$1\s+ORDER BY started_at ASC NULLS LAST\s+LIMIT \$2`
+	selectActiveEvents   = `FROM events\s+WHERE status = \$1 AND \(started_at IS NULL OR started_at > NOW\(\)\)\s+ORDER BY started_at ASC NULLS LAST\s+LIMIT \$2`
 	selectProfilesActive = `FROM profiles p\s+INNER JOIN users u ON p.user_id = u.id`
 	selectUserByTgID     = `FROM users\s+WHERE tg_id = \$1`
 	selectUserByUsername = `FROM users\s+WHERE tg_username = \$1`

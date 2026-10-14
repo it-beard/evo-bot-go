@@ -31,15 +31,18 @@ func enterSetupName(t *testing.T, env *testEnv) gotgbot.Message {
 	return env.lastSent().Msg
 }
 
-// chooseSetupType selects the "meetup" type (event gets id 15) and returns the start date prompt
+// chooseSetupType selects the "meetup" type and returns the start date prompt
 func chooseSetupType(t *testing.T, env *testEnv) gotgbot.Message {
 	t.Helper()
 	enterSetupName(t, env)
-	env.mock.ExpectQuery(regexp.QuoteMeta(sqlCreateEvent)).
-		WithArgs("Go Meetup", constants.EventTypeMeetup, constants.EventStatusActual).
-		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(15))
 	require.True(t, env.sendText(testAdminID, "/2"))
 	return env.lastSent().Msg
+}
+
+// expectCreateEvent expects the "Go Meetup" meetup to be created with the given start and id 15
+func expectCreateEvent(env *testEnv, startedAt time.Time) *sqlmock.ExpectedQuery {
+	return env.mock.ExpectQuery(regexp.QuoteMeta(sqlCreateEvent)).
+		WithArgs("Go Meetup", constants.EventTypeMeetup, constants.EventStatusActual, startedAt)
 }
 
 func TestEventSetupHandler_FullFlowCreatesEvent(t *testing.T) {
@@ -78,12 +81,10 @@ func TestEventSetupHandler_FullFlowCreatesEvent(t *testing.T) {
 		assert.Empty(t, env.client.CallsTo("editMessageReplyMarkup"), "input %q", input)
 	}
 
-	// 5. A valid type creates the event and asks for the start date
+	// 5. A valid type asks for the start date without touching the database yet
 	env.reset()
-	env.mock.ExpectQuery(regexp.QuoteMeta(sqlCreateEvent)).
-		WithArgs("Go Meetup", constants.EventTypeMeetup, constants.EventStatusActual).
-		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(15))
 	require.True(t, env.sendText(testAdminID, "/2"))
+	require.NoError(t, env.mock.ExpectationsWereMet(), "the event must not be created before the date is known")
 	env.requireKeyboardRemoved(typePrompt.Msg)
 	datePrompt := env.lastSent()
 	assert.Equal(t, "Когда стартует мероприятие? Введи дату и время в формате DD.MM.YYYY HH:MM:", datePrompt.Msg.Text)
@@ -96,63 +97,51 @@ func TestEventSetupHandler_FullFlowCreatesEvent(t *testing.T) {
 		"Неверный формат даты. Пожалуйста, введи дату и время в формате DD.MM.YYYY HH:MM или используй кнопку для отмены.",
 	}, env.texts())
 
-	// 7. A valid date is stored on the created event
+	// 7. A valid date creates the event with its start date in one go
 	env.reset()
-	env.mock.ExpectExec(regexp.QuoteMeta(sqlUpdateStart)).
-		WithArgs(time.Date(2025, 4, 10, 19, 30, 0, 0, time.UTC), 15).
-		WillReturnResult(sqlmock.NewResult(0, 1))
-	require.True(t, env.sendText(testAdminID, "10.04.2025 19:30"))
+	expectCreateEvent(env, time.Date(2030, 4, 10, 19, 30, 0, 0, time.UTC)).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(15))
+	require.True(t, env.sendText(testAdminID, "10.04.2030 19:30"))
 
 	env.requireKeyboardRemoved(datePrompt.Msg)
 	assert.Equal(t, []string{
-		"Запись о мероприятии '*Go Meetup*' успешно создана с ID: 15 и датой старта: *10.04.2025 19:30*\n\n" +
+		"Запись о мероприятии '*Go Meetup*' успешно создана с ID: 15 и датой старта: *10.04.2030 19:30*\n\n" +
 			"Для редактирования мероприятия используй команду /eventEdit.\n" +
 			"Для просмотра всех команд используй команду /help",
 	}, env.texts())
 	assert.Equal(t, "Markdown", env.lastSent().Call.Params["parse_mode"])
-	assert.False(t, env.sendText(testAdminID, "10.04.2025 19:30"), "conversation must be over")
+	assert.False(t, env.sendText(testAdminID, "10.04.2030 19:30"), "conversation must be over")
+}
+
+func TestEventSetupHandler_PastStartDateIsSavedWithWarning(t *testing.T) {
+	env := newTestEnv(t, NewEventSetupHandler)
+	chooseSetupType(t, env)
+	env.reset()
+
+	expectCreateEvent(env, time.Date(2025, 4, 10, 19, 30, 0, 0, time.UTC)).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(15))
+	require.True(t, env.sendText(testAdminID, "10.04.2025 19:30"))
+
+	assert.Equal(t, []string{
+		"Запись о мероприятии '*Go Meetup*' успешно создана с ID: 15 и датой старта: *10.04.2025 19:30*\n" +
+			pastStartDateWarning + "\n\n" +
+			"Для редактирования мероприятия используй команду /eventEdit.\n" +
+			"Для просмотра всех команд используй команду /help",
+	}, env.texts())
+	assert.Contains(t, pastStartDateWarning, "не показывается в /events")
 }
 
 func TestEventSetupHandler_CreateEventFailureEndsConversation(t *testing.T) {
 	env := newTestEnv(t, NewEventSetupHandler)
-	enterSetupName(t, env)
+	chooseSetupType(t, env)
 	env.reset()
 
-	env.mock.ExpectQuery(regexp.QuoteMeta(sqlCreateEvent)).
-		WithArgs("Go Meetup", constants.EventTypeClubCall, constants.EventStatusActual).
+	expectCreateEvent(env, time.Date(2030, 4, 10, 19, 30, 0, 0, time.UTC)).
 		WillReturnError(errors.New("db down"))
-	require.True(t, env.sendText(testAdminID, "/1"))
+	require.True(t, env.sendText(testAdminID, "10.04.2030 19:30"))
 
 	assert.Equal(t, []string{"Произошла ошибка при создании записи о мероприятии."}, env.texts())
-	assert.False(t, env.sendText(testAdminID, "10.04.2025 19:30"), "conversation must be over")
-}
-
-func TestEventSetupHandler_StartDateUpdateFailureEndsConversation(t *testing.T) {
-	tests := []struct {
-		name  string
-		setup func(mock sqlmock.Sqlmock)
-	}{
-		{"database error", func(mock sqlmock.Sqlmock) {
-			mock.ExpectExec(regexp.QuoteMeta(sqlUpdateStart)).WillReturnError(errors.New("db down"))
-		}},
-		{"event vanished", func(mock sqlmock.Sqlmock) {
-			mock.ExpectExec(regexp.QuoteMeta(sqlUpdateStart)).WillReturnResult(sqlmock.NewResult(0, 0))
-		}},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			env := newTestEnv(t, NewEventSetupHandler)
-			chooseSetupType(t, env)
-			env.reset()
-
-			tc.setup(env.mock)
-			require.True(t, env.sendText(testAdminID, "10.04.2025 19:30"))
-
-			assert.Equal(t, []string{"Произошла ошибка при обновлении даты начала мероприятия."}, env.texts())
-			assert.False(t, env.sendText(testAdminID, "10.04.2025 19:30"), "conversation must be over")
-		})
-	}
+	assert.False(t, env.sendText(testAdminID, "10.04.2030 19:30"), "conversation must be over")
 }
 
 func TestEventSetupHandler_Cancel(t *testing.T) {
@@ -186,6 +175,8 @@ func TestEventSetupHandler_Cancel(t *testing.T) {
 				assert.Equal(t, []string{setupCanceledText}, env.texts())
 				env.requireKeyboardRemoved(keyboardMsg)
 				assert.False(t, env.sendText(testAdminID, "/1"), "conversation must be over")
+				// Nothing was written to the database, so no half-created event is left behind
+				require.NoError(t, env.mock.ExpectationsWereMet())
 			})
 		}
 	}

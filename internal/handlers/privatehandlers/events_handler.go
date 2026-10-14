@@ -51,8 +51,8 @@ func (h *eventsHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 		return nil
 	}
 
-	// Get actual events to show
-	events, err := h.eventRepository.GetLastActualEvents(10) // Fetch last 10 actual events
+	// Get upcoming events to show
+	events, err := h.eventRepository.GetUpcomingEvents(10) // Fetch the 10 nearest upcoming events
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Ошибка при получении списка мероприятий.", nil)
 		log.Printf("%s: Error during events retrieval: %v", utils.GetCurrentTypeName(), err)

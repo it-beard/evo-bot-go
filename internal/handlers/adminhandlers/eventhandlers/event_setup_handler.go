@@ -29,7 +29,7 @@ const (
 
 	// Context data keys
 	eventSetupCtxDataKeyEventName         = "event_setup_ctx_data_event_name"
-	eventSetupCtxDataKeyEventID           = "event_setup_ctx_data_event_id"
+	eventSetupCtxDataKeyEventType         = "event_setup_ctx_data_event_type"
 	eventSetupCtxDataKeyPreviousMessageID = "event_setup_ctx_data_previous_message_id"
 	eventSetupCtxDataKeyPreviousChatID    = "event_setup_ctx_data_previous_chat_id"
 
@@ -150,7 +150,7 @@ func (h *eventSetupHandler) handleEventName(b *gotgbot.Bot, ctx *ext.Context) er
 	return handlers.NextConversationState(eventSetupStateAskEventType)
 }
 
-// 3. handleEventType processes the event type selection and creates the event
+// 3. handleEventType processes the event type selection
 func (h *eventSetupHandler) handleEventType(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	typeSelection := strings.TrimSpace(strings.Replace(msg.Text, "/", "", 1))
@@ -175,41 +175,9 @@ func (h *eventSetupHandler) handleEventType(b *gotgbot.Bot, ctx *ext.Context) er
 	// Arrays are 0-indexed but our options start from 1
 	eventType = constants.AllEventTypes[index-1]
 
-	// Get the event name from user data store
-	eventNameVal, ok := h.userStore.Get(ctx.EffectiveUser.Id, eventSetupCtxDataKeyEventName)
-	if !ok {
-		h.messageSenderService.Reply(
-			msg,
-			fmt.Sprintf("Произошла внутренняя ошибка. Не удалось найти название мероприятия. Попробуй начать заново с /%s.",
-				constants.EventSetupCommand,
-			),
-			nil,
-		)
-		return handlers.EndConversation()
-	}
-
-	eventName, ok := eventNameVal.(string)
-	if !ok {
-		h.messageSenderService.Reply(
-			msg,
-			fmt.Sprintf("Произошла внутренняя ошибка (неверный тип названия). Попробуй начать заново с /%s.",
-				constants.EventSetupCommand,
-			),
-			nil,
-		)
-		return handlers.EndConversation()
-	}
-
-	// Create event in the database
-	id, err := h.eventRepository.CreateEvent(eventName, eventType)
-	if err != nil {
-		h.messageSenderService.Reply(msg, "Произошла ошибка при создании записи о мероприятии.", nil)
-		log.Printf("%s: Error during event creation: %v", utils.GetCurrentTypeName(), err)
-		return handlers.EndConversation()
-	}
-
-	// Store the event ID
-	h.userStore.Set(ctx.EffectiveUser.Id, eventSetupCtxDataKeyEventID, id)
+	// The event is created only after the start date is known,
+	// so a cancelled setup never leaves a dateless event behind
+	h.userStore.Set(ctx.EffectiveUser.Id, eventSetupCtxDataKeyEventType, eventType)
 
 	// Ask for start date
 	sentMsg, _ := h.messageSenderService.ReplyWithReturnMessage(
@@ -224,7 +192,7 @@ func (h *eventSetupHandler) handleEventType(b *gotgbot.Bot, ctx *ext.Context) er
 	return handlers.NextConversationState(eventSetupStateAskEventStartedAt)
 }
 
-// 4. handleEventStartedAt processes the start date input and updates the event
+// 4. handleEventStartedAt processes the start date input and creates the event
 func (h *eventSetupHandler) handleEventStartedAt(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	dateTimeStr := strings.TrimSpace(msg.Text)
@@ -242,60 +210,43 @@ func (h *eventSetupHandler) handleEventStartedAt(b *gotgbot.Bot, ctx *ext.Contex
 
 	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 
-	// Get event ID from user data store
-	eventIDVal, ok := h.userStore.Get(ctx.EffectiveUser.Id, eventSetupCtxDataKeyEventID)
-	if !ok {
+	// Get the event name and type collected on the previous steps
+	eventNameVal, _ := h.userStore.Get(ctx.EffectiveUser.Id, eventSetupCtxDataKeyEventName)
+	eventName, nameOk := eventNameVal.(string)
+	eventTypeVal, _ := h.userStore.Get(ctx.EffectiveUser.Id, eventSetupCtxDataKeyEventType)
+	eventType, typeOk := eventTypeVal.(constants.EventType)
+	if !nameOk || !typeOk {
 		h.messageSenderService.Reply(
 			msg,
-			fmt.Sprintf("Произошла внутренняя ошибка. Не удалось найти ID мероприятия. Попробуй начать заново с /%s.",
+			fmt.Sprintf("Произошла внутренняя ошибка. Не удалось найти название или тип мероприятия. Попробуй начать заново с /%s.",
 				constants.EventSetupCommand,
 			),
 			nil,
 		)
+		h.userStore.Clear(ctx.EffectiveUser.Id)
 		return handlers.EndConversation()
 	}
 
-	eventID, ok := eventIDVal.(int)
-	if !ok {
-		h.messageSenderService.Reply(
-			msg,
-			fmt.Sprintf("Произошла внутренняя ошибка (неверный тип ID). Попробуй начать заново с /%s.",
-				constants.EventSetupCommand,
-			),
-			nil,
-		)
-		return handlers.EndConversation()
-	}
-
-	// Update the started_at field
-	err = h.eventRepository.UpdateEventStartedAt(eventID, startedAt)
+	// Create event in the database
+	eventID, err := h.eventRepository.CreateEventWithStartedAt(eventName, eventType, startedAt)
 	if err != nil {
-		h.messageSenderService.Reply(msg, "Произошла ошибка при обновлении даты начала мероприятия.", nil)
-		log.Printf("%s: Error during event update: %v", utils.GetCurrentTypeName(), err)
-		return handlers.EndConversation()
-	}
-
-	// Get event name for the success message
-	eventNameVal, ok := h.userStore.Get(ctx.EffectiveUser.Id, eventSetupCtxDataKeyEventName)
-	if !ok {
-		h.messageSenderService.Reply(msg, "Мероприятие успешно создано с датой старта.", nil)
+		h.messageSenderService.Reply(msg, "Произошла ошибка при создании записи о мероприятии.", nil)
+		log.Printf("%s: Error during event creation: %v", utils.GetCurrentTypeName(), err)
 		h.userStore.Clear(ctx.EffectiveUser.Id)
 		return handlers.EndConversation()
 	}
 
-	eventName, ok := eventNameVal.(string)
-	if !ok {
-		h.messageSenderService.Reply(msg, "Мероприятие успешно создано с датой старта.", nil)
-		h.userStore.Clear(ctx.EffectiveUser.Id)
-		return handlers.EndConversation()
+	warning := ""
+	if !startedAt.After(time.Now()) {
+		warning = "\n" + pastStartDateWarning
 	}
 
 	// Success message
 	h.messageSenderService.Reply(
 		msg,
 		fmt.Sprintf(
-			"Запись о мероприятии '*%s*' успешно создана с ID: %d и датой старта: *%s*\n\nДля редактирования мероприятия используй команду /%s.\nДля просмотра всех команд используй команду /%s",
-			eventName, eventID, startedAt.Format("02.01.2006 15:04"), constants.EventEditCommand, constants.HelpCommand,
+			"Запись о мероприятии '*%s*' успешно создана с ID: %d и датой старта: *%s*%s\n\nДля редактирования мероприятия используй команду /%s.\nДля просмотра всех команд используй команду /%s",
+			eventName, eventID, startedAt.Format("02.01.2006 15:04"), warning, constants.EventEditCommand, constants.HelpCommand,
 		),
 		&gotgbot.SendMessageOpts{
 			ParseMode: "Markdown",

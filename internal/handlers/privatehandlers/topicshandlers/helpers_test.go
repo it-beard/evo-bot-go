@@ -27,7 +27,7 @@ const (
 	testUserID           int64 = 501
 	testGroupChatID      int64 = -100500
 
-	selectActiveEventsSQL = `FROM events\s+WHERE status = \$1\s+ORDER BY started_at ASC NULLS LAST\s+LIMIT \$2`
+	selectActiveEventsSQL = `FROM events\s+WHERE status = \$1 AND \(started_at IS NULL OR started_at > NOW\(\)\)\s+ORDER BY started_at ASC NULLS LAST\s+LIMIT \$2`
 	selectEventByIDSQL    = `FROM events\s+WHERE id = \$1`
 	selectTopicsSQL       = `FROM topics\s+WHERE event_id = \$1\s+ORDER BY created_at ASC`
 	insertTopicSQL        = `INSERT INTO topics \(topic, user_nickname, event_id\) VALUES \(\$1, \$2, \$3\) RETURNING id`

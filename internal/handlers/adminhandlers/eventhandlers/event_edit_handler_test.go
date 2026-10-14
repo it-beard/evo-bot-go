@@ -117,7 +117,7 @@ func TestEventEditHandler_SelectEvent(t *testing.T) {
 
 	env.requireKeyboardRemoved(listMsg)
 	prompt := env.lastSent()
-	assert.Equal(t, "Что ты хочешь отредактировать?\n/1. Название\n/2. Дату начала\n/3. Тип\n\nВведи номер:", prompt.Msg.Text)
+	assert.Equal(t, "Что ты хочешь отредактировать?\n/1. Название\n/2. Дату начала\n/3. Тип\n/4. Завершить ✅\n\nВведи номер:", prompt.Msg.Text)
 	assert.Empty(t, prompt.Call.Params["parse_mode"])
 	assert.Equal(t, []string{eventEditCallbackConfirmCancel}, callbackData(t, prompt.Call))
 }
@@ -126,13 +126,13 @@ func TestEventEditHandler_SelectEditTypeValidation(t *testing.T) {
 	env := newTestEnv(t, NewEventEditHandler)
 	selectEventForEdit(t, env)
 
-	for _, input := range []string{"abc", "/0", "/4"} {
+	for _, input := range []string{"abc", "/0", "/5"} {
 		env.reset()
 		ev := editTestEvent()
 		env.expectGetEventByID(7, &ev)
 		require.True(t, env.sendText(testAdminID, input))
 		assert.Equal(t, []string{
-			"Неверный выбор. Пожалуйста, введи число от 1 до 3, или используй кнопку для отмены",
+			"Неверный выбор. Пожалуйста, введи число от 1 до 4, или используй кнопку для отмены",
 		}, env.texts(), "input %q", input)
 		assert.Empty(t, env.client.CallsTo("editMessageReplyMarkup"))
 	}
@@ -213,19 +213,114 @@ func TestEventEditHandler_EditStartDate(t *testing.T) {
 
 			// Valid date is saved as UTC
 			env.reset()
-			newStart := time.Date(2025, 4, 10, 19, 30, 0, 0, time.UTC)
+			newStart := time.Date(2030, 4, 10, 19, 30, 0, 0, time.UTC)
 			env.mock.ExpectExec(regexp.QuoteMeta(sqlUpdateStart)).WithArgs(newStart, 7).WillReturnResult(sqlmock.NewResult(0, 1))
-			require.True(t, env.sendText(testAdminID, " 10.04.2025 19:30 "))
+			require.True(t, env.sendText(testAdminID, " 10.04.2030 19:30 "))
 
 			env.requireKeyboardRemoved(datePrompt)
 			assert.Equal(t, []string{
-				"Дата начала мероприятия с ID 7 успешно обновлена на *10.04.2025 19:30 UTC* \n\n" +
+				"Дата начала мероприятия с ID 7 успешно обновлена на *10.04.2030 19:30 UTC* \n\n" +
 					"Для продолжения редактирования мероприятия используй команду /eventEdit.\n" +
 					"Для просмотра всех команд используй команду /help",
 			}, env.texts())
-			assert.False(t, env.sendText(testAdminID, "10.04.2025 19:30"), "conversation must be over")
+			assert.False(t, env.sendText(testAdminID, "10.04.2030 19:30"), "conversation must be over")
 		})
 	}
+}
+
+func TestEventEditHandler_EditStartDateInPastWarns(t *testing.T) {
+	env := newTestEnv(t, NewEventEditHandler)
+	chooseEditOption(t, env, "/2", editTestEvent())
+	env.reset()
+
+	newStart := time.Date(2025, 4, 10, 19, 30, 0, 0, time.UTC)
+	env.mock.ExpectExec(regexp.QuoteMeta(sqlUpdateStart)).WithArgs(newStart, 7).WillReturnResult(sqlmock.NewResult(0, 1))
+	require.True(t, env.sendText(testAdminID, "10.04.2025 19:30"))
+
+	assert.Equal(t, []string{
+		"Дата начала мероприятия с ID 7 успешно обновлена на *10.04.2025 19:30 UTC* \n" + pastStartDateWarning + "\n\n" +
+			"Для продолжения редактирования мероприятия используй команду /eventEdit.\n" +
+			"Для просмотра всех команд используй команду /help",
+	}, env.texts())
+}
+
+func TestEventEditHandler_FinishActualEvent(t *testing.T) {
+	env := newTestEnv(t, NewEventEditHandler)
+	selectPrompt := selectEventForEdit(t, env)
+	env.reset()
+
+	// A past event that was never started through the bot is still "actual"
+	ev := editTestEvent()
+	env.expectGetEventByID(7, &ev)
+	env.mock.ExpectExec(regexp.QuoteMeta(sqlUpdateStatus)).WithArgs(constants.EventStatusFinished, 7).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	require.True(t, env.sendText(testAdminID, "/4"))
+
+	env.requireKeyboardRemoved(selectPrompt)
+	assert.Equal(t, []string{
+		"Мероприятие *Go Meetup* (ID 7) завершено ✅\n" +
+			"Оно больше не показывается в /events, /topics и /topicAdd.\n\n" +
+			"Для продолжения редактирования мероприятия используй команду /eventEdit.\n" +
+			"Для просмотра всех команд используй команду /help",
+	}, env.texts())
+	assert.Equal(t, "Markdown", env.lastSent().Call.Params["parse_mode"])
+	assert.False(t, env.sendText(testAdminID, "/4"), "conversation must be over")
+}
+
+func TestEventEditHandler_ReopenFinishedEvent(t *testing.T) {
+	tests := []struct {
+		name        string
+		startedAt   *time.Time
+		wantWarning bool
+	}{
+		{"future start date", timePtr(time.Now().Add(48 * time.Hour)), false},
+		{"no start date", nil, false},
+		{"past start date", timePtr(time.Date(2025, 3, 5, 18, 0, 0, 0, time.UTC)), true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			env := newTestEnv(t, NewEventEditHandler)
+			finished := editTestEvent()
+			finished.Status = string(constants.EventStatusFinished)
+			finished.StartedAt = tc.startedAt
+
+			env.expectGetLastEvents(finished)
+			require.True(t, env.sendText(testAdminID, "/eventEdit"))
+			env.expectGetEventByID(7, &finished)
+			require.True(t, env.sendText(testAdminID, "/7"))
+			assert.Contains(t, env.lastSent().Msg.Text, "/4. Вернуть в актуальные 🔄")
+
+			env.reset()
+			env.expectGetEventByID(7, &finished)
+			env.mock.ExpectExec(regexp.QuoteMeta(sqlUpdateStatus)).WithArgs(constants.EventStatusActual, 7).
+				WillReturnResult(sqlmock.NewResult(0, 1))
+			require.True(t, env.sendText(testAdminID, "/4"))
+
+			want := "Мероприятие *Go Meetup* (ID 7) снова актуально 🔄"
+			if tc.wantWarning {
+				want += "\n" + pastStartDateWarning
+			}
+			want += "\n\nДля продолжения редактирования мероприятия используй команду /eventEdit.\n" +
+				"Для просмотра всех команд используй команду /help"
+			assert.Equal(t, []string{want}, env.texts())
+			assert.False(t, env.sendText(testAdminID, "/4"), "conversation must be over")
+		})
+	}
+}
+
+func TestEventEditHandler_StatusUpdateFailure(t *testing.T) {
+	env := newTestEnv(t, NewEventEditHandler)
+	selectEventForEdit(t, env)
+	env.reset()
+
+	ev := editTestEvent()
+	env.expectGetEventByID(7, &ev)
+	env.mock.ExpectExec(regexp.QuoteMeta(sqlUpdateStatus)).WillReturnError(errors.New("db down"))
+	require.True(t, env.sendText(testAdminID, "/4"))
+
+	assert.Equal(t, []string{"Произошла ошибка при обновлении статуса мероприятия."}, env.texts())
+	assert.False(t, env.sendText(testAdminID, "/4"), "conversation must be over")
 }
 
 func TestEventEditHandler_EditTypePromptAndValidation(t *testing.T) {
@@ -319,7 +414,7 @@ func TestEventEditHandler_UpdateFailures(t *testing.T) {
 		{
 			name:   "start date update fails",
 			option: "/2",
-			input:  "10.04.2025 19:30",
+			input:  "10.04.2030 19:30",
 			setup: func(mock sqlmock.Sqlmock) {
 				mock.ExpectExec(regexp.QuoteMeta(sqlUpdateStart)).WillReturnError(errors.New("db down"))
 			},

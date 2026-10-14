@@ -90,8 +90,8 @@ func (h *topicsHandler) startTopics(b *gotgbot.Bot, ctx *ext.Context) error {
 		return handlers.EndConversation()
 	}
 
-	// Get last actual events to show for selection
-	events, err := h.eventRepository.GetLastActualEvents(10)
+	// Get upcoming events to show for selection
+	events, err := h.eventRepository.GetUpcomingEvents(10)
 	if err != nil {
 		h.messageSenderService.Reply(msg, "Ошибка при получении списка мероприятий.", nil)
 		log.Printf("%s: Error during events retrieval: %v", utils.GetCurrentTypeName(), err)

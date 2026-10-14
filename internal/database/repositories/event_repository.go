@@ -56,12 +56,22 @@ func (r *EventRepository) CreateEventWithStartedAt(name string, eventType consta
 	return id, nil
 }
 
-// GetLastActualEvents retrieves the last N actual event records
-func (r *EventRepository) GetLastActualEvents(limit int) ([]Event, error) {
+// IsUpcoming reports whether the event is still actual and has not started by the given moment.
+// Events without a start date are considered upcoming. Keep in sync with GetUpcomingEvents.
+func (e Event) IsUpcoming(now time.Time) bool {
+	if e.Status != string(constants.EventStatusActual) {
+		return false
+	}
+	return e.StartedAt == nil || e.StartedAt.After(now)
+}
+
+// GetUpcomingEvents retrieves up to limit actual events that have not started yet (or have no start date),
+// nearest first. Events whose start time has passed are hidden even if nobody finished them explicitly.
+func (r *EventRepository) GetUpcomingEvents(limit int) ([]Event, error) {
 	query := `
 		SELECT id, name, type, status, started_at, created_at, updated_at
 		FROM events
-		WHERE status = $1
+		WHERE status = $1 AND (started_at IS NULL OR started_at > NOW())
 		ORDER BY started_at ASC NULLS LAST
 		LIMIT $2`
 

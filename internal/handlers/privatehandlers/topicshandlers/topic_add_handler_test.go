@@ -3,7 +3,9 @@ package topicshandlers
 import (
 	"errors"
 	"testing"
+	"time"
 
+	"evo-bot-go/internal/database/repositories"
 	"evo-bot-go/internal/testutils"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -135,6 +137,46 @@ func TestTopicAddHandler_CancelWhileEnteringTopic(t *testing.T) {
 			assert.Equal(t, []string{"Операция добавления темы отменена."}, d.client.SentTexts())
 			assertKeyboardRemoved(t, d.client, promptID)
 			assert.False(t, d.dispatch(t, h, privateText(testUserID, "Тема")), "conversation is ended")
+		})
+	}
+}
+
+func TestTopicAddHandler_PastEventIsRejected(t *testing.T) {
+	pastStart := time.Date(2026, 9, 3, 16, 0, 0, 0, time.UTC)
+	futureStart := time.Now().Add(72 * time.Hour)
+	tests := []struct {
+		name  string
+		event repositories.Event
+	}{
+		{
+			name:  "actual event whose start date has passed",
+			event: repositories.Event{ID: 9, Name: "late coffee #0", Type: "meetup", Status: "actual", StartedAt: &pastStart, CreatedAt: testTime, UpdatedAt: testTime},
+		},
+		{
+			name:  "finished event",
+			event: repositories.Event{ID: 9, Name: "late coffee #0", Type: "meetup", Status: "finished", StartedAt: &futureStart, CreatedAt: testTime, UpdatedAt: testTime},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := newDeps(t)
+			h := d.newTopicAddHandler()
+			openEventList(t, d, h, eventSelectionSpecs()[1])
+			d.client.Reset()
+
+			d.expectEvent(tt.event)
+			require.True(t, d.dispatch(t, h, privateText(testUserID, "/9")))
+
+			assert.Equal(t, []string{
+				"Мероприятие с ID 9 уже прошло, к нему нельзя добавить темы и вопросы. Пожалуйста, выбери ID из списка выше.",
+			}, d.client.SentTexts())
+			assert.Empty(t, d.client.CallsTo("editMessageReplyMarkup"), "the event list stays usable")
+
+			// Still waiting for an event: an upcoming one can be picked right away
+			d.expectEvent(testEvents[0])
+			require.True(t, d.dispatch(t, h, privateText(testUserID, "/7")))
+			assert.Equal(t, topicPromptText, lastSend(t, d.client).Params["text"])
 		})
 	}
 }
