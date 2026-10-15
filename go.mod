@@ -2,9 +2,10 @@ module evo-bot-go
 
 go 1.23.3
 
-toolchain go1.23.5
+toolchain go1.26.9
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/PaulSonOfLars/gotgbot/v2 v2.0.0-rc.32
 	github.com/lib/pq v1.10.9
 	github.com/openai/openai-go/v2 v2.5.0

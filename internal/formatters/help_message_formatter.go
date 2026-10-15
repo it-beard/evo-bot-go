@@ -12,7 +12,7 @@ func FormatHelpMessage(isAdmin bool, config *config.Config) string {
 		"<b>🏠 Базовые команды</b>\n" +
 		"└ /start - Приветственное сообщение\n" +
 		"└ /help - Показать список моих команд\n" +
-		"└ /cancel - Принудительно отменяет любой диалог\n\n" +
+		"└ /cancel - Отменить текущий диалог с ботом\n\n" +
 		"<b>👤 Профиль</b>\n" +
 		"└ /profile - Управление своим профилем, поиск профилей клубчан, публикация и обновление информации о себе в канале «Интро»\n\n" +
 		"<b>🔍 Поиск</b>\n" +
@@ -37,12 +37,11 @@ func FormatHelpMessage(isAdmin bool, config *config.Config) string {
 
 	if isAdmin {
 		adminHelpText := "\n\n<b>🔐 Команды администратора</b>\n" +
-			fmt.Sprintf("└ /%s - Начать мероприятие\n", constants.EventStartCommand) +
+			fmt.Sprintf("└ /%s - Запустить мероприятие (опубликовать ссылку в чате объявлений)\n", constants.EventStartCommand) +
 			fmt.Sprintf("└ /%s - Создать новое мероприятие\n", constants.EventSetupCommand) +
-			fmt.Sprintf("└ /%s - Редактировать мероприятие\n", constants.EventEditCommand) +
+			fmt.Sprintf("└ /%s - Редактировать или завершить мероприятие\n", constants.EventEditCommand) +
 			fmt.Sprintf("└ /%s - Удалить мероприятие\n", constants.EventDeleteCommand) +
-			fmt.Sprintf("└ /%s - Просмотреть темы и вопросы к предстоящим мероприятиям <b>с возможностью удаления</b>\n", constants.ShowTopicsCommand) +
-			fmt.Sprintf("└ /%s - Ввести код для авторизации TG-клиента (задом наперед)\n", constants.CodeCommand) +
+			fmt.Sprintf("└ /%s - Просмотреть темы и вопросы к мероприятиям <b>с возможностью удаления</b>\n", constants.ShowTopicsCommand) +
 			fmt.Sprintf("└ /%s - Управление профилями клубчан", constants.AdminProfilesCommand)
 
 		testCommandsHelpText := "\n\n<b>⚙️ Команды для тестирования</b>\n" +

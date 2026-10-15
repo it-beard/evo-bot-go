@@ -84,7 +84,7 @@ func NewTryGenerateCoffeePairsHandler(
 	)
 }
 
-// Entry point for the /coffeeGeneratePairs command
+// Entry point for the /tryGenerateCoffeePairs command
 func (h *tryGenerateCoffeePairsHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
@@ -127,7 +127,7 @@ func (h *tryGenerateCoffeePairsHandler) showConfirmationMenu(b *gotgbot.Bot, msg
 		msg.Chat.Id,
 		fmt.Sprintf("<b>%s</b>", tryGenerateCoffeePairsMenuHeader)+
 			"\n\n⚠️ ЭТА КОМАНДА НУЖНА ДЛЯ ТЕСТИРОВАНИЯ ФУНКЦИОНАЛА!"+
-			"\n\nВы уверены, что хотите сгенерировать пары для текущего опроса?"+
+			"\n\nТочно сгенерировать пары для текущего опроса?"+
 			fmt.Sprintf("\n\n📊 Опрос: неделя %s", latestPoll.WeekStartDate.Format("2006-01-02"))+
 			fmt.Sprintf("\n👥 Участников: %d", len(participants))+
 			"\n\n⚠️ Пары будут отправлены в сообщество.",
@@ -149,6 +149,9 @@ func (h *tryGenerateCoffeePairsHandler) showConfirmationMenu(b *gotgbot.Bot, msg
 func (h *tryGenerateCoffeePairsHandler) handleConfirmCallback(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	userId := ctx.EffectiveUser.Id
+
+	// Answer the callback query to remove the loading state on the button
+	_, _ = ctx.CallbackQuery.Answer(b, nil)
 
 	h.RemovePreviousMessage(b, &userId)
 
@@ -210,10 +213,16 @@ func (h *tryGenerateCoffeePairsHandler) handleBackCallback(b *gotgbot.Bot, ctx *
 	msg := ctx.EffectiveMessage
 	userId := ctx.EffectiveUser.Id
 
+	// Answer the callback query to remove the loading state on the button
+	_, _ = ctx.CallbackQuery.Answer(b, nil)
+
 	return h.showConfirmationMenu(b, msg, userId)
 }
 
 func (h *tryGenerateCoffeePairsHandler) handleCancelCallback(b *gotgbot.Bot, ctx *ext.Context) error {
+	// Answer the callback query to remove the loading state on the button
+	_, _ = ctx.CallbackQuery.Answer(b, nil)
+
 	return h.handleCancel(b, ctx)
 }
 

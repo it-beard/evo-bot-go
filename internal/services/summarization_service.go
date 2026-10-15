@@ -2,9 +2,10 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"html"
 	"log"
-	"os"
 	"strconv"
 	"time"
 
@@ -51,16 +52,18 @@ func (s *SummarizationService) RunDailySummarization(ctx context.Context, sendTo
 	log.Printf("%s: Starting daily summarization process", utils.GetCurrentTypeName())
 
 	// Process each monitored topic
+	var errs []error
 	for _, topicID := range s.config.MonitoredTopicsIDs {
 		if err := s.summarizeTopicMessages(ctx, topicID, sendToDM); err != nil {
 			log.Printf("%s: Error summarizing topic %d: %v", utils.GetCurrentTypeName(), topicID, err)
-			// Continue with other chats even if one fails
+			// Continue with other chats even if one fails, but report the failure to the caller
+			errs = append(errs, fmt.Errorf("topic %d: %w", topicID, err))
 			continue
 		}
 	}
 
 	log.Printf("%s: Daily summarization process completed", utils.GetCurrentTypeName())
-	return nil
+	return errors.Join(errs...)
 }
 
 // summarizeTopicMessages summarizes a single topic
@@ -131,7 +134,7 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 	)
 
 	// Save the prompt into a temporary file for logging purposes.
-	err = os.WriteFile("last-prompt-log.txt", []byte(prompt), 0644)
+	err = utils.WritePromptLog(prompt)
 	if err != nil {
 		log.Printf("%s: Error writing prompt to file: %v", utils.GetCurrentTypeName(), err)
 	}
@@ -143,7 +146,7 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 
 	// Format the final summary message using the title format from the prompts package
 	dateNowWithMonth := time.Now().Format("02.01.2006")
-	title := fmt.Sprintf("📋 Сводка чата <b>\"%s\"</b> за %s", topicName, dateNowWithMonth)
+	title := fmt.Sprintf("📋 Сводка чата <b>\"%s\"</b> за %s", html.EscapeString(topicName), dateNowWithMonth)
 	finalSummary := fmt.Sprintf("%s\n\n%s", title, summary)
 
 	// Determine the target chat ID and options with summary topic ID
@@ -162,7 +165,9 @@ func (s *SummarizationService) summarizeTopicMessages(ctx context.Context, topic
 	}
 
 	// Send the summary to the target chat
-	s.messageSenderService.SendHtml(targetChatID, finalSummary, opts)
+	if err := s.messageSenderService.SendHtml(targetChatID, finalSummary, opts); err != nil {
+		return fmt.Errorf("%s: failed to send summary: %w", utils.GetCurrentTypeName(), err)
+	}
 
 	log.Printf("%s: Summary sent successfully", utils.GetCurrentTypeName())
 	return nil

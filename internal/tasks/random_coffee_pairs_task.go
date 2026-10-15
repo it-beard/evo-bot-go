@@ -58,31 +58,39 @@ func (t *RandomCoffeePairsTask) run() {
 		case <-t.stop:
 			return
 		case now := <-ticker.C:
-			if now.After(nextRun) {
-				due, err := t.randomCoffeeService.IsPairsDue()
-				if err != nil {
-					log.Printf("%s: Error checking if pairs are due, proceeding anyway: %v", utils.GetCurrentTypeName(), err)
-					due = true
-				}
-
-				if due {
-					log.Printf("%s: Running scheduled random coffee pairs generation", utils.GetCurrentTypeName())
-
-					go func() {
-						if err := t.randomCoffeeService.GenerateAndSendPairs(); err != nil {
-							log.Printf("%s: Error generating random coffee pairs: %v", utils.GetCurrentTypeName(), err)
-						}
-					}()
-				} else {
-					log.Printf("%s: Skipping random coffee pairs generation this week (interval is %d weeks)",
-						utils.GetCurrentTypeName(), t.config.RandomCoffeeIntervalWeeks)
-				}
-
-				nextRun = t.calculateNextRun()
-				log.Printf("%s: Next random coffee pairs generation scheduled for: %v", utils.GetCurrentTypeName(), nextRun)
-			}
+			nextRun = t.runIfDue(now, nextRun)
 		}
 	}
+}
+
+// runIfDue generates random coffee pairs (if they are due this week) once the scheduled time has passed and returns the next scheduled time
+func (t *RandomCoffeePairsTask) runIfDue(now time.Time, nextRun time.Time) time.Time {
+	if !now.After(nextRun) {
+		return nextRun
+	}
+
+	due, err := t.randomCoffeeService.IsPairsDue()
+	if err != nil {
+		log.Printf("%s: Error checking if pairs are due, proceeding anyway: %v", utils.GetCurrentTypeName(), err)
+		due = true
+	}
+
+	if due {
+		log.Printf("%s: Running scheduled random coffee pairs generation", utils.GetCurrentTypeName())
+
+		go func() {
+			if err := t.randomCoffeeService.GenerateAndSendPairs(); err != nil {
+				log.Printf("%s: Error generating random coffee pairs: %v", utils.GetCurrentTypeName(), err)
+			}
+		}()
+	} else {
+		log.Printf("%s: Skipping random coffee pairs generation this week (interval is %d weeks)",
+			utils.GetCurrentTypeName(), t.config.RandomCoffeeIntervalWeeks)
+	}
+
+	nextRun = t.calculateNextRun()
+	log.Printf("%s: Next random coffee pairs generation scheduled for: %v", utils.GetCurrentTypeName(), nextRun)
+	return nextRun
 }
 
 // calculateNextRun calculates the next run time

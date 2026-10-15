@@ -1,8 +1,6 @@
 package topicshandlers
 
 import (
-	"context"
-	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -27,7 +25,6 @@ const (
 	topicsStateSelectEvent = "topics_state_select_event"
 
 	// Context data keys
-	topicsCtxDataKeyCancelFunc        = "topics_ctx_data_cancel_func"
 	topicsCtxDataKeyPreviousMessageID = "topics_ctx_data_previous_message_id"
 	topicsCtxDataKeyPreviousChatID    = "topics_ctx_data_previous_chat_id"
 
@@ -90,26 +87,27 @@ func (h *topicsHandler) startTopics(b *gotgbot.Bot, ctx *ext.Context) error {
 		return handlers.EndConversation()
 	}
 
-	// Get last actual events to show for selection
-	events, err := h.eventRepository.GetLastActualEvents(10)
+	// Get upcoming events to show for selection
+	events, err := h.eventRepository.GetUpcomingEvents(10)
 	if err != nil {
-		h.messageSenderService.Reply(msg, "Ошибка при получении списка мероприятий.", nil)
+		h.messageSenderService.Reply(msg, formatters.EventListErrorText, nil)
 		log.Printf("%s: Error during events retrieval: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 
 	if len(events) == 0 {
-		h.messageSenderService.Reply(msg, "Нет доступных мероприятий для просмотра тем и вопросов.", nil)
+		h.messageSenderService.Reply(msg, "Ближайших мероприятий пока нет, поэтому и тем с вопросами к ним тоже нет.", nil)
 		return handlers.EndConversation()
 	}
 
 	// Format and display event list for selection
 	formattedEvents := formatters.FormatEventListForTopicsView(
 		events,
-		fmt.Sprintf("Выбери ID мероприятия, для которого ты хочешь увидеть темы и вопросы"),
+		"📋 Ближайшие мероприятия",
+		"для которого ты хочешь увидеть темы и вопросы",
 	)
 
-	sentMsg, _ := h.messageSenderService.ReplyMarkdownWithReturnMessage(
+	sentMsg, _ := h.messageSenderService.ReplyHtmlWithReturnMessage(
 		msg,
 		formattedEvents,
 		&gotgbot.SendMessageOpts{
@@ -129,22 +127,14 @@ func (h *topicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Context) e
 	// Check if the input is a valid event ID
 	eventID, err := strconv.Atoi(userInput)
 	if err != nil {
-		h.messageSenderService.Reply(
-			msg,
-			fmt.Sprintf("Пожалуйста, отправь корректный ID мероприятия или используй /%s для отмены.", constants.CancelCommand),
-			nil,
-		)
+		h.messageSenderService.Reply(msg, formatters.InvalidEventIDText, nil)
 		return nil // Stay in the same state
 	}
 
 	// Get the event information
 	event, err := h.eventRepository.GetEventByID(eventID)
 	if err != nil {
-		h.messageSenderService.Reply(
-			msg,
-			fmt.Sprintf("Не удалось найти мероприятие с ID %d. Пожалуйста, проверь ID.", eventID),
-			nil,
-		)
+		h.messageSenderService.Reply(msg, formatters.EventNotFoundText(eventID), nil)
 		log.Printf("%s: Error during event retrieval: %v", utils.GetCurrentTypeName(), err)
 		return nil // Stay in the same state
 	}
@@ -152,15 +142,17 @@ func (h *topicsHandler) handleEventSelection(b *gotgbot.Bot, ctx *ext.Context) e
 	// Get topics for this event
 	topics, err := h.topicRepository.GetTopicsByEventID(eventID)
 	if err != nil {
-		h.messageSenderService.Reply(msg, "Ошибка при получении тем и вопросов для выбранного мероприятия.", nil)
+		h.messageSenderService.Reply(msg, "Произошла ошибка при получении тем и вопросов для выбранного мероприятия.", nil)
 		log.Printf("%s: Error during topics retrieval: %v", utils.GetCurrentTypeName(), err)
 		return handlers.EndConversation()
 	}
 
 	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 	// Format and display topics
-	formattedTopics := formatters.FormatHtmlTopicListForUsers(topics, event.Name, event.Type)
-	h.messageSenderService.ReplyHtml(msg, formattedTopics, nil)
+	// Long lists are split into several messages to fit Telegram's message length limit
+	for _, part := range formatters.FormatHtmlTopicListForUsersMessages(topics, event.Name, event.Type) {
+		h.messageSenderService.ReplyHtml(msg, part, nil)
+	}
 
 	// Clean up user data
 	h.userStore.Clear(ctx.EffectiveUser.Id)
@@ -181,16 +173,7 @@ func (h *topicsHandler) handleCallbackCancel(b *gotgbot.Bot, ctx *ext.Context) e
 func (h *topicsHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
-	// Check if there's an ongoing operation to cancel
-	if cancelFunc, ok := h.userStore.Get(ctx.EffectiveUser.Id, topicsCtxDataKeyCancelFunc); ok {
-		// Call the cancel function to stop any ongoing API calls
-		if cf, ok := cancelFunc.(context.CancelFunc); ok {
-			cf()
-			h.messageSenderService.Reply(msg, "Операция просмотра тем отменена.", nil)
-		}
-	} else {
-		h.messageSenderService.Reply(msg, "Операция просмотра тем отменена.", nil)
-	}
+	h.messageSenderService.Reply(msg, "Операция просмотра тем отменена.", nil)
 
 	h.MessageRemoveInlineKeyboard(b, &ctx.EffectiveUser.Id)
 
@@ -222,6 +205,9 @@ func (h *topicsHandler) MessageRemoveInlineKeyboard(b *gotgbot.Bot, userID *int6
 }
 
 func (h *topicsHandler) SavePreviousMessageInfo(userID int64, sentMsg *gotgbot.Message) {
+	if sentMsg == nil {
+		return
+	}
 	h.userStore.SetPreviousMessageInfo(userID, sentMsg.MessageId, sentMsg.Chat.Id,
 		topicsCtxDataKeyPreviousMessageID, topicsCtxDataKeyPreviousChatID)
 }

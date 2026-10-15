@@ -3,12 +3,16 @@ package clients
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"evo-bot-go/internal/config"
 
 	"github.com/openai/openai-go/v2"
 	"github.com/openai/openai-go/v2/option"
 )
+
+// completionTimeout limits a completion request whose context has no deadline
+var completionTimeout = 5 * time.Minute
 
 type OpenAiClient struct {
 	client *openai.Client
@@ -23,13 +27,16 @@ func NewOpenAiClient() (*OpenAiClient, error) {
 
 	apiKey := appConfig.OpenAIAPIKey
 
-	client := openai.NewClient(
-		option.WithAPIKey(apiKey),
-	)
+	return NewOpenAiClientWithOptions(option.WithAPIKey(apiKey)), nil
+}
+
+// NewOpenAiClientWithOptions creates a client with explicit request options (e.g. a custom base URL in tests)
+func NewOpenAiClientWithOptions(opts ...option.RequestOption) *OpenAiClient {
+	client := openai.NewClient(opts...)
 
 	return &OpenAiClient{
 		client: &client,
-	}, nil
+	}
 }
 
 // GetCompletion sends a message to OpenAI and returns the response
@@ -39,6 +46,13 @@ func (c *OpenAiClient) GetCompletion(ctx context.Context, message string) (strin
 
 // GetCompletionWithReasoning sends a message to OpenAI with specified reasoning effort and returns the response
 func (c *OpenAiClient) GetCompletionWithReasoning(ctx context.Context, message string, reasoningEffort openai.ReasoningEffort) (string, error) {
+	// Never wait forever: callers that pass a context without deadline get the default timeout
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, completionTimeout)
+		defer cancel()
+	}
+
 	completion, err := c.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 		Messages: []openai.ChatCompletionMessageParamUnion{
 			openai.UserMessage(message),
@@ -51,6 +65,10 @@ func (c *OpenAiClient) GetCompletionWithReasoning(ctx context.Context, message s
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to get completion: %w", err)
+	}
+
+	if len(completion.Choices) == 0 {
+		return "", fmt.Errorf("failed to get completion: the response has no choices")
 	}
 
 	return completion.Choices[0].Message.Content, nil

@@ -1,13 +1,30 @@
 package formatters
 
 import (
+	"html"
+
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/database/repositories"
 	"evo-bot-go/internal/utils"
 	"fmt"
 	"strconv"
-	"strings"
 )
+
+// formatProfileHeader renders the linked full name and the @username of a user, escaped for HTML
+func formatProfileHeader(user *repositories.User) string {
+	fullName := user.Firstname
+	if user.Lastname != "" {
+		fullName += " " + user.Lastname
+	}
+	linkedName := "<b><a href=\"tg://user?id=" + strconv.FormatInt(user.TgID, 10) + "\">" + html.EscapeString(fullName) + "</a></b>"
+
+	username := ""
+	if user.TgUsername != "" {
+		username = "(@" + html.EscapeString(user.TgUsername) + ")"
+	}
+
+	return fmt.Sprintf("🖐 %s %s\n", linkedName, username)
+}
 
 // Format a readable view of a user profile
 func FormatProfileView(user *repositories.User, profile *repositories.Profile, showScore bool) string {
@@ -15,25 +32,10 @@ func FormatProfileView(user *repositories.User, profile *repositories.Profile, s
 		return "Твой профиль не найден.\n\nСоздай профиль через кнопку \"Редактировать мой профиль\"."
 	}
 
-	// Format username
-	username := ""
-	fullName := user.Firstname
-	if user.Lastname != "" {
-		fullName += " " + user.Lastname
-	}
-	fullName = "<b><a href=\"tg://user?id=" + strconv.FormatInt(user.TgID, 10) + "\">" + fullName + "</a></b>"
-
-	if user.TgUsername != "" {
-		username = "(@" + user.TgUsername + ")"
-	}
-
-	// Build profile text
-	text := fmt.Sprintf("🖐 %s %s\n", fullName, username)
+	text := formatProfileHeader(user)
 
 	if profile.Bio != "" {
-		profile.Bio = strings.ReplaceAll(profile.Bio, "<", "&lt;")
-		profile.Bio = strings.ReplaceAll(profile.Bio, ">", "&gt;")
-		text += fmt.Sprintf("\n<blockquote>О себе</blockquote>\n%s\n", profile.Bio)
+		text += fmt.Sprintf("\n<blockquote>О себе</blockquote>\n%s\n", html.EscapeString(profile.Bio))
 	}
 
 	if showScore && user.Score > 100 {
@@ -45,27 +47,11 @@ func FormatProfileView(user *repositories.User, profile *repositories.Profile, s
 
 // Format a readable view of a user profile for the admin manager
 func FormatProfileManagerView(user *repositories.User, profile *repositories.Profile, hasCoffeeBan bool, config *config.Config) string {
-
-	// Format username
-	username := ""
-	fullName := user.Firstname
-	if user.Lastname != "" {
-		fullName += " " + user.Lastname
-	}
-	fullName = "<b><a href=\"tg://user?id=" + strconv.FormatInt(user.TgID, 10) + "\">" + fullName + "</a></b>"
-
-	if user.TgUsername != "" {
-		username = "(@" + user.TgUsername + ")"
-	}
-
-	// Build profile text
-	text := fmt.Sprintf("🖐 %s %s\n", fullName, username)
+	text := formatProfileHeader(user)
 
 	if profile.Bio != "" {
 		text += "\n<i>О себе:</i>"
-		profile.Bio = strings.ReplaceAll(profile.Bio, "<", "&lt;")
-		profile.Bio = strings.ReplaceAll(profile.Bio, ">", "&gt;")
-		text += fmt.Sprintf("<blockquote expandable>%s</blockquote>", profile.Bio)
+		text += fmt.Sprintf("<blockquote expandable>%s</blockquote>", html.EscapeString(profile.Bio))
 	}
 	text += fmt.Sprintf("\n\n<i>Карма:</i> <b>%d</b>", user.Score)
 
@@ -83,27 +69,10 @@ func FormatProfileManagerView(user *repositories.User, profile *repositories.Pro
 }
 
 func FormatPublicProfileForMessage(user *repositories.User, profile *repositories.Profile, showScore bool) string {
-
-	// Format username
-	username := ""
-	fullName := user.Firstname
-	if user.Lastname != "" {
-		fullName += " " + user.Lastname
-	}
-	fullName = "<b><a href=\"tg://user?id=" + strconv.FormatInt(user.TgID, 10) + "\">" + fullName + "</a></b>"
-
-	if user.TgUsername != "" {
-		username = "(@" + user.TgUsername + ")"
-	}
-
-	// Build profile text
-	text := fmt.Sprintf("🖐 %s %s\n", fullName, username)
+	text := formatProfileHeader(user)
 
 	if profile.Bio != "" {
-
-		profile.Bio = strings.ReplaceAll(profile.Bio, "<", "&lt;")
-		profile.Bio = strings.ReplaceAll(profile.Bio, ">", "&gt;")
-		text += fmt.Sprintf("\n<blockquote>О себе</blockquote>\n%s\n", profile.Bio)
+		text += fmt.Sprintf("\n<blockquote>О себе</blockquote>\n%s\n", html.EscapeString(profile.Bio))
 	}
 
 	return text

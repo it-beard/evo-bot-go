@@ -207,6 +207,12 @@ func (s *MessageSenderService) ReplyMarkdownWithReturnMessage(msg *gotgbot.Messa
 
 // Reply to a message with html
 func (s *MessageSenderService) ReplyHtml(msg *gotgbot.Message, replyText string, opts *gotgbot.SendMessageOpts) error {
+	_, err := s.ReplyHtmlWithReturnMessage(msg, replyText, opts)
+	return err
+}
+
+// Reply to a message with html and return the sent message
+func (s *MessageSenderService) ReplyHtmlWithReturnMessage(msg *gotgbot.Message, replyText string, opts *gotgbot.SendMessageOpts) (*gotgbot.Message, error) {
 	// default options for html messages
 	if opts == nil {
 		opts = &gotgbot.SendMessageOpts{
@@ -225,13 +231,13 @@ func (s *MessageSenderService) ReplyHtml(msg *gotgbot.Message, replyText string,
 		}
 	}
 
-	_, err := msg.Reply(s.bot, replyText, opts)
+	sentMsg, err := msg.Reply(s.bot, replyText, opts)
 
 	if err != nil {
 		log.Printf("%s: ReplyHtml: Failed to send message: %v", utils.GetCurrentTypeName(), err)
 	}
 
-	return err
+	return sentMsg, err
 }
 
 // ReplyWithCleanupAfterDelay replies to a message and then deletes both the reply and the original message after the specified delay

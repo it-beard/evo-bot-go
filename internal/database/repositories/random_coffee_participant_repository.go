@@ -56,13 +56,15 @@ func (r *RandomCoffeeParticipantRepository) GetParticipant(pollID int64, userID 
 	return p, nil
 }
 
-// GetParticipatingUsers retrieves all users who are participating in a given poll
+// GetParticipatingUsers retrieves all users who are participating in a given poll.
+// Users banned from Random Coffee or no longer in the club after voting are left out of the pairing.
 func (r *RandomCoffeeParticipantRepository) GetParticipatingUsers(pollID int64) ([]User, error) {
 	query := `
-		SELECT u.id, u.tg_id, u.firstname, u.lastname, u.tg_username 
+		SELECT u.id, u.tg_id, u.firstname, u.lastname, u.tg_username
 		FROM users u
 		JOIN random_coffee_participants rpc ON u.id = rpc.user_id
 		WHERE rpc.poll_id = $1 AND rpc.is_participating = TRUE
+			AND u.has_coffee_ban = FALSE AND u.is_club_member IS NOT FALSE
 	`
 	rows, err := r.db.Query(query, pollID)
 	if err != nil {

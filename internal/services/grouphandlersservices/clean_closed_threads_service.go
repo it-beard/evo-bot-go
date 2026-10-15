@@ -6,6 +6,7 @@ import (
 	"evo-bot-go/internal/services"
 	"evo-bot-go/internal/utils"
 	"fmt"
+	"html"
 	"log"
 	"strconv"
 
@@ -63,7 +64,7 @@ func (h *CleanClosedThreadsService) CleanClosedThreads(msg *gotgbot.Message, b *
 	} else {
 		mainConversationTopicName = mainConversationTopic.Name
 	}
-	threadUrl := fmt.Sprintf("<a href=\"https://telegram.me/c/%s/%d\">\"%s\"</a>", chatIdStr, msg.MessageThreadId, topicName)
+	threadUrl := fmt.Sprintf("<a href=\"https://telegram.me/c/%s/%d\">\"%s\"</a>", chatIdStr, msg.MessageThreadId, html.EscapeString(topicName))
 	messageText := fmt.Sprintf(
 		"<b>Приношу свои извинения</b> 🧐\n\n"+
 			"Твоё сообщение в канале %s было удалено, поскольку этот канал предназначен только для чтения. \n\n"+
@@ -71,7 +72,7 @@ func (h *CleanClosedThreadsService) CleanClosedThreads(msg *gotgbot.Message, b *
 			"Твой ответ автоматически появится в чате \"<i>%s</i>\" 👌\n\n"+
 			"⬇️ <i>Копия твоего сообщения</i> ⬇️",
 		threadUrl,
-		mainConversationTopicName,
+		html.EscapeString(mainConversationTopicName),
 	)
 
 	// Send notification to user

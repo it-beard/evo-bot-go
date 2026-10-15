@@ -63,15 +63,18 @@ func (s *AdminSaveMessageService) IsMessageShouldBeSavedOrUpdated(msg *gotgbot.M
 		return false
 	}
 
-	// Must be from an admin or GroupAnonymousBot
-	if !utils.IsUserAdminOrCreator(s.bot, msg.From.Id, s.config) &&
-		(msg.From.IsBot && msg.From.Username != "GroupAnonymousBot") {
+	// Must be "update" or "delete" command (checked before the admin rights, which cost a Bot API call)
+	if msg.Text != constants.AdminSaveMessage_ReplyUpdateMesageCommand &&
+		msg.Text != constants.AdminSaveMessage_ReplyDeleteMessageCommand {
 		return false
 	}
 
-	// Must be "update" or "delete" command
-	return msg.Text == constants.AdminSaveMessage_ReplyUpdateMesageCommand ||
-		msg.Text == constants.AdminSaveMessage_ReplyDeleteMessageCommand
+	// Must be from an admin or an anonymous admin (posting as GroupAnonymousBot)
+	if msg.From == nil {
+		return false
+	}
+	isAnonymousAdmin := msg.From.IsBot && msg.From.Username == "GroupAnonymousBot"
+	return isAnonymousAdmin || utils.IsUserAdminOrCreator(s.bot, msg.From.Id, s.config)
 }
 
 func (h *AdminSaveMessageService) handleUpdateCommand(adminMsg *gotgbot.Message, repliedMessage *gotgbot.Message) error {

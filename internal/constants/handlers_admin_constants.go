@@ -1,6 +1,5 @@
 package constants
 
-const CodeCommand = "code"
 const TrySummarizeCommand = "trySummarize"
 const TryLinkToLearnCommand = "tryLinkToLearn"
 const SummarizeDmFlag = "-dm"

@@ -35,8 +35,11 @@ func newMockChatMember(status string) gotgbot.ChatMember {
 	case "member":
 		return &gotgbot.ChatMemberMember{User: user}
 	case "restricted":
-		// Need to provide required fields even if not used by GetStatus.
-		return &gotgbot.ChatMemberRestricted{User: user}
+		// A restricted user who is still in the chat
+		return &gotgbot.ChatMemberRestricted{User: user, IsMember: true}
+	case "restricted-left":
+		// A restricted user who has left the chat
+		return &gotgbot.ChatMemberRestricted{User: user, IsMember: false}
 	case "left":
 		return &gotgbot.ChatMemberLeft{User: user}
 	case "kicked":
@@ -102,6 +105,18 @@ func TestIsUserClubMember_Restricted(t *testing.T) {
 
 	result := IsUserClubMember(bot, testUserID, mockConfig)
 	assert.True(t, result, "Restricted user should still be considered a club member")
+}
+
+func TestIsUserClubMember_RestrictedUserWhoLeft(t *testing.T) {
+	mockConfig := &config.Config{SuperGroupChatID: -1001234567890}
+
+	bot := &mockBot{
+		GetChatMemberFunc: func(chatId, userId int64, opts *gotgbot.GetChatMemberOpts) (gotgbot.ChatMember, error) {
+			return newMockChatMember("restricted-left"), nil
+		},
+	}
+
+	assert.False(t, IsUserClubMember(bot, 12345, mockConfig), "a restricted user who left the club is not a member")
 }
 
 func TestIsUserClubMember_Left(t *testing.T) {
@@ -242,4 +257,23 @@ func TestIsUserAdminOrCreator_Error(t *testing.T) {
 
 	result := IsUserAdminOrCreator(bot, testUserID, mockConfig)
 	assert.False(t, result, "API error should result in user not having admin privileges")
+}
+
+func TestIsMessageFromSuperGroupChat(t *testing.T) {
+	tests := []struct {
+		chatType string
+		expected bool
+	}{
+		{chatType: "supergroup", expected: true},
+		{chatType: "group", expected: false},
+		{chatType: "private", expected: false},
+		{chatType: "channel", expected: false},
+		{chatType: "", expected: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.chatType, func(t *testing.T) {
+			assert.Equal(t, tt.expected, IsMessageFromSuperGroupChat(gotgbot.Chat{Id: -100123, Type: tt.chatType}))
+		})
+	}
 }

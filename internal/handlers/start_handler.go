@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"html"
+
 	"evo-bot-go/internal/config"
 	"evo-bot-go/internal/constants"
 	"evo-bot-go/internal/formatters"
@@ -57,14 +59,9 @@ func (h *startHandler) handleStart(b *gotgbot.Bot, ctx *ext.Context) error {
 		return handlers.EndConversation()
 	}
 
-	userName := ""
-	if user.FirstName != "" {
-		userName = user.FirstName
-	}
-
 	greeting := "Приветствую"
-	if userName != "" {
-		greeting += ", *" + userName + "*"
+	if user.FirstName != "" {
+		greeting += ", <b>" + html.EscapeString(user.FirstName) + "</b>"
 	}
 	greeting += "! 🎩"
 
@@ -76,7 +73,7 @@ func (h *startHandler) handleStart(b *gotgbot.Bot, ctx *ext.Context) error {
 	if isClubMember {
 		// Message for club members
 		message = greeting + "\n\n" +
-			"Я — *Дженкинс Вебстер*, потомственный дворецкий и верный помощник клуба _\"Эволюция Кода\"_ 🧐\n\n" +
+			"Я — <b>Дженкинс Вебстер</b>, потомственный дворецкий и верный помощник клуба <i>«Эволюция Кода»</i> 🧐\n\n" +
 			"Рад видеть тебя среди участников нашего клуба! Я готов помочь тебе во всех твоих начинаниях. 🤵"
 
 		inlineKeyboard = gotgbot.InlineKeyboardMarkup{
@@ -92,8 +89,8 @@ func (h *startHandler) handleStart(b *gotgbot.Bot, ctx *ext.Context) error {
 	} else {
 		// Message for non-members
 		message = greeting + "\n\n" +
-			"Я — *Дженкинс Вебстер*, потомственный дворецкий и верный помощник клуба _\"Эволюция Кода\"_ 🧐\n\n" +
-			"Позвольте предложить тебе присоединиться к нашему изысканному сообществу разработчиков и разработчиц, " +
+			"Я — <b>Дженкинс Вебстер</b>, потомственный дворецкий и верный помощник клуба <i>«Эволюция Кода»</i> 🧐\n\n" +
+			"Позволь предложить тебе присоединиться к нашему изысканному сообществу разработчиков и разработчиц, " +
 			"где я буду рад служить тебе всеми своими возможностями и ресурсами."
 
 		inlineKeyboard = gotgbot.InlineKeyboardMarkup{
@@ -108,7 +105,7 @@ func (h *startHandler) handleStart(b *gotgbot.Bot, ctx *ext.Context) error {
 		}
 	}
 
-	h.messageSenderService.ReplyMarkdown(
+	h.messageSenderService.ReplyHtml(
 		msg,
 		message,
 		&gotgbot.SendMessageOpts{

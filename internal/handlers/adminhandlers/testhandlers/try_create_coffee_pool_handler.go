@@ -74,7 +74,7 @@ func NewTryCreateCoffeePoolHandler(
 	)
 }
 
-// Entry point for the /coofeeRestart command
+// Entry point for the /tryCreateCoffeePool command
 func (h *tryCreateCoffeePoolHandler) handleCommand(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 
@@ -100,7 +100,7 @@ func (h *tryCreateCoffeePoolHandler) showConfirmationMenu(b *gotgbot.Bot, msg *g
 		msg.Chat.Id,
 		fmt.Sprintf("<b>%s</b>", tryCreateCoffeePoolMenuHeader)+
 			"\n\n⚠️ ЭТА КОМАНДА НУЖНА ДЛЯ ТЕСТИРОВАНИЯ ФУНКЦИОНАЛА!"+
-			"\n\nВы уверены, что хотите запустить новый опрос по кофейным встречам?"+
+			"\n\nТочно запустить новый опрос по кофейным встречам?"+
 			fmt.Sprintf("\n\nОпрос будет отправлен в топик \"Random Coffee\" (ID: %d).", h.config.RandomCoffeeTopicID),
 		&gotgbot.SendMessageOpts{
 			ReplyMarkup: buttons.ConfirmAndCancelButton(
@@ -121,6 +121,9 @@ func (h *tryCreateCoffeePoolHandler) showConfirmationMenu(b *gotgbot.Bot, msg *g
 func (h *tryCreateCoffeePoolHandler) handleConfirmCallback(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	userId := ctx.EffectiveUser.Id
+
+	// Answer the callback query to remove the loading state on the button
+	_, _ = ctx.CallbackQuery.Answer(b, nil)
 
 	h.RemovePreviousMessage(b, &userId)
 
@@ -174,6 +177,9 @@ func (h *tryCreateCoffeePoolHandler) handleConfirmCallback(b *gotgbot.Bot, ctx *
 
 // Handle the "Нет" (Cancel) button click
 func (h *tryCreateCoffeePoolHandler) handleCancelCallback(b *gotgbot.Bot, ctx *ext.Context) error {
+	// Answer the callback query to remove the loading state on the button
+	_, _ = ctx.CallbackQuery.Answer(b, nil)
+
 	return h.handleCancel(b, ctx)
 }
 

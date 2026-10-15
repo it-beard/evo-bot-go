@@ -63,3 +63,19 @@ func TestGetCurrentTypeName_DirectCall(t *testing.T) {
 	assert.True(t, strings.HasSuffix(result, "utils"),
 		"Expected result '%s' to end with 'utils'", result)
 }
+
+func TestGetTypeName_NilFunction(t *testing.T) {
+	var nilFunc func()
+
+	assert.Equal(t, "", GetTypeName(nilFunc))
+}
+
+func TestGetTypeName_ValueReceiverMethod(t *testing.T) {
+	result := GetTypeName(valueReceiver.Method)
+
+	assert.Equal(t, "valueReceiver", result)
+}
+
+type valueReceiver struct{}
+
+func (valueReceiver) Method() {}

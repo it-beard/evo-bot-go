@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 	"time"
 
@@ -274,7 +273,7 @@ func (h *introHandler) processIntroSearchWithType(b *gotgbot.Bot, ctx *ext.Conte
 		utils.EscapeMarkdown(query),
 	)
 
-	if err = os.WriteFile("last-prompt-log.txt", []byte(prompt), 0644); err != nil {
+	if err = utils.WritePromptLog(prompt); err != nil {
 		log.Printf("%s: Error writing prompt to file: %v", utils.GetCurrentTypeName(), err)
 	}
 
@@ -341,10 +340,10 @@ func (h *introHandler) handleCancel(b *gotgbot.Bot, ctx *ext.Context) error {
 		// Call the cancel function to stop any ongoing API calls
 		if cf, ok := cancelFunc.(context.CancelFunc); ok {
 			cf()
-			h.messageSenderService.Send(msg.Chat.Id, "Поиск отменён.", nil)
+			h.messageSenderService.Send(msg.Chat.Id, "Операция поиска участников отменена.", nil)
 		}
 	} else {
-		h.messageSenderService.Send(msg.Chat.Id, "Поиск отменён.", nil)
+		h.messageSenderService.Send(msg.Chat.Id, "Операция поиска участников отменена.", nil)
 	}
 
 	h.RemovePreviousMessage(b, &userId)
