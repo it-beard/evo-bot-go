@@ -48,7 +48,7 @@ func FormatHelpMessage(isAdmin bool, config *config.Config) string {
 			fmt.Sprintf("└ /%s - Ручная генерация саммаризации общения в клубе\n", constants.TrySummarizeCommand) +
 			fmt.Sprintf("└ /%s - Ручное создание нового опроса по Random Coffee\n", constants.TryCreateCoffeePoolCommand) +
 			fmt.Sprintf("└ /%s - Ручная генерация пар для Random Coffee\n", constants.TryGenerateCoffeePairsCommand) +
-			fmt.Sprintf("└ /%s - Отправить ссылку на базу знаний в ЛС\n", constants.TryLinkToLearnCommand)
+			fmt.Sprintf("└ /%s - Отправить ссылку на базу знаний в ЛС (на русском или белорусском)\n", constants.TryLinkToLearnCommand)
 
 		helpText += adminHelpText
 		helpText += testCommandsHelpText

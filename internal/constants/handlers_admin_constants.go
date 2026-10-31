@@ -1,7 +1,6 @@
 package constants
 
 const TrySummarizeCommand = "trySummarize"
-const TryLinkToLearnCommand = "tryLinkToLearn"
 const SummarizeDmFlag = "-dm"
 
 // Event Handlers
@@ -55,4 +54,13 @@ const (
 	TryGenerateCoffeePairsConfirmCallback = TryGenerateCoffeePairsPrefix + "confirm"
 	TryGenerateCoffeePairsBackCallback    = TryGenerateCoffeePairsPrefix + "back"
 	TryGenerateCoffeePairsCancelCallback  = TryGenerateCoffeePairsPrefix + "cancel"
+)
+
+// Try Link To Learn Handler callback constants
+const (
+	TryLinkToLearnCommand            = "tryLinkToLearn"
+	TryLinkToLearnPrefix             = "try_link_to_learn_"
+	TryLinkToLearnRussianCallback    = TryLinkToLearnPrefix + "ru"
+	TryLinkToLearnBelarusianCallback = TryLinkToLearnPrefix + "be"
+	TryLinkToLearnCancelCallback     = TryLinkToLearnPrefix + "cancel"
 )

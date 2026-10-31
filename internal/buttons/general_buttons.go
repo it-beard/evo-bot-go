@@ -94,3 +94,28 @@ func SearchTypeSelectionButton(callbackDataFast string, callbackDataDeep string,
 
 	return inlineKeyboard
 }
+
+func LanguageSelectionButton(callbackDataRussian string, callbackDataBelarusian string, callbackDataCancel string) gotgbot.InlineKeyboardMarkup {
+	inlineKeyboard := gotgbot.InlineKeyboardMarkup{
+		InlineKeyboard: [][]gotgbot.InlineKeyboardButton{
+			{
+				{
+					Text:         "Русский",
+					CallbackData: callbackDataRussian,
+				},
+				{
+					Text:         "Беларуская",
+					CallbackData: callbackDataBelarusian,
+				},
+			},
+			{
+				{
+					Text:         "❌ Отмена",
+					CallbackData: callbackDataCancel,
+				},
+			},
+		},
+	}
+
+	return inlineKeyboard
+}
