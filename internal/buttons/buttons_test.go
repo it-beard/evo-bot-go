@@ -81,6 +81,14 @@ func TestGeneralButtons(t *testing.T) {
 				row(btn{"❌ Отмена", "cancel_cb"}),
 			),
 		},
+		{
+			name:   "LanguageSelectionButton",
+			markup: LanguageSelectionButton("ru_cb", "be_cb", "cancel_cb"),
+			expected: keyboard(
+				row(btn{"Русский", "ru_cb"}, btn{"Беларуская", "be_cb"}),
+				row(btn{"❌ Отмена", "cancel_cb"}),
+			),
+		},
 	}
 
 	for _, tt := range tests {
